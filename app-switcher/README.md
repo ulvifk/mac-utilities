@@ -3,20 +3,21 @@
 Menu bar app that replaces Cmd+Tab with its own switcher. With "Filter enabled" on
 the switcher only lists whitelisted apps; with it off it lists every running app.
 While the app runs, the native Cmd+Tab switcher is never shown: if the filter is on
-but no whitelisted app is running, the switcher lists every running app instead and
-its header says so, so the shortcuts below always stay reachable.
+but no whitelisted app is running, the switcher lists every running app instead, so
+the shortcuts below always stay reachable.
 
-The menu bar item toggles the filter and manages the whitelist (every running
-regular app is listed, checkmark = whitelisted).
+The menu bar item toggles the filter, lists the two in-switcher shortcuts as a
+reminder, and manages the whitelist (every running regular app is listed,
+checkmark = whitelisted).
 
 ## Switcher
 
 - Cmd+Tab / Cmd+Shift+Tab cycle forward and backward; releasing Cmd activates the
   selection.
 - Right / Left arrow do the same while the switcher is open.
-- A status line under the selected app name says whether you are seeing all apps or
-  only whitelisted ones, and whether it fell back to all apps because no whitelisted
-  app is running.
+- The selected app's name sits under its icon, inside the highlight, clamped to the
+  panel edges and truncated rather than ever widening the panel.
+- The highlight is green when the filter is on and neutral when it is off.
 - A small green dot under an icon means the app is whitelisted.
 - Cmd+F while the switcher is open toggles the filter itself and re-filters the list
   on the spot, keeping the selected app selected when it survives.

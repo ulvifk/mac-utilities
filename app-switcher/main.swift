@@ -12,14 +12,16 @@ let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
 let iconSize: CGFloat = 64
+let iconTopInset: CGFloat = 4
 let cellSize: CGFloat = 84
+/// iconTopInset + iconSize + nameTopSpacing + the 13pt name label's 16pt height, so the name sits inside the highlight.
+let cellHeight: CGFloat = 95
 let itemSpacing: CGFloat = 4
 let horizontalPadding: CGFloat = 14
-let verticalPadding: CGFloat = 8
-let rowToFooterSpacing: CGFloat = 2
+let verticalPadding: CGFloat = 10
 let dotSize: CGFloat = 5
-let dotSpacing: CGFloat = 4
-let keycapSize: CGFloat = 16
+let dotSpacing: CGFloat = 3
+let nameTopSpacing: CGFloat = 11
 let panelCornerRadius: CGFloat = 28
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
@@ -104,18 +106,17 @@ struct SwitcherState {
     let apps: [NSRunningApplication]
     let selectedIndex: Int
     let filterEnabled: Bool
-    let whitelistMatched: Bool
     let whitelisted: Set<String>
 }
 
 final class SwitcherPanel: NSPanel {
     private var highlight = NSView()
+    private var iconCells: [NSView] = []
     private var iconViews: [NSImageView] = []
     private var whitelistDots: [NSView] = []
 
     private var nameLabel = NSTextField(labelWithString: "")
-    private var statusLabel = NSTextField(labelWithString: "")
-    private var nameCenterConstraint: NSLayoutConstraint?
+    private var nameConstraints: [NSLayoutConstraint] = []
 
     init() {
         super.init(
@@ -157,7 +158,6 @@ final class SwitcherPanel: NSPanel {
 
     func update(state: SwitcherState) {
         nameLabel.stringValue = state.apps[state.selectedIndex].localizedName ?? ""
-        statusLabel.stringValue = getStatusText(state: state)
 
         for (index, dot) in whitelistDots.enumerated() {
             dot.isHidden = !state.whitelisted.contains(state.apps[index].bundleIdentifier ?? "")
@@ -172,19 +172,9 @@ final class SwitcherPanel: NSPanel {
 
     private func buildContent(state: SwitcherState) {
         let iconRow = buildIconRow(state: state)
-        let footerRow = buildFooterRow(state: state)
+        iconRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = NSStackView(views: [iconRow, footerRow])
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = rowToFooterSpacing
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        // Only valid once the footer is in the stack.
-        NSLayoutConstraint.activate([
-            footerRow.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
-            footerRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor)
-        ])
+        nameLabel = buildNameLabel(text: state.apps[state.selectedIndex].localizedName ?? "")
 
         highlight = NSView()
         highlight.wantsLayer = true
@@ -192,20 +182,20 @@ final class SwitcherPanel: NSPanel {
 
         let container = NSView()
         container.addSubview(highlight)
-        container.addSubview(stack)
-
-        // Matches the band under the icon row, so the row sits in the middle of the panel.
-        let topPadding = rowToFooterSpacing + footerRow.fittingSize.height + verticalPadding
+        container.addSubview(iconRow)
+        container.addSubview(nameLabel)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: topPadding),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
+            iconRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            iconRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            iconRow.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
+            iconRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding),
+            nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: horizontalPadding),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -horizontalPadding)
         ])
 
-        let stackSize = stack.fittingSize
-        let contentSize = NSSize(width: stackSize.width + horizontalPadding * 2, height: stackSize.height + topPadding + verticalPadding)
+        let rowSize = iconRow.fittingSize
+        let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
 
         container.wantsLayer = true
@@ -220,6 +210,22 @@ final class SwitcherPanel: NSPanel {
         setContentSize(contentSize)
     }
 
+    /// Truncates rather than widening the panel: the width comes from the icon row alone.
+    private func buildNameLabel(text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .labelColor
+        label.alignment = .center
+        label.lineBreakMode = .byTruncatingTail
+        label.maximumNumberOfLines = 1
+        label.setContentCompressionResistancePriority(.init(260), for: .horizontal)
+        label.setContentHuggingPriority(.init(1), for: .horizontal)
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        return label
+    }
+
     private func buildGlassView(size: NSSize) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
@@ -230,18 +236,13 @@ final class SwitcherPanel: NSPanel {
         return glass
     }
 
-    private func getStatusText(state: SwitcherState) -> String {
-        if !state.filterEnabled { return "All apps" }
-        if !state.whitelistMatched { return "No whitelisted apps running, showing all" }
-        return "Whitelisted apps"
-    }
-
     private func buildIconRow(state: SwitcherState) -> NSStackView {
         let row = NSStackView()
 
         row.orientation = .horizontal
         row.spacing = itemSpacing
 
+        iconCells = []
         iconViews = []
         whitelistDots = []
 
@@ -252,7 +253,7 @@ final class SwitcherPanel: NSPanel {
         return row
     }
 
-    /// A square cell with the icon centered in it, so the selection highlight is centered on the icon.
+    /// Icon on top, whitelist dot under it, and room below for the selected app name.
     private func buildCell(app: NSRunningApplication, whitelisted: Bool) -> NSView {
         let icon = NSImageView(image: app.icon ?? NSImage())
         let dot = buildWhitelistDot()
@@ -263,6 +264,7 @@ final class SwitcherPanel: NSPanel {
         icon.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = !whitelisted
 
+        iconCells.append(cell)
         iconViews.append(icon)
         whitelistDots.append(dot)
 
@@ -272,11 +274,11 @@ final class SwitcherPanel: NSPanel {
 
         NSLayoutConstraint.activate([
             cell.widthAnchor.constraint(equalToConstant: cellSize),
-            cell.heightAnchor.constraint(equalToConstant: cellSize),
+            cell.heightAnchor.constraint(equalToConstant: cellHeight),
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize),
             icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            icon.topAnchor.constraint(equalTo: cell.topAnchor, constant: iconTopInset),
             dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
             dot.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: dotSpacing)
         ])
@@ -300,71 +302,8 @@ final class SwitcherPanel: NSPanel {
         return dot
     }
 
-    /// The selected app name under its icon, with the status and the keycap hints pushed to the trailing edge.
-    private func buildFooterRow(state: SwitcherState) -> NSView {
-        nameLabel = NSTextField(labelWithString: state.apps[state.selectedIndex].localizedName ?? "")
-        nameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
-        nameLabel.textColor = .labelColor
-        nameLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        statusLabel = NSTextField(labelWithString: getStatusText(state: state))
-        statusLabel.font = .systemFont(ofSize: 11)
-        statusLabel.textColor = .secondaryLabelColor
-
-        let whitelistKeycap = buildKeycap(letter: "W")
-        let trailingGroup = NSStackView(views: [statusLabel, whitelistKeycap, buildKeycap(letter: "F")])
-        trailingGroup.orientation = .horizontal
-        trailingGroup.alignment = .centerY
-        trailingGroup.spacing = 10
-        trailingGroup.setCustomSpacing(6, after: whitelistKeycap)
-        trailingGroup.translatesAutoresizingMaskIntoConstraints = false
-
-        let row = NSView()
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.addSubview(nameLabel)
-        row.addSubview(trailingGroup)
-
-        NSLayoutConstraint.activate([
-            nameLabel.topAnchor.constraint(equalTo: row.topAnchor),
-            nameLabel.bottomAnchor.constraint(equalTo: row.bottomAnchor),
-            nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: row.leadingAnchor),
-            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingGroup.leadingAnchor, constant: -12),
-            trailingGroup.trailingAnchor.constraint(equalTo: row.trailingAnchor),
-            trailingGroup.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor)
-        ])
-
-        return row
-    }
-
-    private func buildKeycap(letter: String) -> NSView {
-        let letterLabel = NSTextField(labelWithString: letter)
-        let key = NSView()
-
-        letterLabel.font = .systemFont(ofSize: 9, weight: .medium)
-        letterLabel.textColor = .labelColor
-        letterLabel.alignment = .center
-        letterLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        key.wantsLayer = true
-        key.layer?.cornerRadius = 4
-        key.layer?.borderWidth = 1
-        key.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.35).cgColor
-        key.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor
-        key.translatesAutoresizingMaskIntoConstraints = false
-        key.addSubview(letterLabel)
-
-        NSLayoutConstraint.activate([
-            key.widthAnchor.constraint(equalToConstant: keycapSize),
-            key.heightAnchor.constraint(equalToConstant: keycapSize),
-            letterLabel.centerXAnchor.constraint(equalTo: key.centerXAnchor),
-            letterLabel.centerYAnchor.constraint(equalTo: key.centerYAnchor)
-        ])
-
-        return key
-    }
-
     private func applySelection(state: SwitcherState, animated: Bool) {
-        centerNameUnderSelectedIcon(selectedIndex: state.selectedIndex)
+        placeNameUnderSelectedIcon(selectedIndex: state.selectedIndex)
         contentView?.layoutSubtreeIfNeeded()
 
         let frame = getHighlightFrame(selectedIndex: state.selectedIndex)
@@ -382,22 +321,22 @@ final class SwitcherPanel: NSPanel {
         }
     }
 
-    /// Slides left of the selected icon when the name would otherwise run into the trailing group.
-    private func centerNameUnderSelectedIcon(selectedIndex: Int) {
-        nameCenterConstraint?.isActive = false
+    /// Clamped to the panel edges, so the name of an edge app stays fully visible.
+    private func placeNameUnderSelectedIcon(selectedIndex: Int) {
+        NSLayoutConstraint.deactivate(nameConstraints)
 
-        let nameCenter = nameLabel.centerXAnchor.constraint(equalTo: iconViews[selectedIndex].centerXAnchor)
-        nameCenter.priority = .defaultLow
-        nameCenter.isActive = true
-        nameCenterConstraint = nameCenter
+        let icon = iconViews[selectedIndex]
+        let centeredName = nameLabel.centerXAnchor.constraint(equalTo: icon.centerXAnchor)
+        centeredName.priority = .defaultLow
+
+        nameConstraints = [centeredName, nameLabel.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: nameTopSpacing)]
+        NSLayoutConstraint.activate(nameConstraints)
     }
 
-    /// A cell-sized square centered on the selected icon, so the highlight is centered whatever the row layout does.
     private func getHighlightFrame(selectedIndex: Int) -> NSRect {
-        let icon = iconViews[selectedIndex]
-        let center = icon.superview!.convert(CGPoint(x: icon.frame.midX, y: icon.frame.midY), to: highlight.superview!)
+        let cell = iconCells[selectedIndex]
 
-        return NSRect(x: center.x - cellSize / 2, y: center.y - cellSize / 2, width: cellSize, height: cellSize)
+        return cell.superview!.convert(cell.frame, to: highlight.superview!)
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
@@ -455,6 +394,8 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         filterMenuItem.target = self
         filterMenuItem.state = isFilterEnabled ? .on : .off
         menu.addItem(filterMenuItem)
+        menu.addItem(buildHintItem(title: "While switching: W toggles whitelist"))
+        menu.addItem(buildHintItem(title: "While switching: F toggles filter"))
         menu.addItem(.separator())
 
         whitelistMenu.delegate = self
@@ -468,6 +409,14 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         menu.addItem(quitItem)
 
         statusItem.menu = menu
+    }
+
+    private func buildHintItem(title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+
+        item.isEnabled = false
+
+        return item
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -686,11 +635,6 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         return recentApps
     }
 
-    private func hasWhitelistedAppRunning() -> Bool {
-        let whitelist = getWhitelist()
-        return getRegularRunningApps().contains { whitelist.contains($0.bundleIdentifier ?? "") }
-    }
-
     private func advanceSelection(backward: Bool) {
         let step = backward ? -1 : 1
         selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
@@ -712,7 +656,6 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             apps: candidates,
             selectedIndex: selectedIndex,
             filterEnabled: isFilterEnabled,
-            whitelistMatched: hasWhitelistedAppRunning(),
             whitelisted: getWhitelist()
         )
     }
