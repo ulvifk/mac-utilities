@@ -114,6 +114,7 @@ final class SwitcherPanel: NSPanel {
 
     private var nameLabel = NSTextField(labelWithString: "")
     private var statusLabel = NSTextField(labelWithString: "")
+    private var nameCenterConstraint: NSLayoutConstraint?
 
     init() {
         super.init(
@@ -177,6 +178,12 @@ final class SwitcherPanel: NSPanel {
         stack.alignment = .centerX
         stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
+
+        // Only valid once the footer is in the stack.
+        NSLayoutConstraint.activate([
+            footerRow.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
+            footerRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor)
+        ])
 
         highlight = NSView()
         highlight.wantsLayer = true
@@ -289,30 +296,45 @@ final class SwitcherPanel: NSPanel {
         return dot
     }
 
-    /// Selected app name, status text and the keycap hints on one line.
-    private func buildFooterRow(state: SwitcherState) -> NSStackView {
+    /// The selected app name under its icon, with the status and the keycap hints pushed to the trailing edge.
+    private func buildFooterRow(state: SwitcherState) -> NSView {
         nameLabel = NSTextField(labelWithString: state.apps[state.selectedIndex].localizedName ?? "")
         nameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
         nameLabel.textColor = .labelColor
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
 
         statusLabel = NSTextField(labelWithString: getStatusText(state: state))
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.textColor = .secondaryLabelColor
 
-        let row = NSStackView(views: [nameLabel, statusLabel, buildKeycap(letter: "W", label: "Whitelist"), buildKeycap(letter: "F", label: "Filter")])
+        let whitelistKeycap = buildKeycap(letter: "W")
+        let trailingGroup = NSStackView(views: [statusLabel, whitelistKeycap, buildKeycap(letter: "F")])
+        trailingGroup.orientation = .horizontal
+        trailingGroup.alignment = .centerY
+        trailingGroup.spacing = 10
+        trailingGroup.setCustomSpacing(6, after: whitelistKeycap)
+        trailingGroup.translatesAutoresizingMaskIntoConstraints = false
 
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 12
-        row.setCustomSpacing(14, after: nameLabel)
+        let row = NSView()
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.addSubview(nameLabel)
+        row.addSubview(trailingGroup)
+
+        NSLayoutConstraint.activate([
+            nameLabel.topAnchor.constraint(equalTo: row.topAnchor),
+            nameLabel.bottomAnchor.constraint(equalTo: row.bottomAnchor),
+            nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: row.leadingAnchor),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingGroup.leadingAnchor, constant: -12),
+            trailingGroup.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            trailingGroup.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor)
+        ])
 
         return row
     }
 
-    private func buildKeycap(letter: String, label: String) -> NSView {
+    private func buildKeycap(letter: String) -> NSView {
         let letterLabel = NSTextField(labelWithString: letter)
         let key = NSView()
-        let text = NSTextField(labelWithString: label)
 
         letterLabel.font = .systemFont(ofSize: 9, weight: .medium)
         letterLabel.textColor = .labelColor
@@ -334,17 +356,11 @@ final class SwitcherPanel: NSPanel {
             letterLabel.centerYAnchor.constraint(equalTo: key.centerYAnchor)
         ])
 
-        text.font = .systemFont(ofSize: 11)
-        text.textColor = .tertiaryLabelColor
-
-        let hint = NSStackView(views: [key, text])
-        hint.orientation = .horizontal
-        hint.spacing = 6
-
-        return hint
+        return key
     }
 
     private func applySelection(state: SwitcherState, animated: Bool) {
+        centerNameUnderSelectedIcon(selectedIndex: state.selectedIndex)
         contentView?.layoutSubtreeIfNeeded()
 
         let frame = getHighlightFrame(selectedIndex: state.selectedIndex)
@@ -360,6 +376,16 @@ final class SwitcherPanel: NSPanel {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             highlight.animator().frame = frame
         }
+    }
+
+    /// Slides left of the selected icon when the name would otherwise run into the trailing group.
+    private func centerNameUnderSelectedIcon(selectedIndex: Int) {
+        nameCenterConstraint?.isActive = false
+
+        let nameCenter = nameLabel.centerXAnchor.constraint(equalTo: iconViews[selectedIndex].centerXAnchor)
+        nameCenter.priority = .defaultLow
+        nameCenter.isActive = true
+        nameCenterConstraint = nameCenter
     }
 
     /// A cell-sized square centered on the selected icon, so the highlight is centered whatever the row layout does.
