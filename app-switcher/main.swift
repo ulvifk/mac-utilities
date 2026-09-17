@@ -120,13 +120,18 @@ final class SwitcherPanel: NSPanel {
 
     private func buildContent(state: SwitcherState) {
         let iconRow = buildIconRow(state: state)
-        let stack = NSStackView(views: [buildHeaderRow(iconRow: iconRow), iconRow, nameLabel])
+        let headerRow = buildHeaderRow()
+        let stack = NSStackView(views: [headerRow, iconRow, nameLabel])
 
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 12
         stack.setCustomSpacing(10, after: iconRow)
         stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let headerWidth = headerRow.widthAnchor.constraint(equalTo: iconRow.widthAnchor)
+        headerWidth.priority = .defaultHigh
+        headerWidth.isActive = true
 
         nameLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         nameLabel.textColor = .labelColor
@@ -163,7 +168,7 @@ final class SwitcherPanel: NSPanel {
         updatePill(state: state)
     }
 
-    private func buildHeaderRow(iconRow: NSStackView) -> NSStackView {
+    private func buildHeaderRow() -> NSStackView {
         let hint = NSTextField(labelWithString: "⌘W whitelist · ⌘F filter")
         let row = NSStackView(views: [buildPill(), hint])
 
@@ -173,9 +178,6 @@ final class SwitcherPanel: NSPanel {
         row.orientation = .horizontal
         row.distribution = .equalSpacing
         row.alignment = .centerY
-        let width = row.widthAnchor.constraint(equalTo: iconRow.widthAnchor)
-        width.priority = .defaultHigh
-        width.isActive = true
 
         return row
     }
@@ -317,6 +319,22 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         buildMenu()
         requestAccessibilityTrust()
         startEventTap()
+        runSmokeTestIfRequested()
+    }
+
+    private func runSmokeTestIfRequested() {
+        guard ProcessInfo.processInfo.environment["APP_SWITCHER_SMOKE_TEST"] != nil else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.candidates = self.getCandidates()
+            self.selectedIndex = 0
+            self.panel.show(state: self.buildState())
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue)")
+            exit(0)
+        }
     }
 
     // MARK: menu

@@ -39,6 +39,14 @@ Grant Accessibility to `AppSwitcher.app` in
 System Settings > Privacy & Security > Accessibility, then relaunch it.
 Without it the event tap cannot be created and Cmd+Tab stays native.
 
+## Dev
+
+Open the panel once without a keyboard, print its geometry and exit:
+
+```sh
+APP_SWITCHER_SMOKE_TEST=1 ./AppSwitcher.app/Contents/MacOS/app-switcher
+```
+
 ## Run at login
 
 ```sh
