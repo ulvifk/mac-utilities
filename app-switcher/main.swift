@@ -21,6 +21,8 @@ let dotSize: CGFloat = 5
 /// The 13pt name label's height. The whitelist dot gets a band of the same height above the icon, so the two mirror each other.
 let nameBandHeight: CGFloat = 16
 let nameTopSpacing: CGFloat = 2
+/// Below the band's centre, so the dot reads as attached to the icon rather than floating.
+let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let panelCornerRadius: CGFloat = 28
@@ -281,7 +283,7 @@ final class SwitcherPanel: NSPanel {
             icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
             icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            dot.centerYAnchor.constraint(equalTo: cell.topAnchor, constant: nameBandHeight / 2)
+            dot.centerYAnchor.constraint(equalTo: cell.topAnchor, constant: dotCenterFromCellTop)
         ])
 
         return cell
