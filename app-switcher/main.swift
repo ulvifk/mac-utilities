@@ -192,9 +192,7 @@ final class SwitcherPanel: NSPanel {
             iconRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
             iconRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
             iconRow.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
-            iconRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding),
-            nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: horizontalPadding),
-            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -horizontalPadding)
+            iconRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
         ])
 
         let rowSize = iconRow.fittingSize
@@ -324,16 +322,26 @@ final class SwitcherPanel: NSPanel {
         }
     }
 
-    /// Clamped to the panel edges, so the name of an edge app stays fully visible.
     private func placeNameUnderSelectedIcon(selectedIndex: Int) {
         NSLayoutConstraint.deactivate(nameConstraints)
 
         let icon = iconViews[selectedIndex]
-        let centeredName = nameLabel.centerXAnchor.constraint(equalTo: icon.centerXAnchor)
-        centeredName.priority = .defaultLow
 
-        nameConstraints = [centeredName, nameLabel.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: nameTopSpacing)]
+        nameConstraints = [
+            nameLabel.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
+            nameLabel.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: nameTopSpacing),
+            nameLabel.widthAnchor.constraint(lessThanOrEqualToConstant: getNameMaxWidth(selectedIndex: selectedIndex))
+        ]
         NSLayoutConstraint.activate(nameConstraints)
+    }
+
+    /// The widest a name centered on this icon can be without crossing either panel edge, so it truncates instead of sliding.
+    private func getNameMaxWidth(selectedIndex: Int) -> CGFloat {
+        let appCount = CGFloat(iconViews.count)
+        let iconCenterX = horizontalPadding + CGFloat(selectedIndex) * (cellSize + itemSpacing) + cellSize / 2
+        let containerWidth = horizontalPadding * 2 + appCount * cellSize + (appCount - 1) * itemSpacing
+
+        return 2 * min(iconCenterX - horizontalPadding, containerWidth - horizontalPadding - iconCenterX)
     }
 
     private func getHighlightFrame(selectedIndex: Int) -> NSRect {
