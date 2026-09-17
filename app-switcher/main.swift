@@ -12,16 +12,17 @@ let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
 let iconSize: CGFloat = 64
-let iconTopInset: CGFloat = 4
 let cellSize: CGFloat = 84
-/// iconTopInset + iconSize + nameTopSpacing + the 13pt name label's 16pt height, so the name sits inside the highlight.
-let cellHeight: CGFloat = 95
 let itemSpacing: CGFloat = 4
 let horizontalPadding: CGFloat = 14
 let verticalPadding: CGFloat = 10
 let dotSize: CGFloat = 5
-let dotSpacing: CGFloat = 3
-let nameTopSpacing: CGFloat = 11
+
+/// The 13pt name label's height. The whitelist dot gets a band of the same height above the icon, so the two mirror each other.
+let nameBandHeight: CGFloat = 16
+let nameTopSpacing: CGFloat = 2
+/// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
+let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let panelCornerRadius: CGFloat = 28
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
@@ -253,7 +254,7 @@ final class SwitcherPanel: NSPanel {
         return row
     }
 
-    /// Icon on top, whitelist dot under it, and room below for the selected app name.
+    /// Whitelist dot above the icon, room for the selected app name below it, icon centered between them.
     private func buildCell(app: NSRunningApplication, whitelisted: Bool) -> NSView {
         let icon = NSImageView(image: app.icon ?? NSImage())
         let dot = buildWhitelistDot()
@@ -278,9 +279,9 @@ final class SwitcherPanel: NSPanel {
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize),
             icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            icon.topAnchor.constraint(equalTo: cell.topAnchor, constant: iconTopInset),
+            icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            dot.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: dotSpacing)
+            dot.centerYAnchor.constraint(equalTo: cell.topAnchor, constant: nameBandHeight / 2)
         ])
 
         return cell

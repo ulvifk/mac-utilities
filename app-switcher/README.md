@@ -18,7 +18,7 @@ checkmark = whitelisted).
 - The selected app's name sits under its icon, inside the highlight, clamped to the
   panel edges and truncated rather than ever widening the panel.
 - The highlight is green when the filter is on and neutral when it is off.
-- A small green dot under an icon means the app is whitelisted.
+- A small green dot above an icon means the app is whitelisted.
 - Cmd+F while the switcher is open toggles the filter itself and re-filters the list
   on the spot, keeping the selected app selected when it survives.
 - Cmd+W while the switcher is open toggles the whitelist membership of the selected
