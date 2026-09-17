@@ -15,7 +15,7 @@ let iconSize: CGFloat = 64
 let cellSize: CGFloat = 84
 let itemSpacing: CGFloat = 4
 let horizontalPadding: CGFloat = 14
-let verticalPadding: CGFloat = 12
+let verticalPadding: CGFloat = 10
 let dotSize: CGFloat = 5
 let dotSpacing: CGFloat = 4
 let keycapSize: CGFloat = 16
@@ -172,16 +172,10 @@ final class SwitcherPanel: NSPanel {
         let iconRow = buildIconRow(state: state)
         let footerRow = buildFooterRow(state: state)
 
-        nameLabel = NSTextField(labelWithString: state.apps[state.selectedIndex].localizedName ?? "")
-        nameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        nameLabel.textColor = .labelColor
-        nameLabel.alignment = .center
-
-        let stack = NSStackView(views: [iconRow, nameLabel, footerRow])
+        let stack = NSStackView(views: [iconRow, footerRow])
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 4
-        stack.setCustomSpacing(3, after: nameLabel)
+        stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         highlight = NSView()
@@ -295,16 +289,22 @@ final class SwitcherPanel: NSPanel {
         return dot
     }
 
-    /// Status text and the keycap hints on one line.
+    /// Selected app name, status text and the keycap hints on one line.
     private func buildFooterRow(state: SwitcherState) -> NSStackView {
+        nameLabel = NSTextField(labelWithString: state.apps[state.selectedIndex].localizedName ?? "")
+        nameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        nameLabel.textColor = .labelColor
+
         statusLabel = NSTextField(labelWithString: getStatusText(state: state))
         statusLabel.font = .systemFont(ofSize: 11)
         statusLabel.textColor = .secondaryLabelColor
 
-        let row = NSStackView(views: [statusLabel, buildKeycap(letter: "W", label: "Whitelist"), buildKeycap(letter: "F", label: "Filter")])
+        let row = NSStackView(views: [nameLabel, statusLabel, buildKeycap(letter: "W", label: "Whitelist"), buildKeycap(letter: "F", label: "Filter")])
 
         row.orientation = .horizontal
-        row.spacing = 14
+        row.alignment = .centerY
+        row.spacing = 12
+        row.setCustomSpacing(14, after: nameLabel)
 
         return row
     }
