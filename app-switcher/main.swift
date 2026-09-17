@@ -11,11 +11,14 @@ let rightArrowKeyCode: Int64 = 124
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
-let iconSize: CGFloat = 72
-let cellSize: CGFloat = 92
-let itemSpacing: CGFloat = 6
+let iconSize: CGFloat = 64
+let cellSize: CGFloat = 84
+let itemSpacing: CGFloat = 4
 let panelPadding: CGFloat = 20
-let badgeSize: CGFloat = 18
+let dotSize: CGFloat = 5
+let dotSpacing: CGFloat = 6
+let keycapSize: CGFloat = 18
+let selectedIconScale: CGFloat = 1.12
 
 func getRegularRunningApps() -> [NSRunningApplication] {
     return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
@@ -60,11 +63,11 @@ struct SwitcherState {
 final class SwitcherPanel: NSPanel {
     private var highlight = NSView()
     private var iconCells: [NSView] = []
-    private var badges: [NSImageView] = []
+    private var iconViews: [NSImageView] = []
+    private var whitelistDots: [NSView] = []
 
-    private var pillView = NSView()
-    private var pillLabel = NSTextField(labelWithString: "")
     private var nameLabel = NSTextField(labelWithString: "")
+    private var statusLabel = NSTextField(labelWithString: "")
 
     init() {
         super.init(
@@ -88,7 +91,8 @@ final class SwitcherPanel: NSPanel {
 
         buildContent(state: state)
         center()
-        moveHighlight(to: state.selectedIndex, animated: false)
+        centerIconAnchorPoints()
+        applySelection(state: state, animated: false)
 
         if wasVisible {
             orderFrontRegardless()
@@ -104,14 +108,14 @@ final class SwitcherPanel: NSPanel {
     }
 
     func update(state: SwitcherState) {
-        updatePill(state: state)
         nameLabel.stringValue = state.apps[state.selectedIndex].localizedName ?? ""
+        statusLabel.stringValue = getStatusText(state: state)
 
-        for (index, badge) in badges.enumerated() {
-            badge.isHidden = !state.whitelisted.contains(state.apps[index].bundleIdentifier ?? "")
+        for (index, dot) in whitelistDots.enumerated() {
+            dot.isHidden = !state.whitelisted.contains(state.apps[index].bundleIdentifier ?? "")
         }
 
-        moveHighlight(to: state.selectedIndex, animated: true)
+        applySelection(state: state, animated: true)
     }
 
     func hide() {
@@ -120,28 +124,29 @@ final class SwitcherPanel: NSPanel {
 
     private func buildContent(state: SwitcherState) {
         let iconRow = buildIconRow(state: state)
-        let headerRow = buildHeaderRow()
-        let stack = NSStackView(views: [headerRow, iconRow, nameLabel])
+        let hintRow = buildHintRow()
 
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = 12
-        stack.setCustomSpacing(10, after: iconRow)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        let headerWidth = headerRow.widthAnchor.constraint(equalTo: iconRow.widthAnchor)
-        headerWidth.priority = .defaultHigh
-        headerWidth.isActive = true
-
-        nameLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        nameLabel = NSTextField(labelWithString: state.apps[state.selectedIndex].localizedName ?? "")
+        nameLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         nameLabel.textColor = .labelColor
         nameLabel.alignment = .center
-        nameLabel.stringValue = state.apps[state.selectedIndex].localizedName ?? ""
+
+        statusLabel = NSTextField(labelWithString: getStatusText(state: state))
+        statusLabel.font = .systemFont(ofSize: 12)
+        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.alignment = .center
+
+        let stack = NSStackView(views: [iconRow, nameLabel, statusLabel, hintRow])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 8
+        stack.setCustomSpacing(2, after: nameLabel)
+        stack.setCustomSpacing(14, after: statusLabel)
+        stack.translatesAutoresizingMaskIntoConstraints = false
 
         highlight = NSView()
         highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = 20
-        highlight.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.14).cgColor
+        highlight.layer?.cornerRadius = 18
 
         let container = NSView()
         container.addSubview(highlight)
@@ -165,64 +170,12 @@ final class SwitcherPanel: NSPanel {
 
         contentView = glass
         setContentSize(contentSize)
-        updatePill(state: state)
     }
 
-    private func buildHeaderRow() -> NSStackView {
-        let hint = NSTextField(labelWithString: "⌘W whitelist · ⌘F filter")
-        let row = NSStackView(views: [buildPill(), hint])
-
-        hint.font = .systemFont(ofSize: 11)
-        hint.textColor = .tertiaryLabelColor
-
-        row.orientation = .horizontal
-        row.distribution = .equalSpacing
-        row.alignment = .centerY
-
-        return row
-    }
-
-    private func buildPill() -> NSView {
-        pillLabel = NSTextField(labelWithString: "")
-        pillView = NSView()
-
-        pillLabel.translatesAutoresizingMaskIntoConstraints = false
-        pillView.wantsLayer = true
-        pillView.layer?.cornerRadius = 10
-        pillView.translatesAutoresizingMaskIntoConstraints = false
-        pillView.addSubview(pillLabel)
-
-        NSLayoutConstraint.activate([
-            pillView.heightAnchor.constraint(equalToConstant: 20),
-            pillLabel.leadingAnchor.constraint(equalTo: pillView.leadingAnchor, constant: 10),
-            pillLabel.trailingAnchor.constraint(equalTo: pillView.trailingAnchor, constant: -10),
-            pillLabel.centerYAnchor.constraint(equalTo: pillView.centerYAnchor)
-        ])
-
-        return pillView
-    }
-
-    private func updatePill(state: SwitcherState) {
-        let textColor: NSColor = state.filterEnabled ? .systemGreen : .secondaryLabelColor
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.boldSystemFont(ofSize: 10),
-            .kern: 0.6,
-            .foregroundColor: textColor
-        ]
-
-        pillLabel.attributedStringValue = NSAttributedString(string: getPillText(state: state), attributes: attributes)
-        pillView.layer?.backgroundColor = getPillFillColor(filterEnabled: state.filterEnabled).cgColor
-    }
-
-    private func getPillText(state: SwitcherState) -> String {
-        if !state.filterEnabled { return "FILTER OFF" }
-        if !state.whitelistMatched { return "FILTER ON · NO WHITELISTED APPS" }
-        return "FILTER ON"
-    }
-
-    private func getPillFillColor(filterEnabled: Bool) -> NSColor {
-        if filterEnabled { return NSColor.systemGreen.withAlphaComponent(0.18) }
-        return NSColor.labelColor.withAlphaComponent(0.08)
+    private func getStatusText(state: SwitcherState) -> String {
+        if !state.filterEnabled { return "All apps" }
+        if !state.whitelistMatched { return "No whitelisted apps running, showing all" }
+        return "Whitelisted apps"
     }
 
     private func buildIconRow(state: SwitcherState) -> NSStackView {
@@ -232,7 +185,8 @@ final class SwitcherPanel: NSPanel {
         row.spacing = itemSpacing
 
         iconCells = []
-        badges = []
+        iconViews = []
+        whitelistDots = []
 
         for app in state.apps {
             let cell = buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? ""))
@@ -245,18 +199,22 @@ final class SwitcherPanel: NSPanel {
 
     private func buildCell(app: NSRunningApplication, whitelisted: Bool) -> NSView {
         let icon = NSImageView(image: app.icon ?? NSImage())
-        let badge = buildBadge()
+        let dot = buildWhitelistDot()
         let cell = NSView()
+        let topInset = (cellSize - (iconSize + dotSpacing + dotSize)) / 2
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
         icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.wantsLayer = true
         icon.translatesAutoresizingMaskIntoConstraints = false
-        badge.isHidden = !whitelisted
-        badges.append(badge)
+        dot.isHidden = !whitelisted
+
+        iconViews.append(icon)
+        whitelistDots.append(dot)
 
         cell.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(icon)
-        cell.addSubview(badge)
+        cell.addSubview(dot)
 
         NSLayoutConstraint.activate([
             cell.widthAnchor.constraint(equalToConstant: cellSize),
@@ -264,34 +222,94 @@ final class SwitcherPanel: NSPanel {
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize),
             icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            badge.trailingAnchor.constraint(equalTo: icon.trailingAnchor, constant: -2),
-            badge.bottomAnchor.constraint(equalTo: icon.bottomAnchor, constant: -2)
+            icon.topAnchor.constraint(equalTo: cell.topAnchor, constant: topInset),
+            dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
+            dot.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: dotSpacing)
         ])
 
         return cell
     }
 
-    private func buildBadge() -> NSImageView {
-        let configuration = NSImage.SymbolConfiguration(paletteColors: [.white, .systemGreen])
-            .applying(NSImage.SymbolConfiguration(pointSize: badgeSize, weight: .bold))
-        let symbol = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Whitelisted")!
-        let badge = NSImageView(image: symbol.withSymbolConfiguration(configuration)!)
+    private func buildWhitelistDot() -> NSView {
+        let dot = NSView()
 
-        badge.imageScaling = .scaleProportionallyDown
-        badge.translatesAutoresizingMaskIntoConstraints = false
+        dot.wantsLayer = true
+        dot.layer?.cornerRadius = dotSize / 2
+        dot.layer?.backgroundColor = NSColor.systemGreen.cgColor
+        dot.translatesAutoresizingMaskIntoConstraints = false
 
-        return badge
+        NSLayoutConstraint.activate([
+            dot.widthAnchor.constraint(equalToConstant: dotSize),
+            dot.heightAnchor.constraint(equalToConstant: dotSize)
+        ])
+
+        return dot
     }
 
-    private func moveHighlight(to index: Int, animated: Bool) {
+    private func buildHintRow() -> NSStackView {
+        let row = NSStackView(views: [buildKeycap(letter: "W", label: "Whitelist"), buildKeycap(letter: "F", label: "Filter")])
+
+        row.orientation = .horizontal
+        row.spacing = 16
+
+        return row
+    }
+
+    private func buildKeycap(letter: String, label: String) -> NSView {
+        let letterLabel = NSTextField(labelWithString: letter)
+        let key = NSView()
+        let text = NSTextField(labelWithString: label)
+
+        letterLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        letterLabel.textColor = .secondaryLabelColor
+        letterLabel.alignment = .center
+        letterLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        key.wantsLayer = true
+        key.layer?.cornerRadius = 4
+        key.layer?.borderWidth = 1
+        key.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.25).cgColor
+        key.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.06).cgColor
+        key.translatesAutoresizingMaskIntoConstraints = false
+        key.addSubview(letterLabel)
+
+        NSLayoutConstraint.activate([
+            key.widthAnchor.constraint(equalToConstant: keycapSize),
+            key.heightAnchor.constraint(equalToConstant: keycapSize),
+            letterLabel.centerXAnchor.constraint(equalTo: key.centerXAnchor),
+            letterLabel.centerYAnchor.constraint(equalTo: key.centerYAnchor)
+        ])
+
+        text.font = .systemFont(ofSize: 11)
+        text.textColor = .tertiaryLabelColor
+
+        let hint = NSStackView(views: [key, text])
+        hint.orientation = .horizontal
+        hint.spacing = 6
+
+        return hint
+    }
+
+    private func centerIconAnchorPoints() {
         contentView?.layoutSubtreeIfNeeded()
 
-        let cell = iconCells[index]
+        for icon in iconViews {
+            let center = CGPoint(x: icon.frame.midX, y: icon.frame.midY)
+            icon.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+            icon.layer?.position = center
+        }
+    }
+
+    private func applySelection(state: SwitcherState, animated: Bool) {
+        contentView?.layoutSubtreeIfNeeded()
+
+        let cell = iconCells[state.selectedIndex]
         let frame = cell.superview!.convert(cell.frame, to: highlight.superview!)
+        highlight.layer?.backgroundColor = getHighlightColor(filterEnabled: state.filterEnabled).cgColor
 
         if !animated {
             highlight.frame = frame
+            scaleIcons(selectedIndex: state.selectedIndex)
             return
         }
 
@@ -299,7 +317,20 @@ final class SwitcherPanel: NSPanel {
             context.duration = 0.12
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             highlight.animator().frame = frame
+            scaleIcons(selectedIndex: state.selectedIndex)
         }
+    }
+
+    private func scaleIcons(selectedIndex: Int) {
+        for (index, icon) in iconViews.enumerated() {
+            let scale: CGFloat = index == selectedIndex ? selectedIconScale : 1
+            icon.layer?.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
+        }
+    }
+
+    private func getHighlightColor(filterEnabled: Bool) -> NSColor {
+        if filterEnabled { return NSColor.systemGreen.withAlphaComponent(0.22) }
+        return NSColor.labelColor.withAlphaComponent(0.12)
     }
 }
 
