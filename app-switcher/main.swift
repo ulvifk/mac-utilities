@@ -18,7 +18,6 @@ let panelPadding: CGFloat = 20
 let dotSize: CGFloat = 5
 let dotSpacing: CGFloat = 4
 let keycapSize: CGFloat = 18
-let selectedIconScale: CGFloat = 1.12
 let panelCornerRadius: CGFloat = 28
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
@@ -138,7 +137,6 @@ final class SwitcherPanel: NSPanel {
 
         buildContent(state: state)
         center()
-        centerIconAnchorPoints()
         applySelection(state: state, animated: false)
 
         if wasVisible {
@@ -262,7 +260,6 @@ final class SwitcherPanel: NSPanel {
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
         icon.imageScaling = .scaleProportionallyUpOrDown
-        icon.wantsLayer = true
         icon.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = !whitelisted
 
@@ -347,16 +344,6 @@ final class SwitcherPanel: NSPanel {
         return hint
     }
 
-    private func centerIconAnchorPoints() {
-        contentView?.layoutSubtreeIfNeeded()
-
-        for icon in iconViews {
-            let center = CGPoint(x: icon.frame.midX, y: icon.frame.midY)
-            icon.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-            icon.layer?.position = center
-        }
-    }
-
     private func applySelection(state: SwitcherState, animated: Bool) {
         contentView?.layoutSubtreeIfNeeded()
 
@@ -365,7 +352,6 @@ final class SwitcherPanel: NSPanel {
 
         if !animated {
             highlight.frame = frame
-            scaleIcons(selectedIndex: state.selectedIndex)
             return
         }
 
@@ -373,7 +359,6 @@ final class SwitcherPanel: NSPanel {
             context.duration = 0.12
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             highlight.animator().frame = frame
-            scaleIcons(selectedIndex: state.selectedIndex)
         }
     }
 
@@ -383,13 +368,6 @@ final class SwitcherPanel: NSPanel {
         let center = icon.superview!.convert(CGPoint(x: icon.frame.midX, y: icon.frame.midY), to: highlight.superview!)
 
         return NSRect(x: center.x - cellSize / 2, y: center.y - cellSize / 2, width: cellSize, height: cellSize)
-    }
-
-    private func scaleIcons(selectedIndex: Int) {
-        for (index, icon) in iconViews.enumerated() {
-            let scale: CGFloat = index == selectedIndex ? selectedIconScale : 1
-            icon.layer?.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
-        }
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
