@@ -13,6 +13,8 @@ regular app is listed, checkmark = whitelisted).
   selection.
 - The header shows whether the filter is ON or OFF.
 - A green checkmark badge on an icon means the app is whitelisted.
+- Cmd+F while the switcher is open toggles the filter itself and re-filters the list
+  on the spot, keeping the selected app selected when it survives.
 - Cmd+W while the switcher is open toggles the whitelist membership of the selected
   app. The visible list is not re-filtered until the switcher closes.
 

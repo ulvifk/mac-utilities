@@ -4,6 +4,7 @@ import CoreGraphics
 
 let tabKeyCode: Int64 = 48
 let wKeyCode: Int64 = 13
+let fKeyCode: Int64 = 3
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
@@ -343,6 +344,11 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return nil
         }
 
+        if isFilterToggleShortcut(event) {
+            toggleFilterAndRefreshCandidates()
+            return nil
+        }
+
         return Unmanaged.passUnretained(event)
     }
 
@@ -360,13 +366,19 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     private func isSwitcherShortcut(_ event: CGEvent) -> Bool {
-        if event.getIntegerValueField(.keyboardEventKeycode) != tabKeyCode { return false }
-        if !event.flags.contains(.maskCommand) { return false }
-        return true
+        return isCommandShortcut(event, keyCode: tabKeyCode)
     }
 
     private func isWhitelistToggleShortcut(_ event: CGEvent) -> Bool {
-        if event.getIntegerValueField(.keyboardEventKeycode) != wKeyCode { return false }
+        return isCommandShortcut(event, keyCode: wKeyCode)
+    }
+
+    private func isFilterToggleShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: fKeyCode)
+    }
+
+    private func isCommandShortcut(_ event: CGEvent, keyCode: Int64) -> Bool {
+        if event.getIntegerValueField(.keyboardEventKeycode) != keyCode { return false }
         if !event.flags.contains(.maskCommand) { return false }
         return true
     }
@@ -400,6 +412,21 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     private func advanceSelection(backward: Bool) {
         let step = backward ? -1 : 1
         selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
+        renderPanel()
+    }
+
+    private func toggleFilterAndRefreshCandidates() {
+        let selectedIdentifier = candidates[selectedIndex].bundleIdentifier
+
+        toggleFilter()
+        candidates = getCandidates()
+
+        if candidates.isEmpty {
+            panel.hide()
+            return
+        }
+
+        selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
         renderPanel()
     }
 
