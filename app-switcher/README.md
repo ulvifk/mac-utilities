@@ -1,11 +1,20 @@
 # app-switcher
 
-Menu bar app that replaces Cmd+Tab with a switcher limited to a whitelist of apps.
-When "Filter enabled" is off, the native Cmd+Tab behaves as usual; the same happens
-when no whitelisted app is running.
+Menu bar app that replaces Cmd+Tab with its own switcher. With "Filter enabled" on
+the switcher only lists whitelisted apps; with it off it lists every running app.
+Native Cmd+Tab is used only when there is nothing to show.
 
 The menu bar item toggles the filter and manages the whitelist (every running
 regular app is listed, checkmark = whitelisted).
+
+## Switcher
+
+- Cmd+Tab / Cmd+Shift+Tab cycle forward and backward; releasing Cmd activates the
+  selection.
+- The header shows whether the filter is ON or OFF.
+- A green checkmark badge on an icon means the app is whitelisted.
+- Cmd+W while the switcher is open toggles the whitelist membership of the selected
+  app. The visible list is not re-filtered until the switcher closes.
 
 ## Build
 

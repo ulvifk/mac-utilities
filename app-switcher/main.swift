@@ -3,6 +3,7 @@ import ApplicationServices
 import CoreGraphics
 
 let tabKeyCode: Int64 = 48
+let wKeyCode: Int64 = 13
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
@@ -10,6 +11,7 @@ let iconSize: CGFloat = 64
 let itemWidth: CGFloat = 104
 let itemSpacing: CGFloat = 8
 let panelPadding: CGFloat = 16
+let badgeSize: CGFloat = 16
 
 func getRegularRunningApps() -> [NSRunningApplication] {
     return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
@@ -61,8 +63,8 @@ final class SwitcherPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
 
-    func show(apps: [NSRunningApplication], selectedIndex: Int) {
-        let stack = buildStack(apps: apps, selectedIndex: selectedIndex)
+    func show(apps: [NSRunningApplication], selectedIndex: Int, filterEnabled: Bool, whitelisted: Set<String>) {
+        let stack = buildStack(apps: apps, selectedIndex: selectedIndex, filterEnabled: filterEnabled, whitelisted: whitelisted)
         let stackSize = stack.fittingSize
         let contentSize = NSSize(width: stackSize.width + panelPadding * 2, height: stackSize.height + panelPadding * 2)
         let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: contentSize))
@@ -89,21 +91,37 @@ final class SwitcherPanel: NSPanel {
         orderOut(nil)
     }
 
-    private func buildStack(apps: [NSRunningApplication], selectedIndex: Int) -> NSStackView {
-        let stack = NSStackView()
+    private func buildStack(apps: [NSRunningApplication], selectedIndex: Int, filterEnabled: Bool, whitelisted: Set<String>) -> NSStackView {
+        let row = NSStackView()
 
-        stack.orientation = .horizontal
-        stack.spacing = itemSpacing
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        row.orientation = .horizontal
+        row.spacing = itemSpacing
 
         for (index, app) in apps.enumerated() {
-            stack.addArrangedSubview(buildItemView(app: app, selected: index == selectedIndex))
+            let isWhitelisted = whitelisted.contains(app.bundleIdentifier ?? "")
+            row.addArrangedSubview(buildItemView(app: app, selected: index == selectedIndex, whitelisted: isWhitelisted))
         }
+
+        let stack = NSStackView(views: [buildHeaderLabel(filterEnabled: filterEnabled), row])
+
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
 
         return stack
     }
 
-    private func buildItemView(app: NSRunningApplication, selected: Bool) -> NSView {
+    private func buildHeaderLabel(filterEnabled: Bool) -> NSTextField {
+        let label = NSTextField(labelWithString: filterEnabled ? "Filter ON" : "Filter OFF")
+
+        label.font = .boldSystemFont(ofSize: 12)
+        label.textColor = filterEnabled ? .systemGreen : .secondaryLabelColor
+
+        return label
+    }
+
+    private func buildItemView(app: NSRunningApplication, selected: Bool, whitelisted: Bool) -> NSView {
         let icon = NSImageView(image: app.icon ?? NSImage())
         let label = NSTextField(labelWithString: app.localizedName ?? "")
         let item = NSStackView(views: [icon, label])
@@ -113,6 +131,10 @@ final class SwitcherPanel: NSPanel {
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize)
         ])
+
+        if whitelisted {
+            addWhitelistBadge(to: icon)
+        }
 
         label.alignment = .center
         label.font = .systemFont(ofSize: 11)
@@ -133,6 +155,20 @@ final class SwitcherPanel: NSPanel {
         }
 
         return item
+    }
+
+    private func addWhitelistBadge(to icon: NSImageView) {
+        let configuration = NSImage.SymbolConfiguration(pointSize: badgeSize, weight: .bold)
+        let badge = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Whitelisted")!.withSymbolConfiguration(configuration)!)
+
+        badge.contentTintColor = .systemGreen
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        icon.addSubview(badge)
+
+        NSLayoutConstraint.activate([
+            badge.trailingAnchor.constraint(equalTo: icon.trailingAnchor),
+            badge.topAnchor.constraint(equalTo: icon.topAnchor)
+        ])
     }
 }
 
@@ -199,7 +235,10 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     @objc private func toggleWhitelistEntry(_ sender: NSMenuItem) {
-        let bundleIdentifier = sender.representedObject as! String
+        toggleWhitelist(bundleIdentifier: sender.representedObject as! String)
+    }
+
+    func toggleWhitelist(bundleIdentifier: String) {
         var whitelist = getWhitelist()
 
         if whitelist.contains(bundleIdentifier) {
@@ -262,10 +301,6 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return Unmanaged.passUnretained(event)
         }
 
-        if !isFilterEnabled {
-            return Unmanaged.passUnretained(event)
-        }
-
         if type == .keyDown {
             return handleKeyDown(event)
         }
@@ -278,13 +313,12 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     private func handleKeyDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
-        if !isSwitcherShortcut(event) {
-            return Unmanaged.passUnretained(event)
+        if panel.isVisible {
+            return handleKeyDownWhileVisible(event)
         }
 
-        if panel.isVisible {
-            advanceSelection(backward: event.flags.contains(.maskShift))
-            return nil
+        if !isSwitcherShortcut(event) {
+            return Unmanaged.passUnretained(event)
         }
 
         candidates = getCandidates()
@@ -293,8 +327,23 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         }
 
         selectedIndex = candidates.count > 1 ? 1 : 0
-        panel.show(apps: candidates, selectedIndex: selectedIndex)
+        renderPanel()
         return nil
+    }
+
+    private func handleKeyDownWhileVisible(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+        if isSwitcherShortcut(event) {
+            advanceSelection(backward: event.flags.contains(.maskShift))
+            return nil
+        }
+
+        if isWhitelistToggleShortcut(event) {
+            toggleWhitelist(bundleIdentifier: candidates[selectedIndex].bundleIdentifier!)
+            renderPanel()
+            return nil
+        }
+
+        return Unmanaged.passUnretained(event)
     }
 
     private func handleFlagsChanged(_ event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -316,6 +365,12 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         return true
     }
 
+    private func isWhitelistToggleShortcut(_ event: CGEvent) -> Bool {
+        if event.getIntegerValueField(.keyboardEventKeycode) != wKeyCode { return false }
+        if !event.flags.contains(.maskCommand) { return false }
+        return true
+    }
+
     // MARK: switching
 
     private func getCandidates() -> [NSRunningApplication] {
@@ -329,7 +384,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
         var candidates: [NSRunningApplication] = []
         for bundleIdentifier in tracker.bundleIdentifiers {
-            guard whitelist.contains(bundleIdentifier) else { continue }
+            guard isEligible(bundleIdentifier: bundleIdentifier, whitelist: whitelist) else { continue }
             guard let app = appsByIdentifier[bundleIdentifier] else { continue }
             candidates.append(app)
         }
@@ -337,10 +392,19 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         return candidates
     }
 
+    private func isEligible(bundleIdentifier: String, whitelist: Set<String>) -> Bool {
+        if !isFilterEnabled { return true }
+        return whitelist.contains(bundleIdentifier)
+    }
+
     private func advanceSelection(backward: Bool) {
         let step = backward ? -1 : 1
         selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
-        panel.show(apps: candidates, selectedIndex: selectedIndex)
+        renderPanel()
+    }
+
+    private func renderPanel() {
+        panel.show(apps: candidates, selectedIndex: selectedIndex, filterEnabled: isFilterEnabled, whitelisted: getWhitelist())
     }
 
     private func activateSelectedApp() {
