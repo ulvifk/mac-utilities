@@ -12,8 +12,8 @@ let whitelistKey = "whitelist"
 
 let iconSize: CGFloat = 64
 let itemWidth: CGFloat = 104
-let itemSpacing: CGFloat = 8
-let panelPadding: CGFloat = 16
+let itemSpacing: CGFloat = 4
+let panelPadding: CGFloat = 20
 let badgeSize: CGFloat = 16
 
 func getRegularRunningApps() -> [NSRunningApplication] {
@@ -72,11 +72,14 @@ final class SwitcherPanel: NSPanel {
         let contentSize = NSSize(width: stackSize.width + panelPadding * 2, height: stackSize.height + panelPadding * 2)
         let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: contentSize))
 
-        background.material = .hudWindow
+        background.material = .popover
+        background.blendingMode = .behindWindow
         background.state = .active
         background.wantsLayer = true
-        background.layer?.cornerRadius = 16
+        background.layer?.cornerRadius = 20
         background.layer?.masksToBounds = true
+        background.layer?.borderWidth = 1
+        background.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
         background.addSubview(stack)
 
         NSLayoutConstraint.activate([
@@ -105,23 +108,43 @@ final class SwitcherPanel: NSPanel {
             row.addArrangedSubview(buildItemView(app: app, selected: index == selectedIndex, whitelisted: isWhitelisted))
         }
 
-        let stack = NSStackView(views: [buildHeaderLabel(filterEnabled: filterEnabled, whitelistMatched: whitelistMatched), row])
+        let stack = NSStackView(views: [buildHeaderPill(filterEnabled: filterEnabled, whitelistMatched: whitelistMatched), row])
 
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 8
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         return stack
     }
 
-    private func buildHeaderLabel(filterEnabled: Bool, whitelistMatched: Bool) -> NSTextField {
+    private func buildHeaderPill(filterEnabled: Bool, whitelistMatched: Bool) -> NSView {
         let label = NSTextField(labelWithString: getHeaderText(filterEnabled: filterEnabled, whitelistMatched: whitelistMatched))
+        let pill = NSView()
 
-        label.font = .boldSystemFont(ofSize: 12)
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
         label.textColor = filterEnabled ? .systemGreen : .secondaryLabelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
 
-        return label
+        pill.wantsLayer = true
+        pill.layer?.cornerRadius = 10
+        pill.layer?.backgroundColor = getPillColor(filterEnabled: filterEnabled).cgColor
+        pill.translatesAutoresizingMaskIntoConstraints = false
+        pill.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            pill.heightAnchor.constraint(equalToConstant: 20),
+            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 10),
+            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -10),
+            label.centerYAnchor.constraint(equalTo: pill.centerYAnchor)
+        ])
+
+        return pill
+    }
+
+    private func getPillColor(filterEnabled: Bool) -> NSColor {
+        if filterEnabled { return NSColor.systemGreen.withAlphaComponent(0.18) }
+        return NSColor.labelColor.withAlphaComponent(0.08)
     }
 
     private func getHeaderText(filterEnabled: Bool, whitelistMatched: Bool) -> String {
@@ -135,6 +158,8 @@ final class SwitcherPanel: NSPanel {
         let label = NSTextField(labelWithString: app.localizedName ?? "")
         let item = NSStackView(views: [icon, label])
 
+        icon.image?.size = NSSize(width: iconSize, height: iconSize)
+        icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             icon.widthAnchor.constraint(equalToConstant: iconSize),
@@ -147,36 +172,45 @@ final class SwitcherPanel: NSPanel {
 
         label.alignment = .center
         label.font = .systemFont(ofSize: 11)
+        label.textColor = selected ? .labelColor : .secondaryLabelColor
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
 
         item.orientation = .vertical
         item.alignment = .centerX
-        item.spacing = 6
-        item.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        item.spacing = 8
+        item.edgeInsets = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
         item.translatesAutoresizingMaskIntoConstraints = false
         item.widthAnchor.constraint(equalToConstant: itemWidth).isActive = true
 
         if selected {
             item.wantsLayer = true
-            item.layer?.cornerRadius = 10
-            item.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.8).cgColor
+            item.layer?.cornerRadius = 12
+            item.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.12).cgColor
         }
 
         return item
     }
 
     private func addWhitelistBadge(to icon: NSImageView) {
-        let configuration = NSImage.SymbolConfiguration(pointSize: badgeSize, weight: .bold)
-        let badge = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Whitelisted")!.withSymbolConfiguration(configuration)!)
+        let configuration = NSImage.SymbolConfiguration(paletteColors: [.white, .systemGreen])
+            .applying(NSImage.SymbolConfiguration(pointSize: badgeSize, weight: .bold))
+        let symbol = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Whitelisted")!
+        let badge = NSImageView(image: symbol.withSymbolConfiguration(configuration)!)
+        let ringSize = badgeSize + 4
 
-        badge.contentTintColor = .systemGreen
+        badge.imageScaling = .scaleProportionallyDown
+        badge.wantsLayer = true
+        badge.layer?.backgroundColor = NSColor.white.cgColor
+        badge.layer?.cornerRadius = ringSize / 2
         badge.translatesAutoresizingMaskIntoConstraints = false
         icon.addSubview(badge)
 
         NSLayoutConstraint.activate([
-            badge.trailingAnchor.constraint(equalTo: icon.trailingAnchor),
-            badge.topAnchor.constraint(equalTo: icon.topAnchor)
+            badge.widthAnchor.constraint(equalToConstant: ringSize),
+            badge.heightAnchor.constraint(equalToConstant: ringSize),
+            badge.trailingAnchor.constraint(equalTo: icon.trailingAnchor, constant: -2),
+            badge.topAnchor.constraint(equalTo: icon.topAnchor, constant: 2)
         ])
     }
 }
