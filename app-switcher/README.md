@@ -44,3 +44,5 @@ Without it the event tap cannot be created and Cmd+Tab stays native.
 ```sh
 cp com.ulvifk.app-switcher.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.ulvifk.app-switcher.plist
 ```
+
+Always launch with `open AppSwitcher.app` or launchd. Running the binary directly from a terminal makes the terminal the responsible process for the Accessibility permission, and the event tap fails.
