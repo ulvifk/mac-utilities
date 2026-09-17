@@ -14,10 +14,11 @@ let whitelistKey = "whitelist"
 let iconSize: CGFloat = 64
 let cellSize: CGFloat = 84
 let itemSpacing: CGFloat = 4
-let panelPadding: CGFloat = 20
+let horizontalPadding: CGFloat = 14
+let verticalPadding: CGFloat = 12
 let dotSize: CGFloat = 5
 let dotSpacing: CGFloat = 4
-let keycapSize: CGFloat = 18
+let keycapSize: CGFloat = 16
 let panelCornerRadius: CGFloat = 28
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
@@ -169,24 +170,18 @@ final class SwitcherPanel: NSPanel {
 
     private func buildContent(state: SwitcherState) {
         let iconRow = buildIconRow(state: state)
-        let hintRow = buildHintRow()
+        let footerRow = buildFooterRow(state: state)
 
         nameLabel = NSTextField(labelWithString: state.apps[state.selectedIndex].localizedName ?? "")
-        nameLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        nameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         nameLabel.textColor = .labelColor
         nameLabel.alignment = .center
 
-        statusLabel = NSTextField(labelWithString: getStatusText(state: state))
-        statusLabel.font = .systemFont(ofSize: 12)
-        statusLabel.textColor = .secondaryLabelColor
-        statusLabel.alignment = .center
-
-        let stack = NSStackView(views: [iconRow, nameLabel, statusLabel, hintRow])
+        let stack = NSStackView(views: [iconRow, nameLabel, footerRow])
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 8
-        stack.setCustomSpacing(2, after: nameLabel)
-        stack.setCustomSpacing(14, after: statusLabel)
+        stack.spacing = 4
+        stack.setCustomSpacing(3, after: nameLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         highlight = NSView()
@@ -198,14 +193,14 @@ final class SwitcherPanel: NSPanel {
         container.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: panelPadding),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -panelPadding),
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: panelPadding),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -panelPadding)
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
         ])
 
         let stackSize = stack.fittingSize
-        let contentSize = NSSize(width: stackSize.width + panelPadding * 2, height: stackSize.height + panelPadding * 2)
+        let contentSize = NSSize(width: stackSize.width + horizontalPadding * 2, height: stackSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
 
         container.wantsLayer = true
@@ -300,11 +295,16 @@ final class SwitcherPanel: NSPanel {
         return dot
     }
 
-    private func buildHintRow() -> NSStackView {
-        let row = NSStackView(views: [buildKeycap(letter: "W", label: "Whitelist"), buildKeycap(letter: "F", label: "Filter")])
+    /// Status text and the keycap hints on one line.
+    private func buildFooterRow(state: SwitcherState) -> NSStackView {
+        statusLabel = NSTextField(labelWithString: getStatusText(state: state))
+        statusLabel.font = .systemFont(ofSize: 11)
+        statusLabel.textColor = .secondaryLabelColor
+
+        let row = NSStackView(views: [statusLabel, buildKeycap(letter: "W", label: "Whitelist"), buildKeycap(letter: "F", label: "Filter")])
 
         row.orientation = .horizontal
-        row.spacing = 16
+        row.spacing = 14
 
         return row
     }
@@ -314,7 +314,7 @@ final class SwitcherPanel: NSPanel {
         let key = NSView()
         let text = NSTextField(labelWithString: label)
 
-        letterLabel.font = .systemFont(ofSize: 10, weight: .medium)
+        letterLabel.font = .systemFont(ofSize: 9, weight: .medium)
         letterLabel.textColor = .labelColor
         letterLabel.alignment = .center
         letterLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -335,7 +335,7 @@ final class SwitcherPanel: NSPanel {
         ])
 
         text.font = .systemFont(ofSize: 11)
-        text.textColor = .secondaryLabelColor
+        text.textColor = .tertiaryLabelColor
 
         let hint = NSStackView(views: [key, text])
         hint.orientation = .horizontal
