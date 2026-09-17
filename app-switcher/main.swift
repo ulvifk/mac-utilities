@@ -5,6 +5,8 @@ import CoreGraphics
 let tabKeyCode: Int64 = 48
 let wKeyCode: Int64 = 13
 let fKeyCode: Int64 = 3
+let leftArrowKeyCode: Int64 = 123
+let rightArrowKeyCode: Int64 = 124
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
@@ -340,6 +342,16 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return nil
         }
 
+        if isForwardShortcut(event) {
+            advanceSelection(backward: false)
+            return nil
+        }
+
+        if isBackwardShortcut(event) {
+            advanceSelection(backward: true)
+            return nil
+        }
+
         if isWhitelistToggleShortcut(event) {
             toggleWhitelist(bundleIdentifier: candidates[selectedIndex].bundleIdentifier!)
             renderPanel()
@@ -369,6 +381,14 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     private func isSwitcherShortcut(_ event: CGEvent) -> Bool {
         return isCommandShortcut(event, keyCode: tabKeyCode)
+    }
+
+    private func isForwardShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: rightArrowKeyCode)
+    }
+
+    private func isBackwardShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: leftArrowKeyCode)
     }
 
     private func isWhitelistToggleShortcut(_ event: CGEvent) -> Bool {

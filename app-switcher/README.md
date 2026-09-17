@@ -13,6 +13,7 @@ regular app is listed, checkmark = whitelisted).
 
 - Cmd+Tab / Cmd+Shift+Tab cycle forward and backward; releasing Cmd activates the
   selection.
+- Right / Left arrow do the same while the switcher is open.
 - The header shows whether the filter is ON or OFF, and whether it fell back to
   listing everything because no whitelisted app is running.
 - A green checkmark badge on an icon means the app is whitelisted.
