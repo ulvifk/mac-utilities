@@ -64,8 +64,8 @@ final class SwitcherPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
 
-    func show(apps: [NSRunningApplication], selectedIndex: Int, filterEnabled: Bool, whitelisted: Set<String>) {
-        let stack = buildStack(apps: apps, selectedIndex: selectedIndex, filterEnabled: filterEnabled, whitelisted: whitelisted)
+    func show(apps: [NSRunningApplication], selectedIndex: Int, filterEnabled: Bool, whitelistMatched: Bool, whitelisted: Set<String>) {
+        let stack = buildStack(apps: apps, selectedIndex: selectedIndex, filterEnabled: filterEnabled, whitelistMatched: whitelistMatched, whitelisted: whitelisted)
         let stackSize = stack.fittingSize
         let contentSize = NSSize(width: stackSize.width + panelPadding * 2, height: stackSize.height + panelPadding * 2)
         let background = NSVisualEffectView(frame: NSRect(origin: .zero, size: contentSize))
@@ -92,7 +92,7 @@ final class SwitcherPanel: NSPanel {
         orderOut(nil)
     }
 
-    private func buildStack(apps: [NSRunningApplication], selectedIndex: Int, filterEnabled: Bool, whitelisted: Set<String>) -> NSStackView {
+    private func buildStack(apps: [NSRunningApplication], selectedIndex: Int, filterEnabled: Bool, whitelistMatched: Bool, whitelisted: Set<String>) -> NSStackView {
         let row = NSStackView()
 
         row.orientation = .horizontal
@@ -103,7 +103,7 @@ final class SwitcherPanel: NSPanel {
             row.addArrangedSubview(buildItemView(app: app, selected: index == selectedIndex, whitelisted: isWhitelisted))
         }
 
-        let stack = NSStackView(views: [buildHeaderLabel(filterEnabled: filterEnabled), row])
+        let stack = NSStackView(views: [buildHeaderLabel(filterEnabled: filterEnabled, whitelistMatched: whitelistMatched), row])
 
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -113,13 +113,19 @@ final class SwitcherPanel: NSPanel {
         return stack
     }
 
-    private func buildHeaderLabel(filterEnabled: Bool) -> NSTextField {
-        let label = NSTextField(labelWithString: filterEnabled ? "Filter ON" : "Filter OFF")
+    private func buildHeaderLabel(filterEnabled: Bool, whitelistMatched: Bool) -> NSTextField {
+        let label = NSTextField(labelWithString: getHeaderText(filterEnabled: filterEnabled, whitelistMatched: whitelistMatched))
 
         label.font = .boldSystemFont(ofSize: 12)
         label.textColor = filterEnabled ? .systemGreen : .secondaryLabelColor
 
         return label
+    }
+
+    private func getHeaderText(filterEnabled: Bool, whitelistMatched: Bool) -> String {
+        if !filterEnabled { return "Filter OFF" }
+        if !whitelistMatched { return "Filter ON (no whitelisted apps running)" }
+        return "Filter ON"
     }
 
     private func buildItemView(app: NSRunningApplication, selected: Bool, whitelisted: Bool) -> NSView {
@@ -323,10 +329,6 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         }
 
         candidates = getCandidates()
-        if candidates.isEmpty {
-            return Unmanaged.passUnretained(event)
-        }
-
         selectedIndex = candidates.count > 1 ? 1 : 0
         renderPanel()
         return nil
@@ -386,7 +388,22 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     // MARK: switching
 
     private func getCandidates() -> [NSRunningApplication] {
+        let recentApps = getRecentRunningApps()
+        if !isFilterEnabled {
+            return recentApps
+        }
+
         let whitelist = getWhitelist()
+        let whitelistedApps = recentApps.filter { whitelist.contains($0.bundleIdentifier!) }
+        if whitelistedApps.isEmpty {
+            return recentApps
+        }
+
+        return whitelistedApps
+    }
+
+    /// Regular running apps, most recently activated first.
+    private func getRecentRunningApps() -> [NSRunningApplication] {
         var appsByIdentifier: [String: NSRunningApplication] = [:]
 
         for app in getRegularRunningApps() {
@@ -394,19 +411,18 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             appsByIdentifier[bundleIdentifier] = app
         }
 
-        var candidates: [NSRunningApplication] = []
+        var recentApps: [NSRunningApplication] = []
         for bundleIdentifier in tracker.bundleIdentifiers {
-            guard isEligible(bundleIdentifier: bundleIdentifier, whitelist: whitelist) else { continue }
             guard let app = appsByIdentifier[bundleIdentifier] else { continue }
-            candidates.append(app)
+            recentApps.append(app)
         }
 
-        return candidates
+        return recentApps
     }
 
-    private func isEligible(bundleIdentifier: String, whitelist: Set<String>) -> Bool {
-        if !isFilterEnabled { return true }
-        return whitelist.contains(bundleIdentifier)
+    private func hasWhitelistedAppRunning() -> Bool {
+        let whitelist = getWhitelist()
+        return getRegularRunningApps().contains { whitelist.contains($0.bundleIdentifier ?? "") }
     }
 
     private func advanceSelection(backward: Bool) {
@@ -421,17 +437,12 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         toggleFilter()
         candidates = getCandidates()
 
-        if candidates.isEmpty {
-            panel.hide()
-            return
-        }
-
         selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
         renderPanel()
     }
 
     private func renderPanel() {
-        panel.show(apps: candidates, selectedIndex: selectedIndex, filterEnabled: isFilterEnabled, whitelisted: getWhitelist())
+        panel.show(apps: candidates, selectedIndex: selectedIndex, filterEnabled: isFilterEnabled, whitelistMatched: hasWhitelistedAppRunning(), whitelisted: getWhitelist())
     }
 
     private func activateSelectedApp() {
