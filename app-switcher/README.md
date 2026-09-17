@@ -42,11 +42,19 @@ Without it the event tap cannot be created and Cmd+Tab stays native.
 
 ## Dev
 
-Open the panel once without a keyboard, print its geometry and exit:
+Open the panel once without a keyboard, print its geometry, capture it to
+`/tmp/app-switcher-smoke.png` and exit:
 
 ```sh
-APP_SWITCHER_SMOKE_TEST=1 ./AppSwitcher.app/Contents/MacOS/app-switcher
+APP_SWITCHER_SMOKE_TEST=1 APP_SWITCHER_SMOKE_INDEX=3 APP_SWITCHER_SMOKE_FILTER=1 \
+  ./AppSwitcher.app/Contents/MacOS/app-switcher
 ```
+
+`APP_SWITCHER_SMOKE_INDEX` picks the selected app (default 1) and
+`APP_SWITCHER_SMOKE_FILTER=1/0` writes the filter preference before showing the
+panel. The capture is a screen-region capture of our own windows, so it needs no
+Screen Recording permission but only shows the desktop and this app. A gradient
+window is put behind the panel first, so the glass has something to blur.
 
 ## Run at login
 

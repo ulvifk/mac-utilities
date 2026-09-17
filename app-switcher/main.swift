@@ -16,9 +16,56 @@ let cellSize: CGFloat = 84
 let itemSpacing: CGFloat = 4
 let panelPadding: CGFloat = 20
 let dotSize: CGFloat = 5
-let dotSpacing: CGFloat = 6
+let dotSpacing: CGFloat = 4
 let keycapSize: CGFloat = 18
 let selectedIconScale: CGFloat = 1.12
+let panelCornerRadius: CGFloat = 28
+let smokeCapturePath = "/tmp/app-switcher-smoke.png"
+
+/// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
+typealias CreateWindowImage = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+
+func writeCapture(around window: NSWindow, path: String) {
+    let margin: CGFloat = 40
+    let frame = window.frame.insetBy(dx: -margin, dy: -margin)
+    let flipped = CGRect(
+        x: frame.minX,
+        y: NSScreen.screens[0].frame.height - frame.maxY,
+        width: frame.width,
+        height: frame.height
+    )
+
+    let onScreenOnly: UInt32 = 1 << 0
+    let everyWindow: UInt32 = 0
+    let bestResolution: UInt32 = 1 << 3
+
+    let symbol = dlsym(dlopen(nil, RTLD_NOW), "CGWindowListCreateImage")!
+    let createImage = unsafeBitCast(symbol, to: CreateWindowImage.self)
+    let image = createImage(flipped, onScreenOnly, everyWindow, bestResolution)!.takeRetainedValue()
+    let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
+
+    try! png.write(to: URL(fileURLWithPath: path))
+    print("smoke: capture \(image.width)x\(image.height) -> \(path)")
+}
+
+/// Colorful window behind the panel, so the capture shows what the glass is blurring.
+var captureBackdrop: NSWindow?
+
+func showCaptureBackdrop(behind window: NSWindow) {
+    let backdrop = NSWindow(contentRect: window.frame.insetBy(dx: -80, dy: -80), styleMask: .borderless, backing: .buffered, defer: false)
+    let gradient = CAGradientLayer()
+
+    gradient.frame = NSRect(origin: .zero, size: backdrop.frame.size)
+    gradient.colors = [NSColor.systemPink.cgColor, NSColor.systemOrange.cgColor, NSColor.white.cgColor, NSColor.systemTeal.cgColor, NSColor.systemIndigo.cgColor]
+    gradient.startPoint = CGPoint(x: 0, y: 1)
+    gradient.endPoint = CGPoint(x: 1, y: 0)
+
+    backdrop.contentView!.wantsLayer = true
+    backdrop.contentView!.layer!.addSublayer(gradient)
+    backdrop.level = .normal
+    backdrop.orderFrontRegardless()
+    captureBackdrop = backdrop
+}
 
 func getRegularRunningApps() -> [NSRunningApplication] {
     return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
@@ -62,7 +109,6 @@ struct SwitcherState {
 
 final class SwitcherPanel: NSPanel {
     private var highlight = NSView()
-    private var iconCells: [NSView] = []
     private var iconViews: [NSImageView] = []
     private var whitelistDots: [NSView] = []
 
@@ -83,6 +129,7 @@ final class SwitcherPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         hidesOnDeactivate = false
+        appearance = NSAppearance(named: .darkAqua)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
 
@@ -163,13 +210,26 @@ final class SwitcherPanel: NSPanel {
         let contentSize = NSSize(width: stackSize.width + panelPadding * 2, height: stackSize.height + panelPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
 
-        let glass = NSGlassEffectView(frame: container.frame)
-        glass.style = .regular
-        glass.cornerRadius = 28
+        container.wantsLayer = true
+        container.layer?.cornerRadius = panelCornerRadius
+        container.layer?.borderWidth = 1
+        container.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+
+        let glass = buildGlassView(size: contentSize)
         glass.contentView = container
 
         contentView = glass
         setContentSize(contentSize)
+    }
+
+    private func buildGlassView(size: NSSize) -> NSGlassEffectView {
+        let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
+
+        glass.style = .regular
+        glass.cornerRadius = panelCornerRadius
+        glass.tintColor = NSColor.black.withAlphaComponent(0.28)
+
+        return glass
     }
 
     private func getStatusText(state: SwitcherState) -> String {
@@ -184,24 +244,21 @@ final class SwitcherPanel: NSPanel {
         row.orientation = .horizontal
         row.spacing = itemSpacing
 
-        iconCells = []
         iconViews = []
         whitelistDots = []
 
         for app in state.apps {
-            let cell = buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? ""))
-            iconCells.append(cell)
-            row.addArrangedSubview(cell)
+            row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
         }
 
         return row
     }
 
+    /// A square cell with the icon centered in it, so the selection highlight is centered on the icon.
     private func buildCell(app: NSRunningApplication, whitelisted: Bool) -> NSView {
         let icon = NSImageView(image: app.icon ?? NSImage())
         let dot = buildWhitelistDot()
         let cell = NSView()
-        let topInset = (cellSize - (iconSize + dotSpacing + dotSize)) / 2
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
         icon.imageScaling = .scaleProportionallyUpOrDown
@@ -222,7 +279,7 @@ final class SwitcherPanel: NSPanel {
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize),
             icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            icon.topAnchor.constraint(equalTo: cell.topAnchor, constant: topInset),
+            icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
             dot.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: dotSpacing)
         ])
@@ -261,15 +318,15 @@ final class SwitcherPanel: NSPanel {
         let text = NSTextField(labelWithString: label)
 
         letterLabel.font = .systemFont(ofSize: 10, weight: .medium)
-        letterLabel.textColor = .secondaryLabelColor
+        letterLabel.textColor = .labelColor
         letterLabel.alignment = .center
         letterLabel.translatesAutoresizingMaskIntoConstraints = false
 
         key.wantsLayer = true
         key.layer?.cornerRadius = 4
         key.layer?.borderWidth = 1
-        key.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.25).cgColor
-        key.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.06).cgColor
+        key.layer?.borderColor = NSColor.labelColor.withAlphaComponent(0.35).cgColor
+        key.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor
         key.translatesAutoresizingMaskIntoConstraints = false
         key.addSubview(letterLabel)
 
@@ -281,7 +338,7 @@ final class SwitcherPanel: NSPanel {
         ])
 
         text.font = .systemFont(ofSize: 11)
-        text.textColor = .tertiaryLabelColor
+        text.textColor = .secondaryLabelColor
 
         let hint = NSStackView(views: [key, text])
         hint.orientation = .horizontal
@@ -303,8 +360,7 @@ final class SwitcherPanel: NSPanel {
     private func applySelection(state: SwitcherState, animated: Bool) {
         contentView?.layoutSubtreeIfNeeded()
 
-        let cell = iconCells[state.selectedIndex]
-        let frame = cell.superview!.convert(cell.frame, to: highlight.superview!)
+        let frame = getHighlightFrame(selectedIndex: state.selectedIndex)
         highlight.layer?.backgroundColor = getHighlightColor(filterEnabled: state.filterEnabled).cgColor
 
         if !animated {
@@ -319,6 +375,14 @@ final class SwitcherPanel: NSPanel {
             highlight.animator().frame = frame
             scaleIcons(selectedIndex: state.selectedIndex)
         }
+    }
+
+    /// A cell-sized square centered on the selected icon, so the highlight is centered whatever the row layout does.
+    private func getHighlightFrame(selectedIndex: Int) -> NSRect {
+        let icon = iconViews[selectedIndex]
+        let center = icon.superview!.convert(CGPoint(x: icon.frame.midX, y: icon.frame.midY), to: highlight.superview!)
+
+        return NSRect(x: center.x - cellSize / 2, y: center.y - cellSize / 2, width: cellSize, height: cellSize)
     }
 
     private func scaleIcons(selectedIndex: Int) {
@@ -354,16 +418,21 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     private func runSmokeTestIfRequested() {
-        guard ProcessInfo.processInfo.environment["APP_SWITCHER_SMOKE_TEST"] != nil else { return }
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["APP_SWITCHER_SMOKE_TEST"] != nil else { return }
+
+        UserDefaults.standard.set(environment["APP_SWITCHER_SMOKE_FILTER"] == "1", forKey: filterEnabledKey)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.candidates = self.getCandidates()
-            self.selectedIndex = 0
+            self.selectedIndex = Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!
             self.panel.show(state: self.buildState())
+            showCaptureBackdrop(behind: self.panel)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue)")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) selected=\(self.selectedIndex)")
+            writeCapture(around: self.panel, path: smokeCapturePath)
             exit(0)
         }
     }
