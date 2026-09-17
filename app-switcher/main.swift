@@ -15,7 +15,8 @@ let iconSize: CGFloat = 64
 let cellSize: CGFloat = 84
 let itemSpacing: CGFloat = 4
 let horizontalPadding: CGFloat = 14
-let verticalPadding: CGFloat = 10
+let verticalPadding: CGFloat = 8
+let rowToFooterSpacing: CGFloat = 2
 let dotSize: CGFloat = 5
 let dotSpacing: CGFloat = 4
 let keycapSize: CGFloat = 16
@@ -176,7 +177,7 @@ final class SwitcherPanel: NSPanel {
         let stack = NSStackView(views: [iconRow, footerRow])
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 2
+        stack.spacing = rowToFooterSpacing
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         // Only valid once the footer is in the stack.
@@ -193,15 +194,18 @@ final class SwitcherPanel: NSPanel {
         container.addSubview(highlight)
         container.addSubview(stack)
 
+        // Matches the band under the icon row, so the row sits in the middle of the panel.
+        let topPadding = rowToFooterSpacing + footerRow.fittingSize.height + verticalPadding
+
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
             stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: topPadding),
             stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
         ])
 
         let stackSize = stack.fittingSize
-        let contentSize = NSSize(width: stackSize.width + horizontalPadding * 2, height: stackSize.height + verticalPadding * 2)
+        let contentSize = NSSize(width: stackSize.width + horizontalPadding * 2, height: stackSize.height + topPadding + verticalPadding)
         container.frame = NSRect(origin: .zero, size: contentSize)
 
         container.wantsLayer = true
