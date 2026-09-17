@@ -28,5 +28,5 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign -s - --force "$APP"
+codesign -s mac-utilities --force "$APP"
 echo "built $APP"
