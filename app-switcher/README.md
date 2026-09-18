@@ -26,7 +26,18 @@ checkmark = whitelisted).
 - Cmd+W while the switcher is open toggles the whitelist membership of the selected
   app. The visible list is not re-filtered until the switcher closes.
 
+## Install
+
+```sh
+../install.sh app-switcher
+```
+
+Builds, copies the app to `~/Applications` and starts it through launchd, so it
+also runs at login. `../uninstall.sh app-switcher` reverses it.
+
 ## Build
+
+For development, without installing:
 
 ```sh
 ./build.sh
@@ -34,8 +45,8 @@ open AppSwitcher.app
 ```
 
 `build.sh` compiles `main.swift`, wraps the binary into `AppSwitcher.app` and
-ad-hoc codesigns it (`codesign -s - --force AppSwitcher.app`), so macOS keeps the
-granted Accessibility permission stable across rebuilds.
+signs it with the "mac-utilities" certificate, so macOS keeps the granted
+Accessibility permission stable across rebuilds.
 
 ## Permissions
 
@@ -59,10 +70,6 @@ panel. The capture is a screen-region capture of our own windows, so it needs no
 Screen Recording permission but only shows the desktop and this app. A gradient
 window is put behind the panel first, so the glass has something to blur.
 
-## Run at login
-
-```sh
-cp com.ulvifk.app-switcher.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.ulvifk.app-switcher.plist
-```
-
-Always launch with `open AppSwitcher.app` or launchd. Running the binary directly from a terminal makes the terminal the responsible process for the Accessibility permission, and the event tap fails.
+Always launch with `install.sh`, launchd or `open AppSwitcher.app`. Running the
+binary directly from a terminal makes the terminal the responsible process for the
+Accessibility permission, and the event tap fails.
