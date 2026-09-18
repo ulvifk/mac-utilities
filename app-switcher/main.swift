@@ -105,6 +105,27 @@ final class RecentAppsTracker {
     }
 }
 
+/// A clickable icon cell. hitTest keeps the icon image view from swallowing the click.
+final class IconCellView: NSView {
+    var index = 0
+    var onClick: (Int) -> Void = { _ in }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let localPoint = convert(point, from: superview)
+        if !bounds.contains(localPoint) { return nil }
+
+        return self
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        onClick(index)
+    }
+}
+
 struct SwitcherState {
     let apps: [NSRunningApplication]
     let selectedIndex: Int
@@ -113,6 +134,8 @@ struct SwitcherState {
 }
 
 final class SwitcherPanel: NSPanel {
+    var onCellClicked: (Int) -> Void = { _ in }
+
     private var highlight = NSView()
     private var iconCells: [NSView] = []
     private var iconViews: [NSImageView] = []
@@ -258,7 +281,10 @@ final class SwitcherPanel: NSPanel {
     private func buildCell(app: NSRunningApplication, whitelisted: Bool) -> NSView {
         let icon = NSImageView(image: app.icon ?? NSImage())
         let dot = buildWhitelistDot()
-        let cell = NSView()
+        let cell = IconCellView()
+
+        cell.index = iconCells.count
+        cell.onClick = { [unowned self] index in self.onCellClicked(index) }
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
         icon.imageScaling = .scaleProportionallyUpOrDown
@@ -370,6 +396,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
+        wirePanelClicks()
         requestAccessibilityTrust()
         startEventTap()
         runSmokeTestIfRequested()
@@ -396,6 +423,13 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     // MARK: menu
+
+    private func wirePanelClicks() {
+        panel.onCellClicked = { index in
+            self.selectedIndex = index
+            self.activateSelectedApp()
+        }
+    }
 
     private func buildMenu() {
         let menu = NSMenu()
