@@ -77,6 +77,19 @@ func getRegularRunningApps() -> [NSRunningApplication] {
     return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
 }
 
+/// One AX round trip costs 10-20ms, so ask every app at once. Each iteration writes its own index, so no lock is needed.
+func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
+    var windowed = [Bool](repeating: false, count: apps.count)
+
+    windowed.withUnsafeMutableBufferPointer { answers in
+        DispatchQueue.concurrentPerform(iterations: apps.count) { index in
+            answers[index] = hasWindows(apps[index])
+        }
+    }
+
+    return zip(apps, windowed).filter { $0.1 }.map { $0.0 }
+}
+
 /// Minimized windows count. The short messaging timeout keeps a hung app from stalling the event tap.
 func hasWindows(_ app: NSRunningApplication) -> Bool {
     let element = AXUIElementCreateApplication(app.processIdentifier)
@@ -407,6 +420,10 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     private var candidates: [NSRunningApplication] = []
     private var selectedIndex = 0
 
+    private var isOpening = false
+    private var commandReleasedWhileOpening = false
+    private var pendingAdvance = 0
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
         wirePanelClicks()
@@ -559,8 +576,9 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        if type == .tapDisabledByTimeout {
+        if isTapDisabled(type) {
             CGEvent.tapEnable(tap: eventTap!, enable: true)
+            print("event tap re-enabled after \(type)")
             return Unmanaged.passUnretained(event)
         }
 
@@ -575,6 +593,14 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         return Unmanaged.passUnretained(event)
     }
 
+    private func isTapDisabled(_ type: CGEventType) -> Bool {
+        if type == .tapDisabledByTimeout { return true }
+        if type == .tapDisabledByUserInput { return true }
+
+        return false
+    }
+
+    /// Never does real work: macOS disables a tap whose callback is slow, and the keystroke then falls through to the Dock.
     private func handleKeyDown(_ event: CGEvent) -> Unmanaged<CGEvent>? {
         if panel.isVisible {
             return handleKeyDownWhileVisible(event)
@@ -584,14 +610,33 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return Unmanaged.passUnretained(event)
         }
 
-        candidates = getCandidates()
-        if candidates.isEmpty {
-            return Unmanaged.passUnretained(event)
+        if isOpening {
+            pendingAdvance += 1
+            return nil
         }
 
-        selectedIndex = candidates.count > 1 ? 1 : 0
-        panel.show(state: buildState())
+        isOpening = true
+        commandReleasedWhileOpening = false
+        pendingAdvance = 0
+        DispatchQueue.main.async { self.openSwitcher() }
         return nil
+    }
+
+    private func openSwitcher() {
+        candidates = getCandidates()
+        isOpening = false
+
+        if candidates.isEmpty { return }
+
+        selectedIndex = (candidates.count > 1 ? 1 : 0) + pendingAdvance
+        selectedIndex %= candidates.count
+
+        if commandReleasedWhileOpening {
+            activateSelectedApp()
+            return
+        }
+
+        panel.show(state: buildState())
     }
 
     private func handleKeyDownWhileVisible(_ event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -617,7 +662,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         }
 
         if isFilterToggleShortcut(event) {
-            toggleFilterAndRefreshCandidates()
+            DispatchQueue.main.async { self.toggleFilterAndRefreshCandidates() }
             return nil
         }
 
@@ -625,11 +670,16 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     private func handleFlagsChanged(_ event: CGEvent) -> Unmanaged<CGEvent>? {
-        if !panel.isVisible {
+        if event.flags.contains(.maskCommand) {
             return Unmanaged.passUnretained(event)
         }
 
-        if event.flags.contains(.maskCommand) {
+        if isOpening {
+            commandReleasedWhileOpening = true
+            return Unmanaged.passUnretained(event)
+        }
+
+        if !panel.isVisible {
             return Unmanaged.passUnretained(event)
         }
 
@@ -692,11 +742,10 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         var recentApps: [NSRunningApplication] = []
         for bundleIdentifier in tracker.bundleIdentifiers {
             guard let app = appsByIdentifier[bundleIdentifier] else { continue }
-            guard hasWindows(app) else { continue }
             recentApps.append(app)
         }
 
-        return recentApps
+        return getAppsWithWindows(recentApps)
     }
 
     private func advanceSelection(backward: Bool) {
