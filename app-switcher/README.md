@@ -16,6 +16,7 @@ checkmark = whitelisted).
   selection.
 - Right / Left arrow do the same while the switcher is open.
 - Click an icon to switch to it.
+- Apps without open windows are hidden.
 - The selected app's name sits under its icon, inside the highlight, clamped to the
   panel edges and truncated rather than ever widening the panel.
 - The highlight is green when the filter is on and neutral when it is off.

@@ -77,6 +77,19 @@ func getRegularRunningApps() -> [NSRunningApplication] {
     return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
 }
 
+/// Minimized windows count. The short messaging timeout keeps a hung app from stalling the event tap.
+func hasWindows(_ app: NSRunningApplication) -> Bool {
+    let element = AXUIElementCreateApplication(app.processIdentifier)
+    AXUIElementSetMessagingTimeout(element, 0.1)
+
+    var value: CFTypeRef?
+    if AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value) != .success { return false }
+
+    guard let windows = value as? [AXUIElement] else { return false }
+
+    return !windows.isEmpty
+}
+
 /// Most-recently-activated bundle identifiers, front of the array is the most recent.
 final class RecentAppsTracker {
     private(set) var bundleIdentifiers: [String] = []
@@ -417,6 +430,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) selected=\(self.selectedIndex)")
+            print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName })")
             writeCapture(around: self.panel, path: smokeCapturePath)
             exit(0)
         }
@@ -571,6 +585,10 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         }
 
         candidates = getCandidates()
+        if candidates.isEmpty {
+            return Unmanaged.passUnretained(event)
+        }
+
         selectedIndex = candidates.count > 1 ? 1 : 0
         panel.show(state: buildState())
         return nil
@@ -674,6 +692,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         var recentApps: [NSRunningApplication] = []
         for bundleIdentifier in tracker.bundleIdentifiers {
             guard let app = appsByIdentifier[bundleIdentifier] else { continue }
+            guard hasWindows(app) else { continue }
             recentApps.append(app)
         }
 
@@ -691,6 +710,10 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
         toggleFilter()
         candidates = getCandidates()
+        if candidates.isEmpty {
+            panel.hide()
+            return
+        }
 
         selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
         panel.show(state: buildState())
