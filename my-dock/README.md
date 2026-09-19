@@ -2,7 +2,14 @@
 
 Menu bar app that renders a floating strip replicating the macOS 27 Dock one-to-one:
 same glass, size, corner radius, icons, running dots, separator and trash state.
-Rendering only: it ignores the mouse, and the menu bar item only has Quit.
+
+Pinned apps grouped on the left, running apps to the right of the chevron:
+
+![shown](screenshots/shown.png)
+
+After clicking the chevron, only the pinned group and the Trash remain:
+
+![hidden](screenshots/hidden.png)
 
 The item list is Apple's own Dock, read through Accessibility (`AXList` of the Dock
 process: app, separator and trash items with their sizes, titles, URLs and running

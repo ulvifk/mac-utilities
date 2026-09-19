@@ -1,20 +1,34 @@
 # mac-utilities
 
-Self-built macOS utilities, one folder per tool.
+Self-built macOS utilities, one folder per tool. Single Swift files, no Xcode projects.
 
-- `app-switcher/` — menu bar app replacing Cmd+Tab with a whitelist-filtered switcher.
-- `my-dock/` — floating strip that replicates the macOS Dock one-to-one, fed by the real Dock's item list.
+## app-switcher
+
+Replaces Cmd+Tab with a switcher that can be filtered to a whitelist of apps.
+
+![all apps](app-switcher/screenshots/all-apps.png)
+
+![filtered to the whitelist](app-switcher/screenshots/filtered.png)
+
+## my-dock
+
+A pixel-matched replica of the macOS Dock that groups pinned apps on the left and
+can hide everything else with one click on the chevron.
+
+![shown](my-dock/screenshots/shown.png)
+
+![hidden](my-dock/screenshots/hidden.png)
 
 ## Install
 
 ```sh
 ./install.sh app-switcher
-./uninstall.sh app-switcher
+./install.sh my-dock
 ```
 
 `install.sh <utility>` builds it, copies the app to `~/Applications` and bootstraps
 its launch agent, so it runs now and at login. `uninstall.sh <utility>` stops it and
-removes both.
+removes both. Each app asks for Accessibility once on first launch.
 
 ## Setup
 

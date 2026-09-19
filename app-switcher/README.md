@@ -10,6 +10,14 @@ The menu bar item toggles the filter, lists the two in-switcher shortcuts as a
 reminder, and manages the whitelist (every running regular app is listed,
 checkmark = whitelisted).
 
+Filter off, every running app listed:
+
+![all apps](screenshots/all-apps.png)
+
+Filter on, only the whitelist, green highlight:
+
+![filtered](screenshots/filtered.png)
+
 ## Switcher
 
 - Cmd+Tab / Cmd+Shift+Tab cycle forward and backward; releasing Cmd activates the
