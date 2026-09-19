@@ -26,6 +26,11 @@ let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let panelCornerRadius: CGFloat = 24
+/// The window shadow draws a hard 1px dark outline around glass, so the panel casts its own soft one from a layer instead.
+let panelShadowMargin: CGFloat = 28
+let panelShadowOpacity: Float = 0.25
+let panelShadowRadius: CGFloat = 12
+let panelShadowOffset = CGSize(width: 0, height: -4)
 /// Same slab as my-dock: regular glass renders lighter than the backdrop and tintColor only brightens it, so a fill inside the 1pt rim darkens it.
 let panelDimmingColor = NSColor.black.withAlphaComponent(0.3)
 let highlightColor = NSColor.white.withAlphaComponent(0.10)
@@ -187,7 +192,7 @@ final class SwitcherPanel: NSPanel {
         level = .floating
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
@@ -258,8 +263,10 @@ final class SwitcherPanel: NSPanel {
         let glass = buildGlassView(size: contentSize)
         glass.contentView = container
 
-        contentView = glass
-        setContentSize(contentSize)
+        let shadowCaster = buildShadowCaster(around: glass)
+        let panelSize = shadowCaster.frame.size
+        contentView = shadowCaster
+        setContentSize(panelSize)
     }
 
     /// Truncates rather than widening the panel: the width comes from the icon row alone.
@@ -285,6 +292,26 @@ final class SwitcherPanel: NSPanel {
         glass.cornerRadius = panelCornerRadius
 
         return glass
+    }
+
+    /// The glass draws a dark 1px outline outside its bounds; a masking view clips it away before the shadow is cast.
+    private func buildShadowCaster(around glass: NSView) -> NSView {
+        let clip = NSView(frame: NSRect(x: panelShadowMargin, y: panelShadowMargin, width: glass.frame.width, height: glass.frame.height))
+        let caster = NSView(frame: NSRect(x: 0, y: 0, width: glass.frame.width + 2 * panelShadowMargin, height: glass.frame.height + 2 * panelShadowMargin))
+
+        clip.wantsLayer = true
+        clip.layer?.cornerRadius = panelCornerRadius
+        clip.layer?.masksToBounds = true
+        clip.addSubview(glass)
+
+        caster.wantsLayer = true
+        caster.layer?.shadowOpacity = panelShadowOpacity
+        caster.layer?.shadowRadius = panelShadowRadius
+        caster.layer?.shadowOffset = panelShadowOffset
+        caster.layer?.shadowPath = CGPath(roundedRect: clip.frame, cornerWidth: panelCornerRadius, cornerHeight: panelCornerRadius, transform: nil)
+        caster.addSubview(clip)
+
+        return caster
     }
 
     private func buildDimmingView(size: NSSize) -> NSView {
