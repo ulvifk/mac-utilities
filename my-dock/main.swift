@@ -342,6 +342,7 @@ func isTrashFull() -> Bool {
 final class DockStripView: NSView {
     var onToggleClicked: () -> Void = {}
     var onTileClicked: (DockItem) -> Void = { _ in }
+    var onTileMenuRequested: (DockItem) -> Void = { _ in }
     var onHovered: (DockItem, CGFloat) -> Void = { _, _ in }
     var onHoverEnded: () -> Void = {}
     var onPointerMoved: (NSPoint?) -> Void = { _ in }
@@ -532,7 +533,31 @@ final class DockStripView: NSView {
         }
 
         if item.kind == .separator { return }
+
+        // A ctrl-click arrives as a plain left click, and means a right click everywhere else on macOS.
+        if event.modifierFlags.contains(.control) {
+            showMenu(for: item)
+            return
+        }
+
         onTileClicked(item)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard let item = getItem(at: convert(event.locationInWindow, from: nil)) else { return }
+
+        if item.kind == .toggle { return }
+        if item.kind == .separator { return }
+
+        showMenu(for: item)
+    }
+
+    /// The tooltip and the Apple-label cover both sit in the band the menu opens over, so the hover ends first.
+    private func showMenu(for item: DockItem) {
+        updateHover(nil)
+        onPointerMoved(nil)
+
+        onTileMenuRequested(item)
     }
 
     /// Cursor rects and cursorUpdate only work in the key window, so the cursor is set by hand from mouse moves.
@@ -766,6 +791,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         strip.onToggleClicked = { [unowned self] in self.toggleHideUnpinned() }
         // Pressing Apple's own item gives its exact behaviour for every kind: launch, activate, unminimize, Trash, folders, files, Handoff.
         strip.onTileClicked = { AXUIElementPerformAction($0.element!, kAXPressAction as CFString) }
+        // Likewise, Apple's Dock pops its own menu for the item: Options, Show All Windows, Quit, Empty Trash.
+        strip.onTileMenuRequested = { AXUIElementPerformAction($0.element!, kAXShowMenuAction as CFString) }
         strip.onHovered = { [unowned self] item, centerX in self.showTooltip(for: item, centerX: centerX) }
         strip.onHoverEnded = { [unowned self] in self.tooltipPanel.orderOut(nil) }
         strip.onPointerMoved = { [unowned self] point in self.setAppleLabelCoverShown(self.isOverAppleItem(point)) }
