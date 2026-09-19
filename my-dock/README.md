@@ -12,6 +12,10 @@ After clicking the chevron, only the pinned group and the Trash remain:
 
 ![hidden](screenshots/hidden.png)
 
+Hovering a tile shows its name, clicking it switches to the app:
+
+![hover](screenshots/hover.png)
+
 The item list is Apple's own Dock, read through Accessibility (`AXList` of the Dock
 process: app, separator and trash items with their sizes, titles, URLs and running
 state), so it mirrors the real Dock's order and contents. It re-reads and re-renders

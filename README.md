@@ -12,8 +12,9 @@ Replaces Cmd+Tab with a switcher that can be filtered to a whitelist of apps.
 
 ## my-dock
 
-A pixel-matched replica of the macOS Dock that groups pinned apps on the left and
-can hide everything else with one click on the chevron.
+A pixel-matched replica of the macOS Dock that sits on top of Apple's, groups pinned
+apps on the left, and collapses everything else with one click on the chevron. Hover
+names, badges, and click to switch or launch.
 
 ![shown](my-dock/screenshots/shown.png)
 
