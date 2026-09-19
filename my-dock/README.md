@@ -30,10 +30,9 @@ forwarded to the matching item of Apple's Dock (`AXPress`), so apps, folders, fi
 minimized windows and the Trash behave exactly like the real Dock; a right click (or a
 ctrl-click) forwards `AXShowMenu` instead, so Apple's own menu for that item opens.
 Apple's Dock keeps labelling whatever its own layout has under the cursor, no matter
-what covers it, so
-while the cursor is on an item the band above the strip is painted with a live capture
-of what lies behind the Dock; animated content right above the Dock can therefore look
-a frame late during a hover. The strip hides itself while the Dock is off-screen
+what covers it, so while the cursor is on an item the band above the strip is painted
+with a live capture of what lies behind the Dock; animated content right above the Dock
+can therefore look a frame late during a hover. The strip hides itself while the Dock is off-screen
 (autohide, a fullscreen space) and comes back with it. Badge counts come from the Dock's `AXStatusLabel`; custom overlays some apps paint
 themselves are not exposed and are not shown.
 
