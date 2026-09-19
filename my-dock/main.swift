@@ -72,6 +72,13 @@ let onScreenOnlyOption: UInt32 = 1 << 0
 let onScreenBelowWindowOption: UInt32 = 1 << 2
 let bestResolutionOption: UInt32 = 1 << 3
 
+/// The screen Apple's Dock is on, not the focused window's; nil while the Dock is off-screen (autohide, a fullscreen space).
+func getScreen(containing dockFrame: CGRect) -> NSScreen? {
+    let frame = getFlippedScreenRect(dockFrame)
+
+    return NSScreen.screens.first { $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) }
+}
+
 func getFlippedScreenRect(_ rect: NSRect) -> CGRect {
     return CGRect(x: rect.minX, y: NSScreen.screens[0].frame.height - rect.maxY, width: rect.width, height: rect.height)
 }
@@ -96,12 +103,14 @@ let dockWindowLayer = 20
 /// The wallpaper behind Apple's Dock: everything from the Dock's own window upward is left out of the capture.
 /// Nil is a transient the caller rides out with the previous image.
 func captureBackdrop(behind window: NSWindow) -> CGImage? {
-    return createWindowImage(getFlippedScreenRect(window.frame), onScreenBelowWindowOption, getAppleDockWindowNumber(), bestResolutionOption)?.takeRetainedValue()
+    guard let dockWindow = getAppleDockWindowNumber() else { return nil }
+
+    return createWindowImage(getFlippedScreenRect(window.frame), onScreenBelowWindowOption, dockWindow, bestResolutionOption)?.takeRetainedValue()
 }
 
-func getAppleDockWindowNumber() -> UInt32 {
+func getAppleDockWindowNumber() -> UInt32? {
     let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as! [[String: Any]]
-    let dock = windows.first { isAppleDockWindow($0) }!
+    guard let dock = windows.first(where: { isAppleDockWindow($0) }) else { return nil }
 
     return dock[kCGWindowNumber as String] as! UInt32
 }
@@ -134,23 +143,33 @@ struct DockItem {
     let badge: String?
     let width: CGFloat
 
+    /// Apple's own Dock item, which clicks are forwarded to; nil for our own toggle slot, which is never clicked through.
+    let element: AXUIElement?
+
     var toggle: ToggleSlot? = nil
 }
 
 /// Apple's Dock item list through Accessibility. The frame is in top-left screen coordinates.
-/// Nil while the Dock is absent or still starting, which happens whenever it restarts (a crash, a killall, a settings change).
+/// Nil while the Dock is absent or still starting (no list, no children or no separator yet), which happens whenever it
+/// restarts (a crash, a killall, a settings change).
 func readDockItems() -> (frame: CGRect, items: [DockItem])? {
     guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return nil }
     let application = AXUIElementCreateApplication(dock.processIdentifier)
     guard let children = getAttribute(application, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
-    let list = children.first { getAttribute($0, kAXRoleAttribute) as? String == "AXList" }!
-    let items = (getAttribute(list, kAXChildrenAttribute) as! [AXUIElement]).map(buildDockItem)
+    guard let list = children.first(where: { getAttribute($0, kAXRoleAttribute) as? String == "AXList" }) else { return nil }
+    guard let elements = getAttribute(list, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
+    guard let frame = getFrame(list) else { return nil }
 
-    return (getFrame(list), items)
+    let items = elements.compactMap(buildDockItem)
+    guard items.contains(where: { $0.kind == .separator }) else { return nil }
+
+    return (frame, items)
 }
 
-func buildDockItem(_ element: AXUIElement) -> DockItem {
-    let subrole = getAttribute(element, kAXSubroleAttribute) as! String
+/// Nil for an item that vanished between the children read and this one, which happens while the Dock restarts.
+func buildDockItem(_ element: AXUIElement) -> DockItem? {
+    guard let subrole = getAttribute(element, kAXSubroleAttribute) as? String else { return nil }
+    guard let frame = getFrame(element) else { return nil }
 
     return DockItem(
         kind: getDockItemKind(subrole: subrole),
@@ -158,7 +177,8 @@ func buildDockItem(_ element: AXUIElement) -> DockItem {
         url: getAttribute(element, kAXURLAttribute) as? URL,
         isRunning: getAttribute(element, "AXIsApplicationRunning") as? Bool ?? false,
         badge: getBadge(element, subrole: subrole),
-        width: getFrame(element).width
+        width: frame.width,
+        element: element
     )
 }
 
@@ -180,18 +200,20 @@ func getAttribute(_ element: AXUIElement, _ name: String) -> Any? {
     return value
 }
 
-func getFrame(_ element: AXUIElement) -> CGRect {
+func getFrame(_ element: AXUIElement) -> CGRect? {
+    guard let value = getAttribute(element, "AXFrame") else { return nil }
+
     var frame = CGRect.zero
-    AXValueGetValue(getAttribute(element, "AXFrame") as! AXValue, .cgRect, &frame)
+    AXValueGetValue(value as! AXValue, .cgRect, &frame)
     return frame
 }
 
-/// Handoff items (an iPhone app advertised through Handoff) carry no URL and get the generic application icon.
-/// Finder plus the standardized bundle paths of the Dock's persistent-apps tiles.
+/// Finder plus the standardized bundle paths of the Dock's persistent-apps tiles; spacer tiles carry no file data.
 func readPinnedPaths() -> Set<String> {
     let tiles = dockDefaults.array(forKey: "persistent-apps") as! [[String: Any]]
-    let paths = tiles.map { tile -> String in
-        let fileData = (tile["tile-data"] as! [String: Any])["file-data"] as! [String: Any]
+    let paths = tiles.compactMap { tile -> String? in
+        guard let fileData = (tile["tile-data"] as? [String: Any])?["file-data"] as? [String: Any] else { return nil }
+
         return URL(string: fileData["_CFURLString"] as! String)!.standardizedFileURL.path
     }
 
@@ -216,7 +238,7 @@ func buildToggleItem(_ runningApps: [DockItem], collapsed: Bool) -> DockItem {
     let slot = ToggleSlot(isCollapsed: collapsed, runningCount: runningApps.count, hasBadge: collapsed && runningApps.contains { $0.badge != nil })
     let name = "\(collapsed ? "Show" : "Hide") \(runningApps.count) running apps"
 
-    return DockItem(kind: .toggle, name: name, url: nil, isRunning: false, badge: nil, width: getToggleWidth(slot), toggle: slot)
+    return DockItem(kind: .toggle, name: name, url: nil, isRunning: false, badge: nil, width: getToggleWidth(slot), element: nil, toggle: slot)
 }
 
 /// Widened by the count drawn right of the chevron while collapsed.
@@ -232,42 +254,6 @@ func getToggleCountSize(_ slot: ToggleSlot) -> NSSize {
 func isPinned(_ item: DockItem, pinned: Set<String>) -> Bool {
     guard let url = item.url else { return false }
     return pinned.contains(url.standardizedFileURL.path)
-}
-
-func getRunningApplication(at url: URL) -> NSRunningApplication {
-    let path = url.standardizedFileURL.path
-    return NSWorkspace.shared.runningApplications.first { $0.bundleURL?.standardizedFileURL.path == path }!
-}
-
-/// Activation alone leaves a fully minimized app in the Dock's minimized state; restoring one window brings it back like Apple's Dock.
-func restoreWindowIfAllMinimized(of app: NSRunningApplication) {
-    let windows = getAttribute(AXUIElementCreateApplication(app.processIdentifier), kAXWindowsAttribute) as? [AXUIElement] ?? []
-    guard let first = windows.first else { return }
-    if !windows.allSatisfy(isMinimized) { return }
-
-    AXUIElementSetAttributeValue(first, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-}
-
-func isMinimized(_ window: AXUIElement) -> Bool {
-    return getAttribute(window, kAXMinimizedAttribute) as? Bool ?? false
-}
-
-/// Trash opens in Finder; a stopped app launches; a running one comes to the front. Handoff items (no URL) do nothing.
-func open(_ item: DockItem) {
-    if item.kind == .trash {
-        NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash"))
-        return
-    }
-
-    guard let url = item.url else { return }
-    if !item.isRunning {
-        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-        return
-    }
-
-    let app = getRunningApplication(at: url)
-    app.activate(options: [.activateAllWindows])
-    restoreWindowIfAllMinimized(of: app)
 }
 
 func interpolateRect(_ from: NSRect, _ to: NSRect, _ progress: Double) -> NSRect {
@@ -326,12 +312,8 @@ final class DockStripView: NSView {
     var onHovered: (DockItem, CGFloat) -> Void = { _, _ in }
     var onHoverEnded: () -> Void = {}
 
-    /// Re-evaluates the hover in place, so a refresh under a resting cursor neither flickers nor keeps a stale item.
     var items: [DockItem] = [] {
-        didSet {
-            needsDisplay = true
-            updateHover(getHoverableIndex(at: convert(window!.mouseLocationOutsideOfEventStream, from: nil)))
-        }
+        didSet { needsDisplay = true }
     }
 
     private var hoveredIndex: Int?
@@ -504,6 +486,15 @@ final class DockStripView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         updateHover(nil)
+    }
+
+    /// Re-evaluates the hover under a resting cursor, once the strip has reached its final geometry.
+    func refreshHover() {
+        let index = getHoverableIndex(at: convert(window!.mouseLocationOutsideOfEventStream, from: nil))
+
+        // The same index may now hold another item, so it is re-reported; a nil index still ends the hover normally.
+        if index != nil { hoveredIndex = nil }
+        updateHover(index)
     }
 
     /// Reports only changes, with the cell's center x, so the tooltip is not rebuilt on every mouse move.
@@ -690,7 +681,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         strip.autoresizingMask = [.width]
         strip.appearance = NSAppearance(named: .aqua)
         strip.onToggleClicked = { [unowned self] in self.toggleHideUnpinned() }
-        strip.onTileClicked = { item in open(item) }
+        // Pressing Apple's own item gives its exact behaviour for every kind: launch, activate, unminimize, Trash, folders, files, Handoff.
+        strip.onTileClicked = { AXUIElementPerformAction($0.element!, kAXPressAction as CFString) }
         strip.onHovered = { [unowned self] item, centerX in self.showTooltip(for: item, centerX: centerX) }
         strip.onHoverEnded = { [unowned self] in self.tooltipPanel.orderOut(nil) }
 
@@ -744,14 +736,19 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         guard let dock = readDockItems() else { return }
         self.dock = dock
 
+        guard let screen = getScreen(containing: dock.frame) else {
+            panel.orderOut(nil)
+            tooltipPanel.orderOut(nil)
+            return
+        }
+
         let collapsed = isHideUnpinnedEnabled
         let items = buildStripItems(dock.items, pinned: readPinnedPaths(), collapsed: collapsed)
         let stripWidth = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
         let bandWidth = max(dock.frame.width, stripWidth) + 2 * bandMargin
-        let screen = NSScreen.main!.frame
 
         strip.items = items
-        panel.setFrame(NSRect(x: screen.midX - bandWidth / 2, y: screen.minY + stripBottomMargin, width: bandWidth, height: stripHeight), display: true)
+        panel.setFrame(NSRect(x: screen.frame.midX - bandWidth / 2, y: screen.frame.minY + stripBottomMargin, width: bandWidth, height: stripHeight), display: true)
         panel.orderFrontRegardless()
         setBackdropShown(collapsed)
         animateStrip(toWidth: stripWidth, thenHideBackdrop: !collapsed)
@@ -788,6 +785,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         if !panel.isVisible || start.width == 0 {
             glass.frame = target
             backdrop.isHidden = thenHideBackdrop
+            strip.refreshHover()
             return
         }
 
@@ -799,6 +797,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
             if progress < 1 { return }
             timer.invalidate()
             backdrop.isHidden = thenHideBackdrop
+            strip.refreshHover()
         }
     }
 
@@ -836,7 +835,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     /// Drives the real hover path (tracking area, highlight, tooltip) by moving the pointer onto the cell.
     private func moveMouse(toCellAt index: Int) {
         let cell = strip.getCellFrames()[index]
-        let point = CGPoint(x: panel.frame.minX + glass.frame.minX + cell.midX, y: NSScreen.main!.frame.height - (panel.frame.minY + stripHeight / 2))
+        let point = CGPoint(x: panel.frame.minX + glass.frame.minX + cell.midX, y: NSScreen.screens[0].frame.height - (panel.frame.minY + stripHeight / 2))
 
         CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)!.post(tap: .cghidEventTap)
     }
