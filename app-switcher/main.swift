@@ -31,8 +31,12 @@ let panelShadowMargin: CGFloat = 28
 let panelShadowOpacity: Float = 0.25
 let panelShadowRadius: CGFloat = 12
 let panelShadowOffset = CGSize(width: 0, height: -4)
-/// Same slab as my-dock: regular glass renders lighter than the backdrop and tintColor only brightens it, so a fill inside the 1pt rim darkens it.
-let panelDimmingColor = NSColor.black.withAlphaComponent(0.3)
+/// tintColor only brightens the glass, so a fill inside the 1pt rim darkens it; kept light so the lensing shows.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.15)
+/// Top-edge sheen and a bright 1pt rim stroke, the "liquid glass" cues the plain glass view lacks.
+let specularHeight: CGFloat = 14
+let specularTopColor = NSColor.white.withAlphaComponent(0.35)
+let specularRimColor = NSColor.white.withAlphaComponent(0.45)
 let highlightColor = NSColor.white.withAlphaComponent(0.10)
 let highlightStrokeColor = NSColor.white.withAlphaComponent(0.08)
 let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.22)
@@ -64,15 +68,23 @@ func writeCapture(around window: NSWindow, path: String) {
     print("smoke: capture \(image.width)x\(image.height) -> \(path)")
 }
 
-/// Colorful window behind the panel, so the capture shows what the glass is blurring.
+/// Colorful window behind the panel, so the capture shows what the glass is blurring. APP_SWITCHER_SMOKE_DARK=1 makes it a dark gray-blue instead.
 var captureBackdrop: NSWindow?
+
+func getCaptureBackdropColors() -> [CGColor] {
+    if ProcessInfo.processInfo.environment["APP_SWITCHER_SMOKE_DARK"] == "1" {
+        return [NSColor(srgbRed: 0x1b / 255, green: 0x1d / 255, blue: 0x24 / 255, alpha: 1).cgColor, NSColor(srgbRed: 0x2a / 255, green: 0x2f / 255, blue: 0x3a / 255, alpha: 1).cgColor]
+    }
+
+    return [NSColor.systemPink.cgColor, NSColor.systemOrange.cgColor, NSColor.white.cgColor, NSColor.systemTeal.cgColor, NSColor.systemIndigo.cgColor]
+}
 
 func showCaptureBackdrop(behind window: NSWindow) {
     let backdrop = NSWindow(contentRect: window.frame.insetBy(dx: -80, dy: -80), styleMask: .borderless, backing: .buffered, defer: false)
     let gradient = CAGradientLayer()
 
     gradient.frame = NSRect(origin: .zero, size: backdrop.frame.size)
-    gradient.colors = [NSColor.systemPink.cgColor, NSColor.systemOrange.cgColor, NSColor.white.cgColor, NSColor.systemTeal.cgColor, NSColor.systemIndigo.cgColor]
+    gradient.colors = getCaptureBackdropColors()
     gradient.startPoint = CGPoint(x: 0, y: 1)
     gradient.endPoint = CGPoint(x: 1, y: 0)
 
@@ -159,6 +171,24 @@ final class IconCellView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         onClick(index)
+    }
+}
+
+/// Top-edge sheen and a bright 1pt rim stroke drawn over the glass; lets clicks through to the cells beneath.
+final class SpecularView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        return nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rim = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: panelCornerRadius - 1.5, yRadius: panelCornerRadius - 1.5)
+        rim.lineWidth = 1
+        specularRimColor.setStroke()
+        rim.stroke()
+
+        let sheen = NSGradient(starting: specularTopColor, ending: specularTopColor.withAlphaComponent(0))!
+        let band = NSRect(x: 0, y: bounds.height - specularHeight, width: bounds.width, height: specularHeight)
+        sheen.draw(in: band, angle: -90)
     }
 }
 
@@ -259,6 +289,7 @@ final class SwitcherPanel: NSPanel {
         let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
         container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
+        container.addSubview(SpecularView(frame: container.bounds), positioned: .below, relativeTo: highlight)
 
         let glass = buildGlassView(size: contentSize)
         glass.contentView = container
@@ -288,7 +319,7 @@ final class SwitcherPanel: NSPanel {
     private func buildGlassView(size: NSSize) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
-        glass.style = .regular
+        glass.style = .clear
         glass.cornerRadius = panelCornerRadius
 
         return glass
