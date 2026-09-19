@@ -18,10 +18,10 @@ state), so it mirrors the real Dock's order and contents. It re-reads and re-ren
 on app launch, termination and activation.
 
 The menu bar item's "Hide unpinned apps" hides every app right of the pinned group
-(Finder and the Dock's persistent apps); the Trash and its separator stay. Clicking
-any separator in the strip toggles the same setting, without moving focus. The
-separator at the pinned/unpinned boundary shows a chevron: "<" collapses, ">" expands.
-Hovering a tile shows its name in a pill above it, like the real Dock. Clicking a
+(Finder and the Dock's persistent apps); the Trash stays. A slot at that boundary
+toggles the same setting without moving focus: "<" collapses the running apps, ">"
+with their count expands them, and a red dot on the slot means a hidden app has a
+badge. Hovering a tile shows its name in a pill above it, like the real Dock. Clicking a
 tile launches the app, or brings it to the front (restoring a fully minimized one);
 the Trash opens in Finder. Badge counts come from the Dock's `AXStatusLabel`; custom
 overlays some apps paint themselves are not exposed and are not shown.
