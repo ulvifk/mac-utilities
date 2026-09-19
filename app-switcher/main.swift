@@ -11,35 +11,37 @@ let rightArrowKeyCode: Int64 = 124
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
-let iconSize: CGFloat = 64
-let cellSize: CGFloat = 84
-let itemSpacing: CGFloat = 4
-let horizontalPadding: CGFloat = 14
-let verticalPadding: CGFloat = 10
+/// The icon image; Tahoe icons fill ~80.5% of their canvas, so the visible squircle is ~55 wide. The cell is as wide as the image.
+let iconSize: CGFloat = 68
+let itemSpacing: CGFloat = 5
+let horizontalPadding: CGFloat = 22
+/// The widest the panel gets, as a share of the screen, before the icons wrap to the next row.
+let maxPanelWidthFraction: CGFloat = 0.7
+let verticalPadding: CGFloat = 7.5
 let dotSize: CGFloat = 5
 
 /// The 13pt name label's height. The whitelist dot gets a band of the same height above the icon, so the two mirror each other.
 let nameBandHeight: CGFloat = 16
-let nameTopSpacing: CGFloat = 2
+let nameTopSpacing: CGFloat = 0
+/// Rows overlap their bands: the name below one row's icons ends 3pt above the whitelist dots of the next.
+let rowSpacing: CGFloat = -8
 /// Below the band's centre, so the dot reads as attached to the icon rather than floating.
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
-let panelCornerRadius: CGFloat = 24
-/// The window shadow draws a hard 1px dark outline around glass, so the panel casts its own soft one from a layer instead.
-let panelShadowMargin: CGFloat = 28
-let panelShadowOpacity: Float = 0.25
-let panelShadowRadius: CGFloat = 12
-let panelShadowOffset = CGSize(width: 0, height: -4)
-/// tintColor only brightens the glass, so a fill inside the 1pt rim darkens it; kept light so the lensing shows.
-let panelDimmingColor = NSColor.black.withAlphaComponent(0.15)
-/// Top-edge sheen and a bright 1pt rim stroke, the "liquid glass" cues the plain glass view lacks.
-let specularHeight: CGFloat = 14
-let specularTopColor = NSColor.white.withAlphaComponent(0.35)
-let specularRimColor = NSColor.white.withAlphaComponent(0.45)
-let highlightColor = NSColor.white.withAlphaComponent(0.10)
-let highlightStrokeColor = NSColor.white.withAlphaComponent(0.08)
-let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.22)
+let panelCornerRadius: CGFloat = 28
+/// Clear glass keeps the backdrop's colour where regular glass washes it out; this pulls it down to the native
+/// switcher's body, roughly 0.63 * backdrop + 19 per channel. The 1pt rim is left undimmed.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.14)
+/// Measured off the native switcher, one row at a time from the edge inward. [row from the edge] -> white alpha
+let topRimAlphas: [CGFloat] = [0.34, 0.07, 0.03, 0.015]
+let bottomRimAlphas: [CGFloat] = [0.35, 0.09, 0.055, 0.045, 0.035, 0.03, 0.02]
+/// The native highlight hugs the icon's squircle with a 3pt margin and has no stroke.
+let highlightColor = NSColor.white.withAlphaComponent(0.30)
+let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.45)
+let highlightCornerRadius: CGFloat = 15.5
+/// The 68pt image has a ~6.5pt transparent margin around the squircle, and the highlight sits 3pt outside it.
+let highlightIconInset: CGFloat = 3.5
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -174,21 +176,24 @@ final class IconCellView: NSView {
     }
 }
 
-/// Top-edge sheen and a bright 1pt rim stroke drawn over the glass; lets clicks through to the cells beneath.
-final class SpecularView: NSView {
+/// Top and bottom edges only, along the straight run between the corner arcs; lets clicks through to the cells beneath.
+final class RimView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         return nil
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let rim = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: panelCornerRadius - 1.5, yRadius: panelCornerRadius - 1.5)
-        rim.lineWidth = 1
-        specularRimColor.setStroke()
-        rim.stroke()
+        let straight = NSRect(x: panelCornerRadius, y: 0, width: bounds.width - 2 * panelCornerRadius, height: 1)
 
-        let sheen = NSGradient(starting: specularTopColor, ending: specularTopColor.withAlphaComponent(0))!
-        let band = NSRect(x: 0, y: bounds.height - specularHeight, width: bounds.width, height: specularHeight)
-        sheen.draw(in: band, angle: -90)
+        for (row, alpha) in topRimAlphas.enumerated() {
+            NSColor.white.withAlphaComponent(alpha).setFill()
+            straight.offsetBy(dx: 0, dy: bounds.height - 1 - CGFloat(row)).fill()
+        }
+
+        for (row, alpha) in bottomRimAlphas.enumerated() {
+            NSColor.white.withAlphaComponent(alpha).setFill()
+            straight.offsetBy(dx: 0, dy: CGFloat(row)).fill()
+        }
     }
 }
 
@@ -203,7 +208,6 @@ final class SwitcherPanel: NSPanel {
     var onCellClicked: (Int) -> Void = { _ in }
 
     private var highlight = NSView()
-    private var iconCells: [NSView] = []
     private var iconViews: [NSImageView] = []
     private var whitelistDots: [NSView] = []
 
@@ -262,42 +266,38 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func buildContent(state: SwitcherState) {
-        let iconRow = buildIconRow(state: state)
-        iconRow.translatesAutoresizingMaskIntoConstraints = false
+        let iconRows = buildIconRows(state: state)
+        iconRows.translatesAutoresizingMaskIntoConstraints = false
 
         nameLabel = buildNameLabel(text: state.apps[state.selectedIndex].localizedName ?? "")
 
         highlight = NSView()
         highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = 18
-        highlight.layer?.borderWidth = 1
-        highlight.layer?.borderColor = highlightStrokeColor.cgColor
+        highlight.layer?.cornerRadius = highlightCornerRadius
 
         let container = NSView()
         container.addSubview(highlight)
-        container.addSubview(iconRow)
+        container.addSubview(iconRows)
         container.addSubview(nameLabel)
 
         NSLayoutConstraint.activate([
-            iconRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
-            iconRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
-            iconRow.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
-            iconRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
+            iconRows.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            iconRows.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            iconRows.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
+            iconRows.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
         ])
 
-        let rowSize = iconRow.fittingSize
+        let rowSize = iconRows.fittingSize
         let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
         container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
-        container.addSubview(SpecularView(frame: container.bounds), positioned: .below, relativeTo: highlight)
+        container.addSubview(RimView(frame: container.bounds), positioned: .below, relativeTo: highlight)
 
         let glass = buildGlassView(size: contentSize)
         glass.contentView = container
 
-        let shadowCaster = buildShadowCaster(around: glass)
-        let panelSize = shadowCaster.frame.size
-        contentView = shadowCaster
-        setContentSize(panelSize)
+        contentView = glass
+        setContentSize(contentSize)
     }
 
     /// Truncates rather than widening the panel: the width comes from the icon row alone.
@@ -305,7 +305,7 @@ final class SwitcherPanel: NSPanel {
         let label = NSTextField(labelWithString: text)
 
         label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.textColor = .labelColor
+        label.textColor = .white
         label.alignment = .center
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
@@ -325,26 +325,6 @@ final class SwitcherPanel: NSPanel {
         return glass
     }
 
-    /// The glass draws a dark 1px outline outside its bounds; a masking view clips it away before the shadow is cast.
-    private func buildShadowCaster(around glass: NSView) -> NSView {
-        let clip = NSView(frame: NSRect(x: panelShadowMargin, y: panelShadowMargin, width: glass.frame.width, height: glass.frame.height))
-        let caster = NSView(frame: NSRect(x: 0, y: 0, width: glass.frame.width + 2 * panelShadowMargin, height: glass.frame.height + 2 * panelShadowMargin))
-
-        clip.wantsLayer = true
-        clip.layer?.cornerRadius = panelCornerRadius
-        clip.layer?.masksToBounds = true
-        clip.addSubview(glass)
-
-        caster.wantsLayer = true
-        caster.layer?.shadowOpacity = panelShadowOpacity
-        caster.layer?.shadowRadius = panelShadowRadius
-        caster.layer?.shadowOffset = panelShadowOffset
-        caster.layer?.shadowPath = CGPath(roundedRect: clip.frame, cornerWidth: panelCornerRadius, cornerHeight: panelCornerRadius, transform: nil)
-        caster.addSubview(clip)
-
-        return caster
-    }
-
     private func buildDimmingView(size: NSSize) -> NSView {
         let dimming = NSView(frame: NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1))
 
@@ -355,23 +335,36 @@ final class SwitcherPanel: NSPanel {
         return dimming
     }
 
-    /// Icons draw as aqua, so system images keep their light variants on the dark glass.
-    private func buildIconRow(state: SwitcherState) -> NSStackView {
-        let row = NSStackView()
+    /// Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
+    private func buildIconRows(state: SwitcherState) -> NSStackView {
+        let rows = NSStackView()
 
-        row.orientation = .horizontal
-        row.spacing = itemSpacing
-        row.appearance = NSAppearance(named: .aqua)
+        rows.orientation = .vertical
+        rows.spacing = rowSpacing
+        rows.alignment = .centerX
+        rows.appearance = NSAppearance(named: .aqua)
 
-        iconCells = []
         iconViews = []
         whitelistDots = []
 
-        for app in state.apps {
-            row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
+        let iconsPerRow = getIconsPerRow()
+
+        for rowStart in stride(from: 0, to: state.apps.count, by: iconsPerRow) {
+            let row = NSStackView()
+
+            row.orientation = .horizontal
+            row.spacing = itemSpacing
+
+            for index in rowStart..<min(rowStart + iconsPerRow, state.apps.count) {
+                let app = state.apps[index]
+
+                row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
+            }
+
+            rows.addArrangedSubview(row)
         }
 
-        return row
+        return rows
     }
 
     /// Whitelist dot above the icon, room for the selected app name below it, icon centered between them.
@@ -380,7 +373,7 @@ final class SwitcherPanel: NSPanel {
         let dot = buildWhitelistDot()
         let cell = IconCellView()
 
-        cell.index = iconCells.count
+        cell.index = iconViews.count
         cell.onClick = { [unowned self] index in self.onCellClicked(index) }
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
@@ -388,7 +381,6 @@ final class SwitcherPanel: NSPanel {
         icon.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = !whitelisted
 
-        iconCells.append(cell)
         iconViews.append(icon)
         whitelistDots.append(dot)
 
@@ -397,7 +389,7 @@ final class SwitcherPanel: NSPanel {
         cell.addSubview(dot)
 
         NSLayoutConstraint.activate([
-            cell.widthAnchor.constraint(equalToConstant: cellSize),
+            cell.widthAnchor.constraint(equalToConstant: iconSize),
             cell.heightAnchor.constraint(equalToConstant: cellHeight),
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize),
@@ -427,6 +419,7 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func applySelection(state: SwitcherState, animated: Bool) {
+        contentView?.layoutSubtreeIfNeeded()
         placeNameUnderSelectedIcon(selectedIndex: state.selectedIndex)
         contentView?.layoutSubtreeIfNeeded()
 
@@ -460,17 +453,26 @@ final class SwitcherPanel: NSPanel {
 
     /// The widest a name centered on this icon can be without crossing either panel edge, so it truncates instead of sliding.
     private func getNameMaxWidth(selectedIndex: Int) -> CGFloat {
-        let appCount = CGFloat(iconViews.count)
-        let iconCenterX = horizontalPadding + CGFloat(selectedIndex) * (cellSize + itemSpacing) + cellSize / 2
-        let containerWidth = horizontalPadding * 2 + appCount * cellSize + (appCount - 1) * itemSpacing
+        let icon = iconViews[selectedIndex]
+        let iconFrame = icon.superview!.convert(icon.frame, to: highlight.superview!)
+        let iconCenterX = iconFrame.midX
+        let containerWidth = highlight.superview!.bounds.width
 
         return 2 * min(iconCenterX - horizontalPadding, containerWidth - horizontalPadding - iconCenterX)
     }
 
+    /// Hugs the selected icon's squircle rather than boxing the whole cell; the name sits below it, outside.
     private func getHighlightFrame(selectedIndex: Int) -> NSRect {
-        let cell = iconCells[selectedIndex]
+        let icon = iconViews[selectedIndex]
+        let frame = icon.superview!.convert(icon.frame, to: highlight.superview!)
 
-        return cell.superview!.convert(cell.frame, to: highlight.superview!)
+        return frame.insetBy(dx: highlightIconInset, dy: highlightIconInset)
+    }
+
+    private func getIconsPerRow() -> Int {
+        let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
+
+        return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
