@@ -25,8 +25,9 @@ Filter on, only the whitelist, green highlight:
 - Right / Left arrow do the same while the switcher is open.
 - Click an icon to switch to it.
 - Apps without open windows are hidden.
-- The selected app's name sits under its icon, inside the highlight, clamped to the
-  panel edges and truncated rather than ever widening the panel.
+- The highlight is a rounded square hugging the selected icon; the app's name sits
+  under it, clamped to the panel edges and truncated rather than ever widening the
+  panel.
 - The highlight is green when the filter is on and neutral when it is off.
 - A small green dot above an icon means the app is whitelisted.
 - Cmd+F while the switcher is open toggles the filter itself and re-filters the list
