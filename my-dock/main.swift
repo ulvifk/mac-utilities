@@ -91,10 +91,25 @@ func writePNG(_ image: CGImage, path: String) {
     try! png.write(to: URL(fileURLWithPath: path))
 }
 
-/// What sits behind the window: without Screen Recording permission other apps' windows, the Dock included, are left out, which
-/// leaves the wallpaper. Nil is a transient the caller rides out with the previous image.
-func captureBackdrop(below window: NSWindow) -> CGImage? {
-    return createWindowImage(getFlippedScreenRect(window.frame), onScreenBelowWindowOption, UInt32(window.windowNumber), bestResolutionOption)?.takeRetainedValue()
+let dockWindowLayer = 20
+
+/// The wallpaper behind Apple's Dock: everything from the Dock's own window upward is left out of the capture.
+/// Nil is a transient the caller rides out with the previous image.
+func captureBackdrop(behind window: NSWindow) -> CGImage? {
+    return createWindowImage(getFlippedScreenRect(window.frame), onScreenBelowWindowOption, getAppleDockWindowNumber(), bestResolutionOption)?.takeRetainedValue()
+}
+
+func getAppleDockWindowNumber() -> UInt32 {
+    let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as! [[String: Any]]
+    let dock = windows.first { isAppleDockWindow($0) }!
+
+    return dock[kCGWindowNumber as String] as! UInt32
+}
+
+func isAppleDockWindow(_ info: [String: Any]) -> Bool {
+    if (info[kCGWindowOwnerName as String] as? String) != "Dock" { return false }
+    if (info[kCGWindowLayer as String] as? Int) != dockWindowLayer { return false }
+    return true
 }
 
 enum DockItemKind {
@@ -758,7 +773,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
     private func refreshBackdrop() {
         if backdrop.isHidden { return }
-        guard let image = captureBackdrop(below: panel) else { return }
+        guard let image = captureBackdrop(behind: panel) else { return }
 
         backdrop.image = image
     }
@@ -813,7 +828,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
             print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
             print("smoke: tooltip=\(self.tooltipPanel.frame) visible=\(self.tooltipPanel.isVisible) text=\(self.tooltip.text) badges=\(self.strip.items.filter { $0.badge != nil }.map { "\($0.name)=\($0.badge!)" })")
             writeCapture(around: self.panel, path: smokeCapturePath)
-            if let behind = captureBackdrop(below: self.panel) { writePNG(behind, path: smokeBackdropPath) }
+            if let behind = captureBackdrop(behind: self.panel) { writePNG(behind, path: smokeBackdropPath) }
             exit(0)
         }
     }
