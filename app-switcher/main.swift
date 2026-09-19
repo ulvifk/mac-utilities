@@ -26,17 +26,12 @@ let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let panelCornerRadius: CGFloat = 24
-/// The window shadow draws a hard 1px dark outline around glass, so the panel casts its own soft one from a layer instead.
-let panelShadowMargin: CGFloat = 28
-let panelShadowOpacity: Float = 0.25
-let panelShadowRadius: CGFloat = 12
-let panelShadowOffset = CGSize(width: 0, height: -4)
-/// tintColor only brightens the glass, so a fill inside the 1pt rim darkens it; kept light so the lensing shows.
-let panelDimmingColor = NSColor.black.withAlphaComponent(0.15)
-/// Top-edge sheen and a bright 1pt rim stroke, the "liquid glass" cues the plain glass view lacks.
-let specularHeight: CGFloat = 14
-let specularTopColor = NSColor.white.withAlphaComponent(0.35)
-let specularRimColor = NSColor.white.withAlphaComponent(0.45)
+/// Regular glass renders lighter than the backdrop and tintColor only brightens it further; the 1pt rim is left undimmed.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.3)
+/// Apple's rims sit ~50 above the backdrop with a short falloff; the glass alone gives ~30, and its own top rim lands one row
+/// outside the frame, so the top needs more. [row from the edge] -> white alpha
+let topRimAlphas: [CGFloat] = [0.20, 0.04, 0.02]
+let bottomRimAlphas: [CGFloat] = [0.28, 0.06, 0.03]
 let highlightColor = NSColor.white.withAlphaComponent(0.10)
 let highlightStrokeColor = NSColor.white.withAlphaComponent(0.08)
 let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.22)
@@ -174,21 +169,24 @@ final class IconCellView: NSView {
     }
 }
 
-/// Top-edge sheen and a bright 1pt rim stroke drawn over the glass; lets clicks through to the cells beneath.
-final class SpecularView: NSView {
+/// Top and bottom edges only, along the straight run between the corner arcs; lets clicks through to the cells beneath.
+final class RimView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? {
         return nil
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let rim = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: panelCornerRadius - 1.5, yRadius: panelCornerRadius - 1.5)
-        rim.lineWidth = 1
-        specularRimColor.setStroke()
-        rim.stroke()
+        let straight = NSRect(x: panelCornerRadius, y: 0, width: bounds.width - 2 * panelCornerRadius, height: 1)
 
-        let sheen = NSGradient(starting: specularTopColor, ending: specularTopColor.withAlphaComponent(0))!
-        let band = NSRect(x: 0, y: bounds.height - specularHeight, width: bounds.width, height: specularHeight)
-        sheen.draw(in: band, angle: -90)
+        for (row, alpha) in topRimAlphas.enumerated() {
+            NSColor.white.withAlphaComponent(alpha).setFill()
+            straight.offsetBy(dx: 0, dy: bounds.height - 1 - CGFloat(row)).fill()
+        }
+
+        for (row, alpha) in bottomRimAlphas.enumerated() {
+            NSColor.white.withAlphaComponent(alpha).setFill()
+            straight.offsetBy(dx: 0, dy: CGFloat(row)).fill()
+        }
     }
 }
 
@@ -289,15 +287,13 @@ final class SwitcherPanel: NSPanel {
         let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
         container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
-        container.addSubview(SpecularView(frame: container.bounds), positioned: .below, relativeTo: highlight)
+        container.addSubview(RimView(frame: container.bounds), positioned: .below, relativeTo: highlight)
 
         let glass = buildGlassView(size: contentSize)
         glass.contentView = container
 
-        let shadowCaster = buildShadowCaster(around: glass)
-        let panelSize = shadowCaster.frame.size
-        contentView = shadowCaster
-        setContentSize(panelSize)
+        contentView = glass
+        setContentSize(contentSize)
     }
 
     /// Truncates rather than widening the panel: the width comes from the icon row alone.
@@ -319,30 +315,10 @@ final class SwitcherPanel: NSPanel {
     private func buildGlassView(size: NSSize) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
-        glass.style = .clear
+        glass.style = .regular
         glass.cornerRadius = panelCornerRadius
 
         return glass
-    }
-
-    /// The glass draws a dark 1px outline outside its bounds; a masking view clips it away before the shadow is cast.
-    private func buildShadowCaster(around glass: NSView) -> NSView {
-        let clip = NSView(frame: NSRect(x: panelShadowMargin, y: panelShadowMargin, width: glass.frame.width, height: glass.frame.height))
-        let caster = NSView(frame: NSRect(x: 0, y: 0, width: glass.frame.width + 2 * panelShadowMargin, height: glass.frame.height + 2 * panelShadowMargin))
-
-        clip.wantsLayer = true
-        clip.layer?.cornerRadius = panelCornerRadius
-        clip.layer?.masksToBounds = true
-        clip.addSubview(glass)
-
-        caster.wantsLayer = true
-        caster.layer?.shadowOpacity = panelShadowOpacity
-        caster.layer?.shadowRadius = panelShadowRadius
-        caster.layer?.shadowOffset = panelShadowOffset
-        caster.layer?.shadowPath = CGPath(roundedRect: clip.frame, cornerWidth: panelCornerRadius, cornerHeight: panelCornerRadius, transform: nil)
-        caster.addSubview(clip)
-
-        return caster
     }
 
     private func buildDimmingView(size: NSSize) -> NSView {
