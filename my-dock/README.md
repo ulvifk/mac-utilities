@@ -25,10 +25,12 @@ The menu bar item's "Hide unpinned apps" hides every app right of the pinned gro
 (Finder and the Dock's persistent apps); the Trash stays. A slot at that boundary
 toggles the same setting without moving focus: "<" collapses the running apps, ">"
 with their count expands them, and a red dot on the slot means a hidden app has a
-badge. Hovering a tile shows its name in a pill above it, like the real Dock. Clicking a
-tile launches the app, or brings it to the front (restoring a fully minimized one);
-the Trash opens in Finder. Badge counts come from the Dock's `AXStatusLabel`; custom
-overlays some apps paint themselves are not exposed and are not shown.
+badge. Hovering a tile shows its name in a pill above it, like the real Dock. A click is
+forwarded to the matching item of Apple's Dock (`AXPress`), so apps, folders, files,
+minimized windows and the Trash behave exactly like the real Dock. The strip hides
+itself while the Dock is off-screen (autohide, a fullscreen space) and comes back with
+it. Badge counts come from the Dock's `AXStatusLabel`; custom overlays some apps paint
+themselves are not exposed and are not shown.
 
 ## Sitting on Apple's Dock
 
@@ -66,7 +68,8 @@ permission stable across rebuilds.
 
 Grant Accessibility to `MyDock.app` in
 System Settings > Privacy & Security > Accessibility, then relaunch it.
-Without it the Dock item list cannot be read and the app exits.
+Without it the Dock item list cannot be read; the app keeps retrying every 2 seconds
+and renders as soon as the permission is granted.
 
 ## Dev
 
