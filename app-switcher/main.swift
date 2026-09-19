@@ -25,7 +25,12 @@ let nameTopSpacing: CGFloat = 2
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
-let panelCornerRadius: CGFloat = 28
+let panelCornerRadius: CGFloat = 24
+/// Same slab as my-dock: regular glass renders lighter than the backdrop and tintColor only brightens it, so a fill inside the 1pt rim darkens it.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.3)
+let highlightColor = NSColor.white.withAlphaComponent(0.10)
+let highlightStrokeColor = NSColor.white.withAlphaComponent(0.08)
+let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.22)
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -184,7 +189,6 @@ final class SwitcherPanel: NSPanel {
         backgroundColor = .clear
         hasShadow = true
         hidesOnDeactivate = false
-        appearance = NSAppearance(named: .darkAqua)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
 
@@ -231,6 +235,8 @@ final class SwitcherPanel: NSPanel {
         highlight = NSView()
         highlight.wantsLayer = true
         highlight.layer?.cornerRadius = 18
+        highlight.layer?.borderWidth = 1
+        highlight.layer?.borderColor = highlightStrokeColor.cgColor
 
         let container = NSView()
         container.addSubview(highlight)
@@ -247,11 +253,7 @@ final class SwitcherPanel: NSPanel {
         let rowSize = iconRow.fittingSize
         let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
-
-        container.wantsLayer = true
-        container.layer?.cornerRadius = panelCornerRadius
-        container.layer?.borderWidth = 1
-        container.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+        container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
 
         let glass = buildGlassView(size: contentSize)
         glass.contentView = container
@@ -281,16 +283,27 @@ final class SwitcherPanel: NSPanel {
 
         glass.style = .regular
         glass.cornerRadius = panelCornerRadius
-        glass.tintColor = NSColor.black.withAlphaComponent(0.28)
 
         return glass
     }
 
+    private func buildDimmingView(size: NSSize) -> NSView {
+        let dimming = NSView(frame: NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1))
+
+        dimming.wantsLayer = true
+        dimming.layer?.cornerRadius = panelCornerRadius - 1
+        dimming.layer?.backgroundColor = panelDimmingColor.cgColor
+
+        return dimming
+    }
+
+    /// Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
     private func buildIconRow(state: SwitcherState) -> NSStackView {
         let row = NSStackView()
 
         row.orientation = .horizontal
         row.spacing = itemSpacing
+        row.appearance = NSAppearance(named: .aqua)
 
         iconCells = []
         iconViews = []
@@ -403,8 +416,8 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
-        if filterEnabled { return NSColor.systemGreen.withAlphaComponent(0.22) }
-        return NSColor.labelColor.withAlphaComponent(0.12)
+        if filterEnabled { return filteredHighlightColor }
+        return highlightColor
     }
 }
 
