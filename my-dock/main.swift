@@ -5,11 +5,13 @@ import UniformTypeIdentifiers
 let stripHeight: CGFloat = 60
 let stripEndPadding: CGFloat = 3.2
 let stripCornerRadius: CGFloat = 22
-let stripDimmingColor = NSColor.black.withAlphaComponent(0.3)
-/// Apple's rims sit ~50 above the backdrop with a short falloff; the glass alone gives ~30, and its own top rim lands one row
-/// outside the frame, so the top needs more. [row from the edge] -> white alpha
-let topRimAlphas: [CGFloat] = [0.20, 0.04, 0.02]
-let bottomRimAlphas: [CGFloat] = [0.28, 0.06, 0.03]
+/// Clear glass lands a little lighter than Apple's Dock on every backdrop; 0.08 black brings the body onto Apple's over both a
+/// bright and a dark one.
+let stripDimmingColor = NSColor.black.withAlphaComponent(0.08)
+/// Apple's rim is a two-pixel bright edge with a short falloff; each of our rows covers two pixels, so a row carries the mean of
+/// Apple's pair, and clear glass adds almost nothing of its own. [row from the edge] -> white alpha
+let topRimAlphas: [CGFloat] = [0.30, 0.065, 0.035]
+let bottomRimAlphas: [CGFloat] = [0.31, 0.07, 0.04]
 let stripBottomMargin: CGFloat = 5
 
 let iconSize: CGFloat = 46
@@ -342,7 +344,7 @@ final class DockStripView: NSView {
         }
     }
 
-    /// Regular glass renders lighter than the backdrop and tintColor only brightens it further; the 1pt rim is left undimmed.
+    /// The 1pt rim is left undimmed so the bright edge keeps its full strength.
     private func drawDimming() {
         let inset = bounds.insetBy(dx: 1, dy: 1)
 
@@ -702,7 +704,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     /// A borderless non-activating panel cannot become key, so clicks on the strip never move focus. It sits one level above
     /// Apple's Dock and spans it, so the Dock keeps reserving the screen band while ours covers it.
     private func buildWindow() {
-        glass.style = .regular
+        glass.style = .clear
         glass.cornerRadius = stripCornerRadius
         glass.contentView = strip
         strip.autoresizingMask = [.width]
