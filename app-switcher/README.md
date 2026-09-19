@@ -6,7 +6,7 @@ While the app runs, the native Cmd+Tab switcher is never shown: if the filter is
 but no whitelisted app is running, the switcher lists every running app instead, so
 the shortcuts below always stay reachable.
 
-The menu bar item toggles the filter, lists the two in-switcher shortcuts as a
+The menu bar item toggles the filter, lists the in-switcher shortcuts as a
 reminder, and manages the whitelist (every running regular app is listed,
 checkmark = whitelisted).
 
@@ -34,6 +34,10 @@ Filter on, only the whitelist, green highlight:
   on the spot, keeping the selected app selected when it survives.
 - Cmd+W while the switcher is open toggles the whitelist membership of the selected
   app. The visible list is not re-filtered until the switcher closes.
+- Cmd+Q while the switcher is open quits the selected app; it leaves the list once it
+  has actually quit, so an app asking for confirmation stays listed.
+- Cmd+H while the switcher is open hides the selected app and drops it from the list.
+- Esc closes the switcher without activating anything.
 
 ## Install
 

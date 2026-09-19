@@ -6,6 +6,9 @@ import QuartzCore
 let tabKeyCode: Int64 = 48
 let wKeyCode: Int64 = 13
 let fKeyCode: Int64 = 3
+let qKeyCode: Int64 = 12
+let hKeyCode: Int64 = 4
+let escapeKeyCode: Int64 = 53
 let leftArrowKeyCode: Int64 = 123
 let rightArrowKeyCode: Int64 = 124
 let filterEnabledKey = "filterEnabled"
@@ -500,6 +503,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
         wirePanelClicks()
+        observeAppTermination()
         requestAccessibilityTrust()
         startEventTap()
         runSmokeTestIfRequested()
@@ -535,6 +539,21 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         }
     }
 
+    private func observeAppTermination() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            if !self.panel.isVisible { return }
+
+            let app = notification.userInfo![NSWorkspace.applicationUserInfoKey] as! NSRunningApplication
+            guard let index = self.candidates.firstIndex(where: { $0.processIdentifier == app.processIdentifier }) else { return }
+
+            self.removeCandidate(at: index)
+        }
+    }
+
     private func buildMenu() {
         let menu = NSMenu()
 
@@ -545,6 +564,9 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         menu.addItem(filterMenuItem)
         menu.addItem(buildHintItem(title: "While switching: W toggles whitelist"))
         menu.addItem(buildHintItem(title: "While switching: F toggles filter"))
+        menu.addItem(buildHintItem(title: "While switching: Q quits app"))
+        menu.addItem(buildHintItem(title: "While switching: H hides app"))
+        menu.addItem(buildHintItem(title: "While switching: Esc cancels"))
         menu.addItem(.separator())
 
         whitelistMenu.delegate = self
@@ -739,6 +761,22 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return nil
         }
 
+        if isQuitShortcut(event) {
+            candidates[selectedIndex].terminate()
+            return nil
+        }
+
+        if isHideShortcut(event) {
+            candidates[selectedIndex].hide()
+            removeCandidate(at: selectedIndex)
+            return nil
+        }
+
+        if isCancelShortcut(event) {
+            panel.hide()
+            return nil
+        }
+
         return Unmanaged.passUnretained(event)
     }
 
@@ -778,6 +816,18 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     private func isFilterToggleShortcut(_ event: CGEvent) -> Bool {
         return isCommandShortcut(event, keyCode: fKeyCode)
+    }
+
+    private func isQuitShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: qKeyCode)
+    }
+
+    private func isHideShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: hKeyCode)
+    }
+
+    private func isCancelShortcut(_ event: CGEvent) -> Bool {
+        return event.getIntegerValueField(.keyboardEventKeycode) == escapeKeyCode
     }
 
     private func isCommandShortcut(_ event: CGEvent, keyCode: Int64) -> Bool {
@@ -825,6 +875,17 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         let step = backward ? -1 : 1
         selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
         panel.update(state: buildState())
+    }
+
+    private func removeCandidate(at index: Int) {
+        candidates.remove(at: index)
+        if candidates.isEmpty {
+            panel.hide()
+            return
+        }
+
+        selectedIndex = min(selectedIndex, candidates.count - 1)
+        panel.show(state: buildState())
     }
 
     private func toggleFilterAndRefreshCandidates() {
