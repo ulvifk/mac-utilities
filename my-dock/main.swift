@@ -15,6 +15,10 @@ let runningDotCenterFromBottom: CGFloat = 6
 let runningDotColor = NSColor.white.withAlphaComponent(0.58)
 let separatorVerticalInset: CGFloat = 8
 let separatorColor = NSColor.white.withAlphaComponent(0.3)
+let chevronWidth: CGFloat = 5
+let chevronHeight: CGFloat = 9
+let chevronLineWidth: CGFloat = 1.5
+let chevronColor = NSColor.white.withAlphaComponent(0.55)
 
 let hideUnpinnedKey = "hideUnpinned"
 let finderPath = "/System/Library/CoreServices/Finder.app"
@@ -58,12 +62,20 @@ enum DockItemKind {
     case trash
 }
 
+enum ToggleHandle {
+    case collapse
+    case expand
+}
+
 struct DockItem {
     let kind: DockItemKind
     let name: String
     let url: URL?
     let isRunning: Bool
     let width: CGFloat
+
+    /// Set on the separator that draws the chevron instead of a line.
+    var toggleHandle: ToggleHandle? = nil
 }
 
 /// Apple's Dock item list through Accessibility. The frame is in top-left screen coordinates.
@@ -136,6 +148,16 @@ func filterHiddenItems(_ items: [DockItem], pinned: Set<String>) -> [DockItem] {
     return Array(pinnedGroup) + trashGroup
 }
 
+/// Marks the separator at the pinned/unpinned boundary: before the first unpinned app, or before the Trash once those are hidden.
+func markToggleHandle(_ items: [DockItem], pinned: Set<String>, handle: ToggleHandle) -> [DockItem] {
+    let firstUnpinned = items.firstIndex { isUnpinnedApp($0, pinned: pinned) }
+    let boundary = firstUnpinned ?? items.firstIndex { $0.kind == .trash }!
+
+    var marked = items
+    marked[boundary - 1].toggleHandle = handle
+    return marked
+}
+
 func isUnpinnedApp(_ item: DockItem, pinned: Set<String>) -> Bool {
     if item.kind != .app { return false }
     return !isPinned(item, pinned: pinned)
@@ -186,6 +208,11 @@ final class DockStripView: NSView {
     }
 
     private func drawItem(_ item: DockItem, cell: NSRect) {
+        if let handle = item.toggleHandle {
+            drawChevron(handle, centerX: cell.midX)
+            return
+        }
+
         if item.kind == .separator {
             drawSeparator(centerX: cell.midX)
             return
@@ -219,6 +246,25 @@ final class DockStripView: NSView {
 
         separatorColor.setFill()
         rect.fill()
+    }
+
+    /// Replaces the separator line with a chevron on the same pixel column and center: "<" collapses the unpinned group, ">" expands it.
+    private func drawChevron(_ handle: ToggleHandle, centerX: CGFloat) {
+        let direction: CGFloat = handle == .collapse ? -1 : 1
+        let center = NSPoint(x: round(centerX) + 0.5, y: stripHeight / 2)
+        let tipX = center.x + direction * chevronWidth / 2
+        let baseX = center.x - direction * chevronWidth / 2
+
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: baseX, y: center.y - chevronHeight / 2))
+        path.line(to: NSPoint(x: tipX, y: center.y))
+        path.line(to: NSPoint(x: baseX, y: center.y + chevronHeight / 2))
+        path.lineWidth = chevronLineWidth
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+
+        chevronColor.setStroke()
+        path.stroke()
     }
 
     // MARK: mouse
@@ -366,7 +412,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         dock = readDockItems()
         let pinned = readPinnedPaths()
         let grouped = insertGroupSeparator(into: dock.items, pinned: pinned)
-        let items = isHideUnpinnedEnabled ? filterHiddenItems(grouped, pinned: pinned) : grouped
+        let visible = isHideUnpinnedEnabled ? filterHiddenItems(grouped, pinned: pinned) : grouped
+        let items = markToggleHandle(visible, pinned: pinned, handle: isHideUnpinnedEnabled ? .expand : .collapse)
 
         let screen = NSScreen.main!.frame
         let width = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }

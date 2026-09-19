@@ -11,7 +11,8 @@ on app launch, termination and activation.
 
 The menu bar item's "Hide unpinned apps" hides every app right of the pinned group
 (Finder and the Dock's persistent apps); the Trash and its separator stay. Clicking
-any separator in the strip toggles the same setting, without moving focus.
+any separator in the strip toggles the same setting, without moving focus. The
+separator at the pinned/unpinned boundary shows a chevron: "<" collapses, ">" expands.
 
 `comparisonOffset` in `main.swift` floats the strip 70pt above the real Dock for
 side-by-side inspection. Set it to 0 when it replaces the Dock.
