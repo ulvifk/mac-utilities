@@ -27,9 +27,12 @@ toggles the same setting without moving focus: "<" collapses the running apps, "
 with their count expands them, and a red dot on the slot means a hidden app has a
 badge. Hovering a tile shows its name in a pill above it, like the real Dock. A click is
 forwarded to the matching item of Apple's Dock (`AXPress`), so apps, folders, files,
-minimized windows and the Trash behave exactly like the real Dock. The strip hides
-itself while the Dock is off-screen (autohide, a fullscreen space) and comes back with
-it. Badge counts come from the Dock's `AXStatusLabel`; custom overlays some apps paint
+minimized windows and the Trash behave exactly like the real Dock. Apple's Dock keeps
+labelling whatever its own layout has under the cursor, no matter what covers it, so
+while the cursor is on an item the band above the strip is painted with a live capture
+of what lies behind the Dock; animated content right above the Dock can therefore look
+a frame late during a hover. The strip hides itself while the Dock is off-screen
+(autohide, a fullscreen space) and comes back with it. Badge counts come from the Dock's `AXStatusLabel`; custom overlays some apps paint
 themselves are not exposed and are not shown.
 
 ## Sitting on Apple's Dock
