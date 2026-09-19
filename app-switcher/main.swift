@@ -26,9 +26,9 @@ let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let panelCornerRadius: CGFloat = 28
-/// Regular glass renders lighter than the backdrop and tintColor only brightens it further; the 1pt rim is left undimmed.
-/// Tuned so the body lands ~5 above the backdrop, like the native switcher's 42,45,52 over a 37,40,45 desktop.
-let panelDimmingColor = NSColor.black.withAlphaComponent(0.24)
+/// Clear glass keeps the backdrop's colour where regular glass washes it out; this pulls it down to the native
+/// switcher's body, roughly 0.63 * backdrop + 19 per channel. The 1pt rim is left undimmed.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.14)
 /// Measured off the native switcher, one row at a time from the edge inward. [row from the edge] -> white alpha
 let topRimAlphas: [CGFloat] = [0.34, 0.07, 0.03, 0.015]
 let bottomRimAlphas: [CGFloat] = [0.35, 0.09, 0.055, 0.045, 0.035, 0.03, 0.02]
@@ -315,7 +315,7 @@ final class SwitcherPanel: NSPanel {
     private func buildGlassView(size: NSSize) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
-        glass.style = .regular
+        glass.style = .clear
         glass.cornerRadius = panelCornerRadius
 
         return glass
