@@ -1,7 +1,8 @@
 # my-dock
 
-Menu bar app that renders a floating strip replicating the macOS 27 Dock one-to-one:
-same glass, size, corner radius, icons, running dots, separator and trash state.
+Menu bar app that replaces the macOS 27 Dock with a strip replicating it one-to-one:
+same glass, size, corner radius, icons, running dots, badges, separator and trash
+state, at the same place on screen.
 
 Pinned apps grouped on the left, running apps to the right of the chevron:
 
@@ -17,12 +18,23 @@ state), so it mirrors the real Dock's order and contents. It re-reads and re-ren
 on app launch, termination and activation.
 
 The menu bar item's "Hide unpinned apps" hides every app right of the pinned group
-(Finder and the Dock's persistent apps); the Trash and its separator stay. Clicking
-any separator in the strip toggles the same setting, without moving focus. The
-separator at the pinned/unpinned boundary shows a chevron: "<" collapses, ">" expands.
+(Finder and the Dock's persistent apps); the Trash stays. A slot at that boundary
+toggles the same setting without moving focus: "<" collapses the running apps, ">"
+with their count expands them, and a red dot on the slot means a hidden app has a
+badge. Hovering a tile shows its name in a pill above it, like the real Dock. Clicking a
+tile launches the app, or brings it to the front (restoring a fully minimized one);
+the Trash opens in Finder. Badge counts come from the Dock's `AXStatusLabel`; custom
+overlays some apps paint themselves are not exposed and are not shown.
 
-`comparisonOffset` in `main.swift` floats the strip 70pt above the real Dock for
-side-by-side inspection. Set it to 0 when it replaces the Dock.
+## Sitting on Apple's Dock
+
+Apple's Dock stays visible underneath: it keeps reserving the screen band, so zoomed
+windows still stop above it. The strip is a window one level above the Dock, spanning
+the Dock's width plus a margin, with the same frame as the real strip. Expanded, the
+strip is wider than the Dock and covers it. Collapsed, the strip is narrower, and the
+rest of the band shows a live capture of the wallpaper behind the band (refreshed
+twice a second and on space changes), so the Dock does not peek out beside it.
+Drag-and-drop pinning currently cannot reach the real Dock because ours covers it.
 
 ## Install
 
@@ -61,11 +73,12 @@ Render once, print the window frame and item list, capture the strip to
 MY_DOCK_SMOKE_TEST=1 MY_DOCK_SMOKE_HIDE=1 ./MyDock.app/Contents/MacOS/my-dock
 ```
 
-`MY_DOCK_SMOKE_HIDE=1/0` writes the "Hide unpinned apps" preference before rendering.
+`MY_DOCK_SMOKE_HIDE=1/0` writes the "Hide unpinned apps" preference before rendering
+and `MY_DOCK_SMOKE_HOVER=<index>` shows the tooltip of that item before the capture.
 
 The capture is a screen-region capture of our own windows around the strip, so it
-needs no Screen Recording permission. The real Dock is another process and is not in
-the capture.
+needs no Screen Recording permission. The capture behind the window (the wallpaper
+patch source) is written next to it as `/tmp/my-dock-smoke-behind.png`.
 
 Always launch with `install.sh`, launchd or `open MyDock.app`. Running the binary
 directly from a terminal makes the terminal the responsible process for the
