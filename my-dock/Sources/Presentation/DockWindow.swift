@@ -11,6 +11,8 @@ protocol DockStripViewDelegate: AnyObject {
 }
 
 final class DockWindow: DockStripViewDelegate {
+    private static let maximizedWindowGap: CGFloat = 5
+
     private unowned let handler: DockEventHandler
     private let menus: DockMenus
 
@@ -22,6 +24,13 @@ final class DockWindow: DockStripViewDelegate {
     private let tooltip = TooltipView()
 
     var isInteracting: Bool { strip.isInteracting }
+
+    var maximizedWindowArea: MaximizedWindowArea? {
+        guard let screen = panel.screen else { return nil }
+        guard let primary = NSScreen.screens.first else { return nil }
+        let reservedTop = screen.frame.minY + stripBottomMargin + stripHeight + Self.maximizedWindowGap
+        return MaximizedWindowArea(visibleFrame: screen.visibleFrame, reservedTop: reservedTop, primaryScreenTop: primary.frame.maxY)
+    }
 
     init(handler: DockEventHandler, menus: DockMenus) {
         self.handler = handler

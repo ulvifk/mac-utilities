@@ -33,7 +33,7 @@ done
 
 echo "installed $APPS_DIR/$APP_NAME"
 if [ "$UTILITY" = my-dock ]; then
-    echo "Core Dock features need no Accessibility permission. Existing access enables badge counts."
+    echo "Accessibility access enables maximized-window fitting and badge counts. App icons and dragging need no permission."
 else
     echo "Grant Accessibility once in System Settings > Privacy & Security > Accessibility (first install only)."
 fi

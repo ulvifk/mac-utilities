@@ -2,6 +2,7 @@ import AppKit
 
 final class MyDockController: NSObject, NSApplicationDelegate, DockEventHandler {
     private let session: DockSession
+    private let maximizedWindows = MaximizedWindowService()
     private var timer: Timer?
 
     private lazy var menus = DockMenus(handler: self)
@@ -30,6 +31,7 @@ final class MyDockController: NSObject, NSApplicationDelegate, DockEventHandler 
 
     func applicationWillTerminate(_ notification: Notification) {
         timer!.invalidate()
+        maximizedWindows.stopObserving()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
         NSStatusBar.system.removeStatusItem(statusItem)
@@ -70,5 +72,6 @@ final class MyDockController: NSObject, NSApplicationDelegate, DockEventHandler 
         let runningIDs = Set(running.compactMap(\.bundleIdentifier))
         let items = DockItems.build(state: session.state, runningIDs: runningIDs, badges: DockBadges.read())
         window.render(items)
+        maximizedWindows.update(area: window.maximizedWindowArea)
     }
 }

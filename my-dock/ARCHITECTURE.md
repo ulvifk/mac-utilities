@@ -14,6 +14,8 @@ MyDock draws one horizontal glass strip. It owns the app list and drag sessions.
 | Draw glass details, icons, badges, and drop feedback | `Sources/Presentation/DockRenderer.swift`, `DockAppearance.swift` |
 | Handle mouse, menu, accessibility, and drag events | `Sources/Presentation/DockStripView.swift`, `DockAccessibilityElement.swift` |
 | Position the strip and tooltips | `Sources/Presentation/DockWindow.swift` |
+| Calculate space for maximized windows | `Sources/Model/MaximizedWindowArea.swift` |
+| Observe and resize the focused maximized window | `Sources/Platform/MaximizedWindowService.swift` |
 | Build native menus | `Sources/Presentation/DockMenus.swift` |
 | Read app information, pasteboards, badges, and saved files; perform macOS actions | `Sources/Platform/` |
 
@@ -35,9 +37,13 @@ For a visual change, edit the renderer or appearance constants. Layout is calcul
 - A collapsed chevron remains a drop target. Trash and the desktop reject internal shortcut drops.
 - Group assignment survives an app quitting and restarting. Keeping an app in MyDock controls whether it remains displayed while stopped.
 - Persisted `apps.json` keeps the existing format. Do not replace it with the separate `layout.json` used by the experimental shelf.
+- Window fitting uses Accessibility notifications and waits for mouse release. The model recognizes maximized frames, including tiling margins. The service excludes minimized, true full-screen, and non-resizable windows. This is an after-the-fact correction; Apple still owns snapping.
+- Reserve a stable strip height when fitting windows, even when a long app list scales the icons down. Expanding the hidden group must not resize application windows.
 
 ## Checks
 
 Run `./my-dock/test.sh` from the repository root. These are standalone Swift test executables; they do not need XCTest or a full Xcode installation. The model and session tests cover state changes and failed saves. The input tests cover pasteboard validation. The presentation tests cover app visibility, badges, drop boundaries, and allowed operations.
 
 Run `./my-dock/build.sh` for the signed app. The build treats warnings as errors. After changing the interaction code, check real dragging, cancelled drops, menus, and saved order across a restart on macOS.
+
+Window-space tests cover tiling margins, preserving the top edge, repeat adjustments, excluded frames, and screen coordinate conversion. Check the visible second resize with a real maximized window; correct final bounds do not prove a seamless animation.
