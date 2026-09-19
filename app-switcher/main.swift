@@ -25,7 +25,21 @@ let nameTopSpacing: CGFloat = 2
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
-let panelCornerRadius: CGFloat = 28
+let panelCornerRadius: CGFloat = 24
+/// The window shadow draws a hard 1px dark outline around glass, so the panel casts its own soft one from a layer instead.
+let panelShadowMargin: CGFloat = 28
+let panelShadowOpacity: Float = 0.25
+let panelShadowRadius: CGFloat = 12
+let panelShadowOffset = CGSize(width: 0, height: -4)
+/// tintColor only brightens the glass, so a fill inside the 1pt rim darkens it; kept light so the lensing shows.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.15)
+/// Top-edge sheen and a bright 1pt rim stroke, the "liquid glass" cues the plain glass view lacks.
+let specularHeight: CGFloat = 14
+let specularTopColor = NSColor.white.withAlphaComponent(0.35)
+let specularRimColor = NSColor.white.withAlphaComponent(0.45)
+let highlightColor = NSColor.white.withAlphaComponent(0.10)
+let highlightStrokeColor = NSColor.white.withAlphaComponent(0.08)
+let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.22)
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -54,15 +68,23 @@ func writeCapture(around window: NSWindow, path: String) {
     print("smoke: capture \(image.width)x\(image.height) -> \(path)")
 }
 
-/// Colorful window behind the panel, so the capture shows what the glass is blurring.
+/// Colorful window behind the panel, so the capture shows what the glass is blurring. APP_SWITCHER_SMOKE_DARK=1 makes it a dark gray-blue instead.
 var captureBackdrop: NSWindow?
+
+func getCaptureBackdropColors() -> [CGColor] {
+    if ProcessInfo.processInfo.environment["APP_SWITCHER_SMOKE_DARK"] == "1" {
+        return [NSColor(srgbRed: 0x1b / 255, green: 0x1d / 255, blue: 0x24 / 255, alpha: 1).cgColor, NSColor(srgbRed: 0x2a / 255, green: 0x2f / 255, blue: 0x3a / 255, alpha: 1).cgColor]
+    }
+
+    return [NSColor.systemPink.cgColor, NSColor.systemOrange.cgColor, NSColor.white.cgColor, NSColor.systemTeal.cgColor, NSColor.systemIndigo.cgColor]
+}
 
 func showCaptureBackdrop(behind window: NSWindow) {
     let backdrop = NSWindow(contentRect: window.frame.insetBy(dx: -80, dy: -80), styleMask: .borderless, backing: .buffered, defer: false)
     let gradient = CAGradientLayer()
 
     gradient.frame = NSRect(origin: .zero, size: backdrop.frame.size)
-    gradient.colors = [NSColor.systemPink.cgColor, NSColor.systemOrange.cgColor, NSColor.white.cgColor, NSColor.systemTeal.cgColor, NSColor.systemIndigo.cgColor]
+    gradient.colors = getCaptureBackdropColors()
     gradient.startPoint = CGPoint(x: 0, y: 1)
     gradient.endPoint = CGPoint(x: 1, y: 0)
 
@@ -152,6 +174,24 @@ final class IconCellView: NSView {
     }
 }
 
+/// Top-edge sheen and a bright 1pt rim stroke drawn over the glass; lets clicks through to the cells beneath.
+final class SpecularView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        return nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rim = NSBezierPath(roundedRect: bounds.insetBy(dx: 1.5, dy: 1.5), xRadius: panelCornerRadius - 1.5, yRadius: panelCornerRadius - 1.5)
+        rim.lineWidth = 1
+        specularRimColor.setStroke()
+        rim.stroke()
+
+        let sheen = NSGradient(starting: specularTopColor, ending: specularTopColor.withAlphaComponent(0))!
+        let band = NSRect(x: 0, y: bounds.height - specularHeight, width: bounds.width, height: specularHeight)
+        sheen.draw(in: band, angle: -90)
+    }
+}
+
 struct SwitcherState {
     let apps: [NSRunningApplication]
     let selectedIndex: Int
@@ -182,9 +222,8 @@ final class SwitcherPanel: NSPanel {
         level = .floating
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         hidesOnDeactivate = false
-        appearance = NSAppearance(named: .darkAqua)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
 
@@ -231,6 +270,8 @@ final class SwitcherPanel: NSPanel {
         highlight = NSView()
         highlight.wantsLayer = true
         highlight.layer?.cornerRadius = 18
+        highlight.layer?.borderWidth = 1
+        highlight.layer?.borderColor = highlightStrokeColor.cgColor
 
         let container = NSView()
         container.addSubview(highlight)
@@ -247,17 +288,16 @@ final class SwitcherPanel: NSPanel {
         let rowSize = iconRow.fittingSize
         let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
-
-        container.wantsLayer = true
-        container.layer?.cornerRadius = panelCornerRadius
-        container.layer?.borderWidth = 1
-        container.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+        container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
+        container.addSubview(SpecularView(frame: container.bounds), positioned: .below, relativeTo: highlight)
 
         let glass = buildGlassView(size: contentSize)
         glass.contentView = container
 
-        contentView = glass
-        setContentSize(contentSize)
+        let shadowCaster = buildShadowCaster(around: glass)
+        let panelSize = shadowCaster.frame.size
+        contentView = shadowCaster
+        setContentSize(panelSize)
     }
 
     /// Truncates rather than widening the panel: the width comes from the icon row alone.
@@ -279,18 +319,49 @@ final class SwitcherPanel: NSPanel {
     private func buildGlassView(size: NSSize) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
-        glass.style = .regular
+        glass.style = .clear
         glass.cornerRadius = panelCornerRadius
-        glass.tintColor = NSColor.black.withAlphaComponent(0.28)
 
         return glass
     }
 
+    /// The glass draws a dark 1px outline outside its bounds; a masking view clips it away before the shadow is cast.
+    private func buildShadowCaster(around glass: NSView) -> NSView {
+        let clip = NSView(frame: NSRect(x: panelShadowMargin, y: panelShadowMargin, width: glass.frame.width, height: glass.frame.height))
+        let caster = NSView(frame: NSRect(x: 0, y: 0, width: glass.frame.width + 2 * panelShadowMargin, height: glass.frame.height + 2 * panelShadowMargin))
+
+        clip.wantsLayer = true
+        clip.layer?.cornerRadius = panelCornerRadius
+        clip.layer?.masksToBounds = true
+        clip.addSubview(glass)
+
+        caster.wantsLayer = true
+        caster.layer?.shadowOpacity = panelShadowOpacity
+        caster.layer?.shadowRadius = panelShadowRadius
+        caster.layer?.shadowOffset = panelShadowOffset
+        caster.layer?.shadowPath = CGPath(roundedRect: clip.frame, cornerWidth: panelCornerRadius, cornerHeight: panelCornerRadius, transform: nil)
+        caster.addSubview(clip)
+
+        return caster
+    }
+
+    private func buildDimmingView(size: NSSize) -> NSView {
+        let dimming = NSView(frame: NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1))
+
+        dimming.wantsLayer = true
+        dimming.layer?.cornerRadius = panelCornerRadius - 1
+        dimming.layer?.backgroundColor = panelDimmingColor.cgColor
+
+        return dimming
+    }
+
+    /// Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
     private func buildIconRow(state: SwitcherState) -> NSStackView {
         let row = NSStackView()
 
         row.orientation = .horizontal
         row.spacing = itemSpacing
+        row.appearance = NSAppearance(named: .aqua)
 
         iconCells = []
         iconViews = []
@@ -403,8 +474,8 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
-        if filterEnabled { return NSColor.systemGreen.withAlphaComponent(0.22) }
-        return NSColor.labelColor.withAlphaComponent(0.12)
+        if filterEnabled { return filteredHighlightColor }
+        return highlightColor
     }
 }
 
