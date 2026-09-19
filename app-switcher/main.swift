@@ -15,15 +15,20 @@ let whitelistKey = "whitelist"
 let iconSize: CGFloat = 68
 let itemSpacing: CGFloat = 5
 let horizontalPadding: CGFloat = 22
-let screenEdgeMargin: CGFloat = 24
+/// The widest the panel gets, as a share of the screen, before the icons wrap to the next row.
+let maxPanelWidthFraction: CGFloat = 0.7
 let verticalPadding: CGFloat = 7.5
 let dotSize: CGFloat = 5
 
 /// The 13pt name label's height. The whitelist dot gets a band of the same height above the icon, so the two mirror each other.
 let nameBandHeight: CGFloat = 16
 let nameTopSpacing: CGFloat = 0
+/// Rows overlap their bands: the name below one row's icons ends 3pt above the whitelist dots of the next.
+let rowSpacing: CGFloat = -8
 /// Below the band's centre, so the dot reads as attached to the icon rather than floating.
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
+/// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
+let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let panelCornerRadius: CGFloat = 28
 /// Clear glass keeps the backdrop's colour where regular glass washes it out; this pulls it down to the native
 /// switcher's body, roughly 0.63 * backdrop + 19 per channel. The 1pt rim is left undimmed.
@@ -209,11 +214,6 @@ final class SwitcherPanel: NSPanel {
     private var nameLabel = NSTextField(labelWithString: "")
     private var nameConstraints: [NSLayoutConstraint] = []
 
-    /// 1 until the row would leave the screen, then the factor that makes it fit.
-    private var iconScale: CGFloat = 1
-    private var scaledIconSize: CGFloat { iconSize * iconScale }
-    private var scaledItemSpacing: CGFloat { itemSpacing * iconScale }
-
     init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
@@ -266,30 +266,28 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func buildContent(state: SwitcherState) {
-        iconScale = getIconScale(appCount: state.apps.count)
-
-        let iconRow = buildIconRow(state: state)
-        iconRow.translatesAutoresizingMaskIntoConstraints = false
+        let iconRows = buildIconRows(state: state)
+        iconRows.translatesAutoresizingMaskIntoConstraints = false
 
         nameLabel = buildNameLabel(text: state.apps[state.selectedIndex].localizedName ?? "")
 
         highlight = NSView()
         highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = highlightCornerRadius * iconScale
+        highlight.layer?.cornerRadius = highlightCornerRadius
 
         let container = NSView()
         container.addSubview(highlight)
-        container.addSubview(iconRow)
+        container.addSubview(iconRows)
         container.addSubview(nameLabel)
 
         NSLayoutConstraint.activate([
-            iconRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
-            iconRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
-            iconRow.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
-            iconRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
+            iconRows.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            iconRows.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            iconRows.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
+            iconRows.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
         ])
 
-        let rowSize = iconRow.fittingSize
+        let rowSize = iconRows.fittingSize
         let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
         container.frame = NSRect(origin: .zero, size: contentSize)
         container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
@@ -338,21 +336,35 @@ final class SwitcherPanel: NSPanel {
     }
 
     /// Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
-    private func buildIconRow(state: SwitcherState) -> NSStackView {
-        let row = NSStackView()
+    private func buildIconRows(state: SwitcherState) -> NSStackView {
+        let rows = NSStackView()
 
-        row.orientation = .horizontal
-        row.spacing = scaledItemSpacing
-        row.appearance = NSAppearance(named: .aqua)
+        rows.orientation = .vertical
+        rows.spacing = rowSpacing
+        rows.alignment = .centerX
+        rows.appearance = NSAppearance(named: .aqua)
 
         iconViews = []
         whitelistDots = []
 
-        for app in state.apps {
-            row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
+        let iconsPerRow = getIconsPerRow()
+
+        for rowStart in stride(from: 0, to: state.apps.count, by: iconsPerRow) {
+            let row = NSStackView()
+
+            row.orientation = .horizontal
+            row.spacing = itemSpacing
+
+            for index in rowStart..<min(rowStart + iconsPerRow, state.apps.count) {
+                let app = state.apps[index]
+
+                row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
+            }
+
+            rows.addArrangedSubview(row)
         }
 
-        return row
+        return rows
     }
 
     /// Whitelist dot above the icon, room for the selected app name below it, icon centered between them.
@@ -364,7 +376,7 @@ final class SwitcherPanel: NSPanel {
         cell.index = iconViews.count
         cell.onClick = { [unowned self] index in self.onCellClicked(index) }
 
-        icon.image?.size = NSSize(width: scaledIconSize, height: scaledIconSize)
+        icon.image?.size = NSSize(width: iconSize, height: iconSize)
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = !whitelisted
@@ -377,10 +389,10 @@ final class SwitcherPanel: NSPanel {
         cell.addSubview(dot)
 
         NSLayoutConstraint.activate([
-            cell.widthAnchor.constraint(equalToConstant: scaledIconSize),
-            cell.heightAnchor.constraint(equalToConstant: scaledIconSize + 2 * (nameBandHeight + nameTopSpacing)),
-            icon.widthAnchor.constraint(equalToConstant: scaledIconSize),
-            icon.heightAnchor.constraint(equalToConstant: scaledIconSize),
+            cell.widthAnchor.constraint(equalToConstant: iconSize),
+            cell.heightAnchor.constraint(equalToConstant: cellHeight),
+            icon.widthAnchor.constraint(equalToConstant: iconSize),
+            icon.heightAnchor.constraint(equalToConstant: iconSize),
             icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
             icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
@@ -407,6 +419,7 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func applySelection(state: SwitcherState, animated: Bool) {
+        contentView?.layoutSubtreeIfNeeded()
         placeNameUnderSelectedIcon(selectedIndex: state.selectedIndex)
         contentView?.layoutSubtreeIfNeeded()
 
@@ -440,9 +453,10 @@ final class SwitcherPanel: NSPanel {
 
     /// The widest a name centered on this icon can be without crossing either panel edge, so it truncates instead of sliding.
     private func getNameMaxWidth(selectedIndex: Int) -> CGFloat {
-        let appCount = CGFloat(iconViews.count)
-        let iconCenterX = horizontalPadding + CGFloat(selectedIndex) * (scaledIconSize + scaledItemSpacing) + scaledIconSize / 2
-        let containerWidth = horizontalPadding * 2 + appCount * scaledIconSize + (appCount - 1) * scaledItemSpacing
+        let icon = iconViews[selectedIndex]
+        let iconFrame = icon.superview!.convert(icon.frame, to: highlight.superview!)
+        let iconCenterX = iconFrame.midX
+        let containerWidth = highlight.superview!.bounds.width
 
         return 2 * min(iconCenterX - horizontalPadding, containerWidth - horizontalPadding - iconCenterX)
     }
@@ -452,14 +466,13 @@ final class SwitcherPanel: NSPanel {
         let icon = iconViews[selectedIndex]
         let frame = icon.superview!.convert(icon.frame, to: highlight.superview!)
 
-        return frame.insetBy(dx: highlightIconInset * iconScale, dy: highlightIconInset * iconScale)
+        return frame.insetBy(dx: highlightIconInset, dy: highlightIconInset)
     }
 
-    private func getIconScale(appCount: Int) -> CGFloat {
-        let availableWidth = NSScreen.main!.visibleFrame.width - 2 * screenEdgeMargin - 2 * horizontalPadding
-        let naturalWidth = CGFloat(appCount) * iconSize + CGFloat(appCount - 1) * itemSpacing
+    private func getIconsPerRow() -> Int {
+        let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
 
-        return min(1, availableWidth / naturalWidth)
+        return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
