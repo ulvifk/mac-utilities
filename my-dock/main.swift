@@ -40,7 +40,7 @@ let toggleBadgeDotDiameter: CGFloat = 5
 let toggleHoverColor = NSColor.white.withAlphaComponent(0.10)
 let toggleHoverCornerRadius: CGFloat = 8
 let toggleHoverVerticalInset: CGFloat = 8
-let recenterAnimationDuration: TimeInterval = 0.25
+let stripResizeAnimationDuration: TimeInterval = 0.25
 
 /// Name pill in its own panel above the hovered cell, so it may overhang the strip's ends. Fill and rims match Apple's tooltip over a dark backdrop.
 let tooltipPillHeight: CGFloat = 26
@@ -55,40 +55,46 @@ let tooltipBottomRimColor = NSColor.white.withAlphaComponent(0.15)
 let tooltipTextAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.white]
 
 let hideUnpinnedKey = "hideUnpinned"
-/// Apple's Dock settings as they were before we hid it, restored on quit.
-let restoreAutohideKey = "restoreAutohide"
-let restoreAutohideDelayKey = "restoreAutohideDelay"
-let hiddenDockAutohideDelay = 1000.0
+/// The window spans Apple's Dock plus this margin on each side, so the collapsed strip can hide the Dock behind a wallpaper patch.
+let bandMargin: CGFloat = 12
+let backdropRefreshInterval: TimeInterval = 0.5
 let finderPath = "/System/Library/CoreServices/Finder.app"
 let dockDefaults = UserDefaults(suiteName: "com.apple.dock")!
 /// Pinning happens by drag and drop in Apple's Dock, which fires no workspace notification.
 let refreshInterval: TimeInterval = 2
 let smokeCapturePath = "/tmp/my-dock-smoke.png"
+let smokeBackdropPath = "/tmp/my-dock-smoke-behind.png"
 
-/// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
+/// CGWindowListCreateImage is gone from the SDK but still in the dylib.
 typealias CreateWindowImage = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+let createWindowImage = unsafeBitCast(dlsym(dlopen(nil, RTLD_NOW), "CGWindowListCreateImage")!, to: CreateWindowImage.self)
+let onScreenOnlyOption: UInt32 = 1 << 0
+let onScreenBelowWindowOption: UInt32 = 1 << 2
+let bestResolutionOption: UInt32 = 1 << 3
 
+func getFlippedScreenRect(_ rect: NSRect) -> CGRect {
+    return CGRect(x: rect.minX, y: NSScreen.screens[0].frame.height - rect.maxY, width: rect.width, height: rect.height)
+}
+
+/// Screen-region capture of our own windows plus the desktop, for the smoke test.
 func writeCapture(around window: NSWindow, path: String) {
     let margin: CGFloat = 40
-    let frame = window.frame.insetBy(dx: -margin, dy: -margin)
-    let flipped = CGRect(
-        x: frame.minX,
-        y: NSScreen.screens[0].frame.height - frame.maxY,
-        width: frame.width,
-        height: frame.height
-    )
+    let region = getFlippedScreenRect(window.frame.insetBy(dx: -margin, dy: -margin))
+    let image = createWindowImage(region, onScreenOnlyOption, 0, bestResolutionOption)!.takeRetainedValue()
 
-    let onScreenOnly: UInt32 = 1 << 0
-    let everyWindow: UInt32 = 0
-    let bestResolution: UInt32 = 1 << 3
-
-    let symbol = dlsym(dlopen(nil, RTLD_NOW), "CGWindowListCreateImage")!
-    let createImage = unsafeBitCast(symbol, to: CreateWindowImage.self)
-    let image = createImage(flipped, onScreenOnly, everyWindow, bestResolution)!.takeRetainedValue()
-    let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
-
-    try! png.write(to: URL(fileURLWithPath: path))
+    writePNG(image, path: path)
     print("smoke: capture \(image.width)x\(image.height) -> \(path)")
+}
+
+func writePNG(_ image: CGImage, path: String) {
+    let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
+    try! png.write(to: URL(fileURLWithPath: path))
+}
+
+/// What sits behind the window: without Screen Recording permission other apps' windows, the Dock included, are left out, which
+/// leaves the wallpaper. Nil is a transient the caller rides out with the previous image.
+func captureBackdrop(below window: NSWindow) -> CGImage? {
+    return createWindowImage(getFlippedScreenRect(window.frame), onScreenBelowWindowOption, UInt32(window.windowNumber), bestResolutionOption)?.takeRetainedValue()
 }
 
 enum DockItemKind {
@@ -117,7 +123,7 @@ struct DockItem {
 }
 
 /// Apple's Dock item list through Accessibility. The frame is in top-left screen coordinates.
-/// Nil while the Dock is absent or still starting: we restart it ourselves with killall, so that state is expected for a second.
+/// Nil while the Dock is absent or still starting, which happens whenever it restarts (a crash, a killall, a settings change).
 func readDockItems() -> (frame: CGRect, items: [DockItem])? {
     guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return nil }
     let application = AXUIElementCreateApplication(dock.processIdentifier)
@@ -529,6 +535,20 @@ final class DockStripView: NSView {
     }
 }
 
+/// Draws the captured wallpaper pixel for pixel, so the patch continues the real wallpaper around the band without a seam.
+final class BackdropView: NSView {
+    var image: CGImage? {
+        didSet { needsDisplay = true }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let image else { return }
+
+        NSGraphicsContext.current!.cgContext.interpolationQuality = .none
+        NSGraphicsContext.current!.cgContext.draw(image, in: bounds)
+    }
+}
+
 /// Apple's Dock tooltip: a dark capsule with a filleted speech-bubble caret, drawn as one shape, the name centered on its line box.
 final class TooltipView: NSView {
     var text = "" {
@@ -597,6 +617,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     private let hideUnpinnedMenuItem = NSMenuItem(title: "Hide unpinned apps", action: #selector(toggleHideUnpinned), keyEquivalent: "")
 
     private let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    private let band = NSView()
+    private let backdrop = BackdropView()
     private let glass = NSGlassEffectView()
     private let strip = DockStripView()
 
@@ -604,7 +626,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     private let tooltip = TooltipView()
 
     private var dock = (frame: CGRect.zero, items: [DockItem]())
-    private var frameAnimation: Timer?
+    private var stripAnimation: Timer?
+    private var backdropRefresh: Timer?
 
     /// The smoke test goes first because it writes the preferences the menu and the first render read.
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -615,49 +638,6 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         observeApplicationChanges()
         scheduleRefresh()
         render()
-        hideAppleDock()
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        restoreAppleDock()
-    }
-
-    // MARK: Apple's Dock
-
-    /// Autohide with a huge delay keeps Apple's Dock off screen while its item list stays readable. The previous settings are kept
-    /// in our defaults until a clean quit restores them, so a crash or kill does not lose them.
-    private func hideAppleDock() {
-        let defaults = UserDefaults.standard
-
-        if defaults.object(forKey: restoreAutohideKey) == nil {
-            defaults.set(dockDefaults.bool(forKey: "autohide"), forKey: restoreAutohideKey)
-            defaults.set(dockDefaults.object(forKey: "autohide-delay"), forKey: restoreAutohideDelayKey)
-        }
-
-        dockDefaults.set(true, forKey: "autohide")
-        dockDefaults.set(hiddenDockAutohideDelay, forKey: "autohide-delay")
-        dockDefaults.synchronize()
-        restartAppleDock()
-    }
-
-    private func restoreAppleDock() {
-        let defaults = UserDefaults.standard
-
-        dockDefaults.set(defaults.bool(forKey: restoreAutohideKey), forKey: "autohide")
-        dockDefaults.set(defaults.object(forKey: restoreAutohideDelayKey), forKey: "autohide-delay")
-        dockDefaults.synchronize()
-        defaults.removeObject(forKey: restoreAutohideKey)
-        defaults.removeObject(forKey: restoreAutohideDelayKey)
-        restartAppleDock()
-    }
-
-    private func restartAppleDock() {
-        let killall = Process()
-
-        killall.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        killall.arguments = ["Dock"]
-        try! killall.run()
-        killall.waitUntilExit()
     }
 
     private func buildMenu() {
@@ -686,7 +666,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     }
 
     /// Apple's Dock draws the light trash variant in both appearances, so the content draws as aqua.
-    /// A borderless non-activating panel cannot become key, so clicks on the strip never move focus.
+    /// A borderless non-activating panel cannot become key, so clicks on the strip never move focus. It sits one level above
+    /// Apple's Dock and spans it, so the Dock keeps reserving the screen band while ours covers it.
     private func buildWindow() {
         glass.style = .regular
         glass.cornerRadius = stripCornerRadius
@@ -698,11 +679,15 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         strip.onHovered = { [unowned self] item, centerX in self.showTooltip(for: item, centerX: centerX) }
         strip.onHoverEnded = { [unowned self] in self.tooltipPanel.orderOut(nil) }
 
-        panel.contentView = glass
+        backdrop.autoresizingMask = [.width, .height]
+        band.addSubview(backdrop)
+        band.addSubview(glass)
+
+        panel.contentView = band
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)))
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)) + 1)
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
         tooltipPanel.contentView = tooltip
@@ -731,51 +716,81 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         for name in names {
             NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { _ in self.render() }
         }
+
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { _ in self.refreshBackdrop() }
     }
 
     private func scheduleRefresh() {
         Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in self.render() }
     }
 
-    /// The strip is drawn for the final layout at once; the window re-centers with an animation around it.
+    /// The window always spans the whole band; only the glass strip changes width, animated, centered in it.
     private func render() {
         guard let dock = readDockItems() else { return }
         self.dock = dock
 
-        let items = buildStripItems(dock.items, pinned: readPinnedPaths(), collapsed: isHideUnpinnedEnabled)
+        let collapsed = isHideUnpinnedEnabled
+        let items = buildStripItems(dock.items, pinned: readPinnedPaths(), collapsed: collapsed)
+        let stripWidth = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
+        let bandWidth = max(dock.frame.width, stripWidth) + 2 * bandMargin
         let screen = NSScreen.main!.frame
-        let width = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
-        let frame = NSRect(x: screen.midX - width / 2, y: screen.minY + stripBottomMargin, width: width, height: stripHeight)
 
         strip.items = items
-        if !panel.isVisible {
-            panel.setFrame(frame, display: true)
-            panel.orderFrontRegardless()
+        panel.setFrame(NSRect(x: screen.midX - bandWidth / 2, y: screen.minY + stripBottomMargin, width: bandWidth, height: stripHeight), display: true)
+        panel.orderFrontRegardless()
+        setBackdropShown(collapsed)
+        animateStrip(toWidth: stripWidth, thenHideBackdrop: !collapsed)
+    }
+
+    /// Collapsed, the wallpaper patch covers the Dock beside the strip and follows the wallpaper; expanded, the strip covers it all.
+    private func setBackdropShown(_ shown: Bool) {
+        if !shown {
+            backdropRefresh?.invalidate()
+            backdropRefresh = nil
             return
         }
 
-        animateFrame(to: frame)
+        backdrop.isHidden = false
+        refreshBackdrop()
+        if backdropRefresh != nil { return }
+        backdropRefresh = Timer.scheduledTimer(withTimeInterval: backdropRefreshInterval, repeats: true) { [unowned self] _ in refreshBackdrop() }
     }
 
-    /// Timer-driven instead of the window animator, which only starts moving some 200ms after the click.
-    private func animateFrame(to target: NSRect) {
-        let start = panel.frame
+    private func refreshBackdrop() {
+        if backdrop.isHidden { return }
+        guard let image = captureBackdrop(below: panel) else { return }
+
+        backdrop.image = image
+    }
+
+    /// Timer-driven: the view animator would do, but this keeps one code path with the exact end frame and a completion.
+    private func animateStrip(toWidth width: CGFloat, thenHideBackdrop: Bool) {
+        let target = NSRect(x: round((panel.frame.width - width) / 2), y: 0, width: width, height: stripHeight)
+        let start = glass.frame
         let startedAt = Date()
 
-        frameAnimation?.invalidate()
-        frameAnimation = Timer.scheduledTimer(withTimeInterval: 1 / 60, repeats: true) { [unowned self] timer in
-            let progress = min(1, Date().timeIntervalSince(startedAt) / recenterAnimationDuration)
+        stripAnimation?.invalidate()
+        if !panel.isVisible || start.width == 0 {
+            glass.frame = target
+            backdrop.isHidden = thenHideBackdrop
+            return
+        }
+
+        stripAnimation = Timer.scheduledTimer(withTimeInterval: 1 / 60, repeats: true) { [unowned self] timer in
+            let progress = min(1, Date().timeIntervalSince(startedAt) / stripResizeAnimationDuration)
             let eased = progress < 0.5 ? 2 * progress * progress : 1 - pow(-2 * progress + 2, 2) / 2
 
-            panel.setFrame(interpolateRect(start, target, eased), display: true)
-            if progress >= 1 { timer.invalidate() }
+            glass.frame = interpolateRect(start, target, eased)
+            if progress < 1 { return }
+            timer.invalidate()
+            backdrop.isHidden = thenHideBackdrop
         }
     }
 
     /// Centered on the cell in screen coordinates, caret tip a few points above the strip; may overhang the strip's ends.
     private func showTooltip(for item: DockItem, centerX: CGFloat) {
         let size = TooltipView.getSize(for: item.name)
-        let origin = NSPoint(x: round(panel.frame.minX + centerX - size.width / 2), y: panel.frame.maxY + tooltipTipAboveStrip)
+        let origin = NSPoint(x: round(panel.frame.minX + glass.frame.minX + centerX - size.width / 2), y: panel.frame.maxY + tooltipTipAboveStrip)
 
         tooltip.text = item.name
         tooltipPanel.setFrame(NSRect(origin: origin, size: size), display: true)
@@ -794,10 +809,11 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-            print("smoke: frame=\(self.panel.frame) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
+            print("smoke: frame=\(self.panel.frame) strip=\(self.glass.frame) level=\(self.panel.level.rawValue) backdropShown=\(!self.backdrop.isHidden) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
             print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
             print("smoke: tooltip=\(self.tooltipPanel.frame) visible=\(self.tooltipPanel.isVisible) text=\(self.tooltip.text) badges=\(self.strip.items.filter { $0.badge != nil }.map { "\($0.name)=\($0.badge!)" })")
             writeCapture(around: self.panel, path: smokeCapturePath)
+            if let behind = captureBackdrop(below: self.panel) { writePNG(behind, path: smokeBackdropPath) }
             exit(0)
         }
     }
@@ -805,7 +821,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     /// Drives the real hover path (tracking area, highlight, tooltip) by moving the pointer onto the cell.
     private func moveMouse(toCellAt index: Int) {
         let cell = strip.getCellFrames()[index]
-        let point = CGPoint(x: panel.frame.minX + cell.midX, y: NSScreen.main!.frame.height - (panel.frame.minY + stripHeight / 2))
+        let point = CGPoint(x: panel.frame.minX + glass.frame.minX + cell.midX, y: NSScreen.main!.frame.height - (panel.frame.minY + stripHeight / 2))
 
         CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)!.post(tap: .cghidEventTap)
     }

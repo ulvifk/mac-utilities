@@ -26,19 +26,15 @@ tile launches the app, or brings it to the front (restoring a fully minimized on
 the Trash opens in Finder. Badge counts come from the Dock's `AXStatusLabel`; custom
 overlays some apps paint themselves are not exposed and are not shown.
 
-## Replacing Apple's Dock
+## Sitting on Apple's Dock
 
-On launch the app hides Apple's Dock by setting `com.apple.dock` `autohide` to true
-with an `autohide-delay` of 1000 seconds and restarting the Dock, after remembering
-the previous values in its own defaults (`restoreAutohide`, `restoreAutohideDelay`).
-The Dock keeps running hidden, which is what the strip reads its items from. Quit
-from the menu bar item writes the previous values back and restarts the Dock again.
-If the app is killed instead of quit, the next launch keeps the remembered values
-and the next clean quit restores them. To restore by hand:
-
-```sh
-defaults write com.apple.dock autohide -bool false; defaults delete com.apple.dock autohide-delay; killall Dock
-```
+Apple's Dock stays visible underneath: it keeps reserving the screen band, so zoomed
+windows still stop above it. The strip is a window one level above the Dock, spanning
+the Dock's width plus a margin, with the same frame as the real strip. Expanded, the
+strip is wider than the Dock and covers it. Collapsed, the strip is narrower, and the
+rest of the band shows a live capture of the wallpaper behind the band (refreshed
+twice a second and on space changes), so the Dock does not peek out beside it.
+Drag-and-drop pinning currently cannot reach the real Dock because ours covers it.
 
 ## Install
 
@@ -81,8 +77,8 @@ MY_DOCK_SMOKE_TEST=1 MY_DOCK_SMOKE_HIDE=1 ./MyDock.app/Contents/MacOS/my-dock
 and `MY_DOCK_SMOKE_HOVER=<index>` shows the tooltip of that item before the capture.
 
 The capture is a screen-region capture of our own windows around the strip, so it
-needs no Screen Recording permission. A smoke run hides Apple's Dock like a normal
-launch and exits without restoring it; the next clean quit of the app restores it.
+needs no Screen Recording permission. The capture behind the window (the wallpaper
+patch source) is written next to it as `/tmp/my-dock-smoke-behind.png`.
 
 Always launch with `install.sh`, launchd or `open MyDock.app`. Running the binary
 directly from a terminal makes the terminal the responsible process for the
