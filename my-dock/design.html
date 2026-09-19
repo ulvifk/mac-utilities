@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>dock-strip design</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, "SF Pro Text", Helvetica, sans-serif;
+    color: #f2f2f2;
+    background:
+      radial-gradient(1200px 600px at 20% 10%, #3a4a6a 0%, transparent 60%),
+      radial-gradient(900px 500px at 80% 90%, #5a3a4a 0%, transparent 60%),
+      #1b1d24;
+    overflow: hidden;
+  }
+
+  /* menu bar */
+  .menubar {
+    height: 28px;
+    background: rgba(20,20,24,.65);
+    backdrop-filter: blur(20px);
+    display: flex; align-items: center; justify-content: flex-end;
+    padding: 0 12px; gap: 14px; font-size: 13px;
+  }
+  .menubar .icon {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: grid; place-items: center; cursor: pointer;
+    background: rgba(255,255,255,.08);
+  }
+  .menubar .icon svg { width: 14px; height: 14px; fill: #fff; }
+  .menubar .clock { opacity: .85; }
+
+  /* dropdown */
+  .menu {
+    position: absolute; top: 30px; right: 60px;
+    width: 220px; padding: 6px;
+    background: rgba(40,40,46,.92);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45);
+    font-size: 13px;
+    display: none;
+  }
+  .menu.open { display: block; }
+  .menu .item { padding: 6px 10px; border-radius: 6px; display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .menu .item:hover { background: #3b6df2; }
+  .menu .item .check { width: 12px; display: inline-block; }
+  .menu hr { border: 0; border-top: 1px solid rgba(255,255,255,.12); margin: 6px 4px; }
+
+  /* explanation */
+  .note {
+    position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+    max-width: 560px; text-align: center; line-height: 1.5; font-size: 15px; opacity: .85;
+  }
+  .note b { color: #fff; }
+  .note code { background: rgba(255,255,255,.1); padding: 1px 6px; border-radius: 4px; }
+
+  /* dock */
+  .dock-wrap { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; }
+  .dock {
+    display: flex; align-items: flex-end; gap: 6px;
+    padding: 6px 8px;
+    background: rgba(255,255,255,.14);
+    backdrop-filter: blur(30px) saturate(160%);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    transition: padding .25s ease;
+  }
+  .group { display: flex; gap: 6px; align-items: flex-end; overflow: hidden; }
+  .group.unpinned { transition: max-width .35s ease, opacity .25s ease, margin .35s ease; max-width: 2000px; opacity: 1; }
+  .hidden .group.unpinned { max-width: 0; opacity: 0; margin-left: -6px; }
+  .sep { width: 1px; height: 44px; background: rgba(255,255,255,.25); margin: 0 4px 8px; transition: opacity .25s, width .25s, margin .25s; }
+  .hidden .sep { opacity: 0; width: 0; margin: 0; }
+
+  .app { position: relative; width: 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+  .tile {
+    width: 52px; height: 52px; border-radius: 12px;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 18px; color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 3px 8px rgba(0,0,0,.35);
+    transition: transform .15s ease;
+  }
+  .app:hover .tile { transform: translateY(-6px) scale(1.08); }
+  .dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.85); }
+  .dot.off { visibility: hidden; }
+  .badge {
+    position: absolute; top: -6px; right: -4px;
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: #ff3b30; color: #fff; font-size: 11px; font-weight: 600;
+    display: grid; place-items: center; box-shadow: 0 0 0 2px rgba(0,0,0,.3);
+  }
+  .app .name {
+    position: absolute; bottom: 66px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,30,34,.9); padding: 3px 8px; border-radius: 6px; font-size: 12px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .15s;
+  }
+  .app:hover .name { opacity: 1; }
+
+  /* drop hint */
+  .drop {
+    width: 52px; height: 52px; border-radius: 12px;
+    border: 2px dashed rgba(255,255,255,.45);
+    display: grid; place-items: center; font-size: 22px; opacity: .6;
+    margin-bottom: 8px;
+  }
+
+  /* legend */
+  .legend {
+    position: absolute; left: 24px; bottom: 100px; font-size: 13px; line-height: 1.7; opacity: .8;
+  }
+  .legend .k { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="icon" id="menuIcon" title="dock-strip">
+    <svg viewBox="0 0 16 16"><rect x="1" y="10" width="14" height="4" rx="2"/><rect x="3" y="4" width="3" height="4" rx="1"/><rect x="7" y="4" width="3" height="4" rx="1"/><rect x="11" y="4" width="3" height="4" rx="1" opacity=".35"/></svg>
+  </div>
+  <span class="clock">Sat Sep 19 00:24</span>
+</div>
+
+<div class="menu" id="menu">
+  <div class="item" id="toggle"><span class="check">✓</span> Hide unpinned apps</div>
+  <hr>
+  <div class="item"><span class="check"></span> Quit</div>
+</div>
+
+<div class="note" id="note">
+  <b>Toggle is ON.</b> Only pinned apps show. Running apps that are not pinned are gone from the strip.<br>
+  Reach them with <code>⌘ Tab</code>. Drag an app onto the strip to pin it, drag it off to unpin.
+</div>
+
+<div class="legend">
+  <div><span class="k" style="background:#fff;opacity:.9"></span>dot under icon = running</div>
+  <div><span class="k" style="background:#ff3b30"></span>badge = unread count (from the app’s Dock tile)</div>
+  <div>click the menu bar icon at the top right to toggle</div>
+</div>
+
+<div class="dock-wrap">
+  <div class="dock hidden" id="dock">
+    <div class="group pinned">
+      <div class="app"><div class="tile" style="background:linear-gradient(#5fb2ff,#1c7cff)">F</div><div class="dot"></div><div class="name">Finder</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#6a5cff,#2e2a6b)">T3</div><div class="dot"></div><div class="name">T3 Code</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#c9d3e0,#8894a4)">W</div><div class="dot"></div><div class="name">Warp</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#4a3aff,#1a1030)">▶</div><div class="dot off"></div><div class="name">Stremio</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#fff,#cfd6e0);color:#1c7cff">S</div><div class="dot"></div><div class="name">Safari</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#ff5c8a,#8a2be2)">IJ</div><div class="dot"></div><div class="name">IntelliJ IDEA</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#21d789,#0aa65c)">PC</div><div class="dot"></div><div class="name">PyCharm</div></div>
+      <div class="app" title="drop zone"><div class="drop">+</div><div class="name">Drop an app here to pin it</div></div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="group unpinned">
+      <div class="app"><div class="tile" style="background:linear-gradient(#fff,#e8e8ee);color:#4a154b">S</div><div class="dot"></div><div class="badge">3</div><div class="name">Slack</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#7b83eb,#4b53bc)">T</div><div class="dot"></div><div class="badge">4</div><div class="name">Microsoft Teams</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#1ed760,#0f8f3f)">♪</div><div class="dot"></div><div class="name">Spotify</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#25d366,#128c7e)">W</div><div class="dot"></div><div class="name">WhatsApp</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#333,#111)">∿</div><div class="dot"></div><div class="name">Spokenly</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#fff,#ddd);color:#333">19</div><div class="dot"></div><div class="badge">47</div><div class="name">Calendar</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#2d8cff,#0b5cd6)">Z</div><div class="dot"></div><div class="name">zoom.us</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#33c481,#1b7a4c)">X</div><div class="dot"></div><div class="name">Excel</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#3ec6ff,#0078d4)">E</div><div class="dot"></div><div class="name">Edge</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#ff8a5c,#d9480f)">C</div><div class="dot"></div><div class="name">Claude</div></div>
+      <div class="app"><div class="tile" style="background:linear-gradient(#fff,#e5e5e5);color:#ea4335">G</div><div class="dot"></div><div class="name">Chrome</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const menu = document.getElementById('menu');
+  const dock = document.getElementById('dock');
+  const toggle = document.getElementById('toggle');
+  const note = document.getElementById('note');
+
+  document.getElementById('menuIcon').onclick = () => menu.classList.toggle('open');
+  document.body.addEventListener('click', e => {
+    if (!menu.contains(e.target) && e.target.id !== 'menuIcon' && !document.getElementById('menuIcon').contains(e.target)) menu.classList.remove('open');
+  });
+
+  toggle.onclick = () => {
+    const hidden = dock.classList.toggle('hidden');
+    toggle.querySelector('.check').textContent = hidden ? '✓' : '';
+    note.innerHTML = hidden
+      ? '<b>Toggle is ON.</b> Only pinned apps show. Running apps that are not pinned are gone from the strip.<br>Reach them with <code>⌘ Tab</code>. Drag an app onto the strip to pin it, drag it off to unpin.'
+      : '<b>Toggle is OFF.</b> Everything running shows, pinned group first, then the rest. Same as the normal Dock.';
+    menu.classList.remove('open');
+  };
+</script>
+</body>
+</html>
