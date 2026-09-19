@@ -1,7 +1,8 @@
 # my-dock
 
-Menu bar app that renders a floating strip replicating the macOS 27 Dock one-to-one:
-same glass, size, corner radius, icons, running dots, separator and trash state.
+Menu bar app that replaces the macOS 27 Dock with a strip replicating it one-to-one:
+same glass, size, corner radius, icons, running dots, badges, separator and trash
+state, at the same place on screen.
 
 Pinned apps grouped on the left, running apps to the right of the chevron:
 
@@ -20,9 +21,24 @@ The menu bar item's "Hide unpinned apps" hides every app right of the pinned gro
 (Finder and the Dock's persistent apps); the Trash and its separator stay. Clicking
 any separator in the strip toggles the same setting, without moving focus. The
 separator at the pinned/unpinned boundary shows a chevron: "<" collapses, ">" expands.
+Hovering a tile shows its name in a pill above it, like the real Dock. Clicking a
+tile launches the app, or brings it to the front (restoring a fully minimized one);
+the Trash opens in Finder. Badge counts come from the Dock's `AXStatusLabel`; custom
+overlays some apps paint themselves are not exposed and are not shown.
 
-`comparisonOffset` in `main.swift` floats the strip 70pt above the real Dock for
-side-by-side inspection. Set it to 0 when it replaces the Dock.
+## Replacing Apple's Dock
+
+On launch the app hides Apple's Dock by setting `com.apple.dock` `autohide` to true
+with an `autohide-delay` of 1000 seconds and restarting the Dock, after remembering
+the previous values in its own defaults (`restoreAutohide`, `restoreAutohideDelay`).
+The Dock keeps running hidden, which is what the strip reads its items from. Quit
+from the menu bar item writes the previous values back and restarts the Dock again.
+If the app is killed instead of quit, the next launch keeps the remembered values
+and the next clean quit restores them. To restore by hand:
+
+```sh
+defaults write com.apple.dock autohide -bool false; defaults delete com.apple.dock autohide-delay; killall Dock
+```
 
 ## Install
 
@@ -61,11 +77,12 @@ Render once, print the window frame and item list, capture the strip to
 MY_DOCK_SMOKE_TEST=1 MY_DOCK_SMOKE_HIDE=1 ./MyDock.app/Contents/MacOS/my-dock
 ```
 
-`MY_DOCK_SMOKE_HIDE=1/0` writes the "Hide unpinned apps" preference before rendering.
+`MY_DOCK_SMOKE_HIDE=1/0` writes the "Hide unpinned apps" preference before rendering
+and `MY_DOCK_SMOKE_HOVER=<index>` shows the tooltip of that item before the capture.
 
 The capture is a screen-region capture of our own windows around the strip, so it
-needs no Screen Recording permission. The real Dock is another process and is not in
-the capture.
+needs no Screen Recording permission. A smoke run hides Apple's Dock like a normal
+launch and exits without restoring it; the next clean quit of the app restores it.
 
 Always launch with `install.sh`, launchd or `open MyDock.app`. Running the binary
 directly from a terminal makes the terminal the responsible process for the

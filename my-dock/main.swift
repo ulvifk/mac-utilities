@@ -19,15 +19,33 @@ let chevronWidth: CGFloat = 5
 let chevronHeight: CGFloat = 9
 let chevronLineWidth: CGFloat = 1.5
 let chevronColor = NSColor.white.withAlphaComponent(0.55)
+let badgeHeight: CGFloat = 18
+let badgeHorizontalPadding: CGFloat = 1.5
+let badgeInsetFromIconRight: CGFloat = 1
+let badgeColor = NSColor.systemRed
+let badgeTextAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: .bold), .foregroundColor: NSColor.white]
+
+/// Transparent band above the strip that the hover tooltip is drawn in; clicks fall through its clear pixels.
+let tooltipZoneHeight: CGFloat = 44
+let tooltipPillHeight: CGFloat = 26
+let tooltipHorizontalPadding: CGFloat = 13.5
+let tooltipCaretWidth: CGFloat = 14
+let tooltipCaretHeight: CGFloat = 8
+let tooltipGapAboveStrip: CGFloat = 1
+let tooltipTextAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.white]
+/// tintColor lifts the glass toward Apple's tooltip tone; the caret is solid in that same tone.
+let tooltipTintColor = NSColor.white.withAlphaComponent(0.3)
+let tooltipCaretColor = NSColor(white: 0.3, alpha: 0.85)
 
 let hideUnpinnedKey = "hideUnpinned"
+/// Apple's Dock settings as they were before we hid it, restored on quit.
+let restoreAutohideKey = "restoreAutohide"
+let restoreAutohideDelayKey = "restoreAutohideDelay"
+let hiddenDockAutohideDelay = 1000.0
 let finderPath = "/System/Library/CoreServices/Finder.app"
 let dockDefaults = UserDefaults(suiteName: "com.apple.dock")!
 /// Pinning happens by drag and drop in Apple's Dock, which fires no workspace notification.
 let refreshInterval: TimeInterval = 2
-
-// ponytail: comparison mode floats our strip above Apple's Dock; set to 0 when it replaces the Dock.
-let comparisonOffset: CGFloat = 70
 let smokeCapturePath = "/tmp/my-dock-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -72,6 +90,7 @@ struct DockItem {
     let name: String
     let url: URL?
     let isRunning: Bool
+    let badge: String?
     let width: CGFloat
 
     /// Set on the separator that draws the chevron instead of a line.
@@ -79,10 +98,11 @@ struct DockItem {
 }
 
 /// Apple's Dock item list through Accessibility. The frame is in top-left screen coordinates.
-func readDockItems() -> (frame: CGRect, items: [DockItem]) {
-    let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first!
+/// Nil while the Dock is absent or still starting: we restart it ourselves with killall, so that state is expected for a second.
+func readDockItems() -> (frame: CGRect, items: [DockItem])? {
+    guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return nil }
     let application = AXUIElementCreateApplication(dock.processIdentifier)
-    let children = getAttribute(application, kAXChildrenAttribute) as! [AXUIElement]
+    guard let children = getAttribute(application, kAXChildrenAttribute) as? [AXUIElement] else { return nil }
     let list = children.first { getAttribute($0, kAXRoleAttribute) as? String == "AXList" }!
     let items = (getAttribute(list, kAXChildrenAttribute) as! [AXUIElement]).map(buildDockItem)
 
@@ -90,13 +110,22 @@ func readDockItems() -> (frame: CGRect, items: [DockItem]) {
 }
 
 func buildDockItem(_ element: AXUIElement) -> DockItem {
+    let subrole = getAttribute(element, kAXSubroleAttribute) as! String
+
     return DockItem(
-        kind: getDockItemKind(subrole: getAttribute(element, kAXSubroleAttribute) as! String),
+        kind: getDockItemKind(subrole: subrole),
         name: getAttribute(element, kAXTitleAttribute) as? String ?? "",
         url: getAttribute(element, kAXURLAttribute) as? URL,
         isRunning: getAttribute(element, "AXIsApplicationRunning") as? Bool ?? false,
+        badge: getBadge(element, subrole: subrole),
         width: getFrame(element).width
     )
+}
+
+/// Only application items carry a count here; Handoff items put their device id in the same attribute.
+func getBadge(_ element: AXUIElement, subrole: String) -> String? {
+    if subrole != "AXApplicationDockItem" { return nil }
+    return getAttribute(element, "AXStatusLabel") as? String
 }
 
 func getDockItemKind(subrole: String) -> DockItemKind {
@@ -168,6 +197,42 @@ func isPinned(_ item: DockItem, pinned: Set<String>) -> Bool {
     return pinned.contains(url.standardizedFileURL.path)
 }
 
+func getRunningApplication(at url: URL) -> NSRunningApplication {
+    let path = url.standardizedFileURL.path
+    return NSWorkspace.shared.runningApplications.first { $0.bundleURL?.standardizedFileURL.path == path }!
+}
+
+/// Activation alone leaves a fully minimized app in the Dock's minimized state; restoring one window brings it back like Apple's Dock.
+func restoreWindowIfAllMinimized(of app: NSRunningApplication) {
+    let windows = getAttribute(AXUIElementCreateApplication(app.processIdentifier), kAXWindowsAttribute) as? [AXUIElement] ?? []
+    guard let first = windows.first else { return }
+    if !windows.allSatisfy(isMinimized) { return }
+
+    AXUIElementSetAttributeValue(first, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+}
+
+func isMinimized(_ window: AXUIElement) -> Bool {
+    return getAttribute(window, kAXMinimizedAttribute) as? Bool ?? false
+}
+
+/// Trash opens in Finder; a stopped app launches; a running one comes to the front. Handoff items (no URL) do nothing.
+func open(_ item: DockItem) {
+    if item.kind == .trash {
+        NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash"))
+        return
+    }
+
+    guard let url = item.url else { return }
+    if !item.isRunning {
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+        return
+    }
+
+    let app = getRunningApplication(at: url)
+    app.activate(options: [.activateAllWindows])
+    restoreWindowIfAllMinimized(of: app)
+}
+
 func getIcon(_ item: DockItem) -> NSImage {
     if item.kind == .trash { return NSImage(named: isTrashFull() ? NSImage.trashFullName : NSImage.trashEmptyName)! }
     guard let url = item.url else { return NSWorkspace.shared.icon(for: .applicationBundle) }
@@ -184,10 +249,15 @@ func isTrashFull() -> Bool {
 /// Draws the tiles left to right in top-left coordinates, so every inset reads as a distance from the strip's top.
 final class DockStripView: NSView {
     var onSeparatorClicked: () -> Void = {}
+    var onTileClicked: (DockItem) -> Void = { _ in }
+    var onTileHovered: (DockItem, CGFloat) -> Void = { _, _ in }
+    var onHoverEnded: () -> Void = {}
 
     var items: [DockItem] = [] {
         didSet { needsDisplay = true }
     }
+
+    private var hoveredTileIndex: Int?
 
     override var isFlipped: Bool { return true }
 
@@ -218,13 +288,21 @@ final class DockStripView: NSView {
             return
         }
 
-        drawIcon(getIcon(item), centerX: cell.midX)
+        let iconRect = NSRect(x: cell.midX - iconSize / 2, y: iconTopInset, width: iconSize, height: iconSize)
+        getIcon(item).draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        if let badge = item.badge { drawBadge(badge, iconRect: iconRect) }
         if item.isRunning { drawRunningDot(centerX: cell.midX) }
     }
 
-    private func drawIcon(_ icon: NSImage, centerX: CGFloat) {
-        let rect = NSRect(x: centerX - iconSize / 2, y: iconTopInset, width: iconSize, height: iconSize)
-        icon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+    /// Red count on the icon's top-right corner like Apple's: a circle for short counts, a pill for longer ones.
+    private func drawBadge(_ badge: String, iconRect: NSRect) {
+        let textSize = (badge as NSString).size(withAttributes: badgeTextAttributes)
+        let width = max(badgeHeight, ceil(textSize.width) + 2 * badgeHorizontalPadding)
+        let rect = NSRect(x: iconRect.maxX - badgeInsetFromIconRight - width, y: iconRect.minY, width: width, height: badgeHeight)
+
+        badgeColor.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: badgeHeight / 2, yRadius: badgeHeight / 2).fill()
+        (badge as NSString).draw(at: NSPoint(x: rect.midX - textSize.width / 2, y: rect.midY - textSize.height / 2), withAttributes: badgeTextAttributes)
     }
 
     /// Apple's Dock snaps the dot to whole pixels; a fractional center would smear a 4px circle over 5 columns.
@@ -275,9 +353,14 @@ final class DockStripView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if !isSeparator(at: convert(event.locationInWindow, from: nil)) { return }
+        guard let item = getItem(at: convert(event.locationInWindow, from: nil)) else { return }
 
-        onSeparatorClicked()
+        if item.kind == .separator {
+            onSeparatorClicked()
+            return
+        }
+
+        onTileClicked(item)
     }
 
     /// Cursor rects and cursorUpdate only work in the key window, so the cursor is set by hand from mouse moves.
@@ -288,7 +371,19 @@ final class DockStripView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        if isSeparator(at: convert(event.locationInWindow, from: nil)) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        updateCursor(at: point)
+        updateHoveredTile(getTileIndex(at: point))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        NSCursor.arrow.set()
+        updateHoveredTile(nil)
+    }
+
+    private func updateCursor(at point: NSPoint) {
+        if isSeparator(at: point) {
             NSCursor.pointingHand.set()
             return
         }
@@ -296,8 +391,13 @@ final class DockStripView: NSView {
         NSCursor.arrow.set()
     }
 
-    override func mouseExited(with event: NSEvent) {
-        NSCursor.arrow.set()
+    /// Reports only changes, with the tile's center x, so the tooltip is not rebuilt on every mouse move.
+    private func updateHoveredTile(_ index: Int?) {
+        if index == hoveredTileIndex { return }
+        hoveredTileIndex = index
+
+        guard let index else { onHoverEnded(); return }
+        onTileHovered(items[index], getCellFrames()[index].midX)
     }
 
     private func isSeparator(at point: NSPoint) -> Bool {
@@ -308,8 +408,15 @@ final class DockStripView: NSView {
         return zip(items, getCellFrames()).first { $0.1.contains(point) }?.0
     }
 
+    /// Index of the app or trash cell under the point; separators and empty space give nil.
+    private func getTileIndex(at point: NSPoint) -> Int? {
+        guard let index = getCellFrames().firstIndex(where: { $0.contains(point) }) else { return nil }
+        if items[index].kind == .separator { return nil }
+        return index
+    }
+
     /// One full-height cell per item, left to right from the end padding; drawing and hit testing share them.
-    private func getCellFrames() -> [NSRect] {
+    func getCellFrames() -> [NSRect] {
         var frames: [NSRect] = []
         var cellX = stripEndPadding
 
@@ -322,13 +429,74 @@ final class DockStripView: NSView {
     }
 }
 
+/// Name pill with a downward caret above the hovered tile, like Apple's Dock tooltip. The caret is solid in the pill's tone, since glass cannot take that shape.
+final class TooltipView: NSView {
+    var text = "" {
+        didSet { layoutText() }
+    }
+
+    private let glass = NSGlassEffectView()
+    private let textView = TooltipTextView()
+
+    convenience init() {
+        self.init(frame: .zero)
+
+        glass.style = .regular
+        glass.cornerRadius = tooltipPillHeight / 2
+        glass.tintColor = tooltipTintColor
+        glass.contentView = textView
+        addSubview(glass)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let caret = NSBezierPath()
+        let centerX = bounds.midX
+
+        caret.move(to: NSPoint(x: centerX - tooltipCaretWidth / 2, y: tooltipCaretHeight))
+        caret.line(to: NSPoint(x: centerX + tooltipCaretWidth / 2, y: tooltipCaretHeight))
+        caret.line(to: NSPoint(x: centerX, y: 0))
+        caret.close()
+
+        tooltipCaretColor.setFill()
+        caret.fill()
+    }
+
+    private func layoutText() {
+        let width = ceil((text as NSString).size(withAttributes: tooltipTextAttributes).width) + 2 * tooltipHorizontalPadding
+
+        frame.size = NSSize(width: width, height: tooltipPillHeight + tooltipCaretHeight)
+        glass.frame = NSRect(x: 0, y: tooltipCaretHeight, width: width, height: tooltipPillHeight)
+        textView.frame = glass.bounds
+        textView.text = text
+        needsDisplay = true
+    }
+}
+
+/// Centers the name's line box in the pill, which lands the capitals on the pill's center like Apple's tooltip.
+final class TooltipTextView: NSView {
+    var text = "" {
+        didSet { needsDisplay = true }
+    }
+
+    /// Font smoothing thickens white text on a transparent layer; Apple's tooltip text is lighter than that.
+    override func draw(_ dirtyRect: NSRect) {
+        let size = (text as NSString).size(withAttributes: tooltipTextAttributes)
+        let origin = NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2)
+
+        NSGraphicsContext.current!.cgContext.setShouldSmoothFonts(false)
+        (text as NSString).draw(at: origin, withAttributes: tooltipTextAttributes)
+    }
+}
+
 final class MyDockController: NSObject, NSApplicationDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let hideUnpinnedMenuItem = NSMenuItem(title: "Hide unpinned apps", action: #selector(toggleHideUnpinned), keyEquivalent: "")
 
     private let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    private let content = NSView()
     private let glass = NSGlassEffectView()
     private let strip = DockStripView()
+    private let tooltip = TooltipView()
 
     private var dock = (frame: CGRect.zero, items: [DockItem]())
 
@@ -341,6 +509,49 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         observeApplicationChanges()
         scheduleRefresh()
         render()
+        hideAppleDock()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        restoreAppleDock()
+    }
+
+    // MARK: Apple's Dock
+
+    /// Autohide with a huge delay keeps Apple's Dock off screen while its item list stays readable. The previous settings are kept
+    /// in our defaults until a clean quit restores them, so a crash or kill does not lose them.
+    private func hideAppleDock() {
+        let defaults = UserDefaults.standard
+
+        if defaults.object(forKey: restoreAutohideKey) == nil {
+            defaults.set(dockDefaults.bool(forKey: "autohide"), forKey: restoreAutohideKey)
+            defaults.set(dockDefaults.object(forKey: "autohide-delay"), forKey: restoreAutohideDelayKey)
+        }
+
+        dockDefaults.set(true, forKey: "autohide")
+        dockDefaults.set(hiddenDockAutohideDelay, forKey: "autohide-delay")
+        dockDefaults.synchronize()
+        restartAppleDock()
+    }
+
+    private func restoreAppleDock() {
+        let defaults = UserDefaults.standard
+
+        dockDefaults.set(defaults.bool(forKey: restoreAutohideKey), forKey: "autohide")
+        dockDefaults.set(defaults.object(forKey: restoreAutohideDelayKey), forKey: "autohide-delay")
+        dockDefaults.synchronize()
+        defaults.removeObject(forKey: restoreAutohideKey)
+        defaults.removeObject(forKey: restoreAutohideDelayKey)
+        restartAppleDock()
+    }
+
+    private func restartAppleDock() {
+        let killall = Process()
+
+        killall.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
+        killall.arguments = ["Dock"]
+        try! killall.run()
+        killall.waitUntilExit()
     }
 
     private func buildMenu() {
@@ -376,8 +587,15 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         glass.contentView = strip
         strip.appearance = NSAppearance(named: .aqua)
         strip.onSeparatorClicked = { [unowned self] in self.toggleHideUnpinned() }
+        strip.onTileClicked = { item in open(item) }
+        strip.onTileHovered = { [unowned self] item, centerX in self.showTooltip(for: item, centerX: centerX) }
+        strip.onHoverEnded = { [unowned self] in self.tooltip.isHidden = true }
 
-        panel.contentView = glass
+        tooltip.isHidden = true
+        content.addSubview(glass)
+        content.addSubview(tooltip)
+
+        panel.contentView = content
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -409,7 +627,9 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     }
 
     private func render() {
-        dock = readDockItems()
+        guard let dock = readDockItems() else { return }
+        self.dock = dock
+
         let pinned = readPinnedPaths()
         let grouped = insertGroupSeparator(into: dock.items, pinned: pinned)
         let visible = isHideUnpinnedEnabled ? filterHiddenItems(grouped, pinned: pinned) : grouped
@@ -417,12 +637,22 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
         let screen = NSScreen.main!.frame
         let width = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
-        let frame = NSRect(x: screen.midX - width / 2, y: screen.minY + stripBottomMargin + comparisonOffset, width: width, height: stripHeight)
+        let frame = NSRect(x: screen.midX - width / 2, y: screen.minY + stripBottomMargin, width: width, height: stripHeight + tooltipZoneHeight)
 
         panel.setFrame(frame, display: false)
+        glass.frame = NSRect(x: 0, y: 0, width: width, height: stripHeight)
         strip.frame = glass.bounds
         strip.items = items
         panel.orderFrontRegardless()
+    }
+
+    /// Centered on the tile, kept inside the window, caret tip just above the strip.
+    private func showTooltip(for item: DockItem, centerX: CGFloat) {
+        tooltip.text = item.name
+
+        let x = min(max(0, centerX - tooltip.frame.width / 2), panel.frame.width - tooltip.frame.width)
+        tooltip.frame.origin = NSPoint(x: round(x), y: stripHeight + tooltipGapAboveStrip)
+        tooltip.isHidden = false
     }
 
     private func runSmokeTestIfRequested() {
@@ -431,9 +661,15 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
         UserDefaults.standard.set(environment["MY_DOCK_SMOKE_HIDE"] == "1", forKey: hideUnpinnedKey)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard let index = environment["MY_DOCK_SMOKE_HOVER"] else { return }
+            self.showTooltip(for: self.strip.items[Int(index)!], centerX: self.strip.getCellFrames()[Int(index)!].midX)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
             print("smoke: frame=\(self.panel.frame) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
             print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
+            print("smoke: tooltip=\(self.tooltip.frame) hidden=\(self.tooltip.isHidden) text=\(self.tooltip.text) badges=\(self.strip.items.filter { $0.badge != nil }.map { "\($0.name)=\($0.badge!)" })")
             writeCapture(around: self.panel, path: smokeCapturePath)
             exit(0)
         }
