@@ -11,30 +11,33 @@ let rightArrowKeyCode: Int64 = 124
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
-let iconSize: CGFloat = 64
-let cellSize: CGFloat = 84
-let itemSpacing: CGFloat = 4
-let horizontalPadding: CGFloat = 14
-let verticalPadding: CGFloat = 10
+/// The icon image; Tahoe icons fill ~80.5% of their canvas, so the visible squircle is ~55 wide. The cell is as wide as the image.
+let iconSize: CGFloat = 68
+let itemSpacing: CGFloat = 5
+let horizontalPadding: CGFloat = 22
+let verticalPadding: CGFloat = 7.5
 let dotSize: CGFloat = 5
 
 /// The 13pt name label's height. The whitelist dot gets a band of the same height above the icon, so the two mirror each other.
 let nameBandHeight: CGFloat = 16
-let nameTopSpacing: CGFloat = 2
+let nameTopSpacing: CGFloat = 0
 /// Below the band's centre, so the dot reads as attached to the icon rather than floating.
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
-let panelCornerRadius: CGFloat = 24
+let panelCornerRadius: CGFloat = 28
 /// Regular glass renders lighter than the backdrop and tintColor only brightens it further; the 1pt rim is left undimmed.
-let panelDimmingColor = NSColor.black.withAlphaComponent(0.3)
-/// Apple's rims sit ~50 above the backdrop with a short falloff; the glass alone gives ~30, and its own top rim lands one row
-/// outside the frame, so the top needs more. [row from the edge] -> white alpha
-let topRimAlphas: [CGFloat] = [0.20, 0.04, 0.02]
-let bottomRimAlphas: [CGFloat] = [0.28, 0.06, 0.03]
-let highlightColor = NSColor.white.withAlphaComponent(0.10)
-let highlightStrokeColor = NSColor.white.withAlphaComponent(0.08)
-let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.22)
+/// Tuned so the body lands ~5 above the backdrop, like the native switcher's 42,45,52 over a 37,40,45 desktop.
+let panelDimmingColor = NSColor.black.withAlphaComponent(0.24)
+/// Measured off the native switcher, one row at a time from the edge inward. [row from the edge] -> white alpha
+let topRimAlphas: [CGFloat] = [0.34, 0.07, 0.03, 0.015]
+let bottomRimAlphas: [CGFloat] = [0.35, 0.09, 0.055, 0.045, 0.035, 0.03, 0.02]
+/// The native highlight hugs the icon's squircle with a 3pt margin and has no stroke.
+let highlightColor = NSColor.white.withAlphaComponent(0.30)
+let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.45)
+let highlightCornerRadius: CGFloat = 15.5
+/// The 68pt image has a ~6.5pt transparent margin around the squircle, and the highlight sits 3pt outside it.
+let highlightIconInset: CGFloat = 3.5
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -201,7 +204,6 @@ final class SwitcherPanel: NSPanel {
     var onCellClicked: (Int) -> Void = { _ in }
 
     private var highlight = NSView()
-    private var iconCells: [NSView] = []
     private var iconViews: [NSImageView] = []
     private var whitelistDots: [NSView] = []
 
@@ -267,9 +269,7 @@ final class SwitcherPanel: NSPanel {
 
         highlight = NSView()
         highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = 18
-        highlight.layer?.borderWidth = 1
-        highlight.layer?.borderColor = highlightStrokeColor.cgColor
+        highlight.layer?.cornerRadius = highlightCornerRadius
 
         let container = NSView()
         container.addSubview(highlight)
@@ -301,7 +301,7 @@ final class SwitcherPanel: NSPanel {
         let label = NSTextField(labelWithString: text)
 
         label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.textColor = .labelColor
+        label.textColor = .white
         label.alignment = .center
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
@@ -339,7 +339,6 @@ final class SwitcherPanel: NSPanel {
         row.spacing = itemSpacing
         row.appearance = NSAppearance(named: .aqua)
 
-        iconCells = []
         iconViews = []
         whitelistDots = []
 
@@ -356,7 +355,7 @@ final class SwitcherPanel: NSPanel {
         let dot = buildWhitelistDot()
         let cell = IconCellView()
 
-        cell.index = iconCells.count
+        cell.index = iconViews.count
         cell.onClick = { [unowned self] index in self.onCellClicked(index) }
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
@@ -364,7 +363,6 @@ final class SwitcherPanel: NSPanel {
         icon.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = !whitelisted
 
-        iconCells.append(cell)
         iconViews.append(icon)
         whitelistDots.append(dot)
 
@@ -373,7 +371,7 @@ final class SwitcherPanel: NSPanel {
         cell.addSubview(dot)
 
         NSLayoutConstraint.activate([
-            cell.widthAnchor.constraint(equalToConstant: cellSize),
+            cell.widthAnchor.constraint(equalToConstant: iconSize),
             cell.heightAnchor.constraint(equalToConstant: cellHeight),
             icon.widthAnchor.constraint(equalToConstant: iconSize),
             icon.heightAnchor.constraint(equalToConstant: iconSize),
@@ -437,16 +435,18 @@ final class SwitcherPanel: NSPanel {
     /// The widest a name centered on this icon can be without crossing either panel edge, so it truncates instead of sliding.
     private func getNameMaxWidth(selectedIndex: Int) -> CGFloat {
         let appCount = CGFloat(iconViews.count)
-        let iconCenterX = horizontalPadding + CGFloat(selectedIndex) * (cellSize + itemSpacing) + cellSize / 2
-        let containerWidth = horizontalPadding * 2 + appCount * cellSize + (appCount - 1) * itemSpacing
+        let iconCenterX = horizontalPadding + CGFloat(selectedIndex) * (iconSize + itemSpacing) + iconSize / 2
+        let containerWidth = horizontalPadding * 2 + appCount * iconSize + (appCount - 1) * itemSpacing
 
         return 2 * min(iconCenterX - horizontalPadding, containerWidth - horizontalPadding - iconCenterX)
     }
 
+    /// Hugs the selected icon's squircle rather than boxing the whole cell; the name sits below it, outside.
     private func getHighlightFrame(selectedIndex: Int) -> NSRect {
-        let cell = iconCells[selectedIndex]
+        let icon = iconViews[selectedIndex]
+        let frame = icon.superview!.convert(icon.frame, to: highlight.superview!)
 
-        return cell.superview!.convert(cell.frame, to: highlight.superview!)
+        return frame.insetBy(dx: highlightIconInset, dy: highlightIconInset)
     }
 
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
