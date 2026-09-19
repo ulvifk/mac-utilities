@@ -5,11 +5,14 @@ import UniformTypeIdentifiers
 let stripHeight: CGFloat = 60
 let stripEndPadding: CGFloat = 3.2
 let stripCornerRadius: CGFloat = 22
-let stripDimmingColor = NSColor.black.withAlphaComponent(0.3)
-/// Apple's rims sit ~50 above the backdrop with a short falloff; the glass alone gives ~30, and its own top rim lands one row
-/// outside the frame, so the top needs more. [row from the edge] -> white alpha
-let topRimAlphas: [CGFloat] = [0.20, 0.04, 0.02]
-let bottomRimAlphas: [CGFloat] = [0.28, 0.06, 0.03]
+/// Clear glass lands a little lighter than Apple's Dock on every backdrop; 0.08 black brings the body onto Apple's over both a
+/// bright and a dark one.
+let stripDimmingColor = NSColor.black.withAlphaComponent(0.08)
+/// Apple's rim is the backdrop with its brightness raised, hue and saturation kept, opaque along the whole outline, with a short
+/// falloff inside the top and bottom edges. [row below the 1pt rim] -> alpha of the tinted falloff row
+let rimBrightnessGain: CGFloat = 0.25
+let topRimFalloffAlphas: [CGFloat] = [0.065, 0.035]
+let bottomRimFalloffAlphas: [CGFloat] = [0.07, 0.04]
 let stripBottomMargin: CGFloat = 5
 
 let iconSize: CGFloat = 46
@@ -114,6 +117,25 @@ func captureBackdrop(behind window: NSWindow) -> CGImage? {
     guard let dockWindow = getAppleDockWindowNumber() else { return nil }
 
     return createWindowImage(getFlippedScreenRect(window.frame), onScreenBelowWindowOption, dockWindow, bestResolutionOption)?.takeRetainedValue()
+}
+
+/// The rim colour: every pixel's brightness raised by the gain with hue and saturation kept, which scaling all three channels does.
+func buildBrightenedImage(_ image: CGImage) -> CGImage {
+    let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+
+    let pixels = context.data!.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
+    let gain = rimBrightnessGain * 255
+    for pixel in stride(from: 0, to: image.width * image.height * 4, by: 4) {
+        let brightest = CGFloat(max(pixels[pixel], pixels[pixel + 1], pixels[pixel + 2]))
+        let raised = min(255, brightest + gain)
+        for channel in 0..<3 {
+            pixels[pixel + channel] = brightest == 0 ? UInt8(raised) : UInt8(min(255, CGFloat(pixels[pixel + channel]) * raised / brightest))
+        }
+    }
+
+    return context.makeImage()!
 }
 
 func getAppleDockWindowNumber() -> UInt32? {
@@ -328,6 +350,11 @@ final class DockStripView: NSView {
         didSet { needsDisplay = true }
     }
 
+    /// The wallpaper behind the whole panel, brightened, for the rim to sample; nil until the first capture lands.
+    var rimImage: NSImage? {
+        didSet { needsDisplay = true }
+    }
+
     private var hoveredIndex: Int?
 
     override var isFlipped: Bool { return true }
@@ -342,7 +369,7 @@ final class DockStripView: NSView {
         }
     }
 
-    /// Regular glass renders lighter than the backdrop and tintColor only brightens it further; the 1pt rim is left undimmed.
+    /// The 1pt rim is left undimmed so the bright edge keeps its full strength.
     private func drawDimming() {
         let inset = bounds.insetBy(dx: 1, dy: 1)
 
@@ -350,19 +377,47 @@ final class DockStripView: NSView {
         NSBezierPath(roundedRect: inset, xRadius: stripCornerRadius - 1, yRadius: stripCornerRadius - 1).fill()
     }
 
-    /// Top and bottom edges only, along the straight run between the corner arcs.
+    /// Apple's rim runs around the whole outline as one opaque line, with the falloff rows inside the top and bottom edges only.
     private func drawRims() {
-        let straight = NSRect(x: stripCornerRadius, y: 0, width: bounds.width - 2 * stripCornerRadius, height: 1)
+        guard rimImage != nil else { return }
 
-        for (row, alpha) in topRimAlphas.enumerated() {
-            NSColor.white.withAlphaComponent(alpha).setFill()
-            straight.offsetBy(dx: 0, dy: CGFloat(row)).fill()
+        NSGraphicsContext.current!.saveGraphicsState()
+        buildOutlineRing().setClip()
+        drawRimImage(alpha: 1)
+        NSGraphicsContext.current!.restoreGraphicsState()
+
+        for (row, alpha) in topRimFalloffAlphas.enumerated() {
+            drawFalloffRow(y: 1 + CGFloat(row), alpha: alpha)
         }
 
-        for (row, alpha) in bottomRimAlphas.enumerated() {
-            NSColor.white.withAlphaComponent(alpha).setFill()
-            straight.offsetBy(dx: 0, dy: stripHeight - 1 - CGFloat(row)).fill()
+        for (row, alpha) in bottomRimFalloffAlphas.enumerated() {
+            drawFalloffRow(y: bounds.height - 2 - CGFloat(row), alpha: alpha)
         }
+    }
+
+    /// The 1pt band just inside the outline: what stroking the rounded rect covers, corner arcs included.
+    private func buildOutlineRing() -> NSBezierPath {
+        let ring = NSBezierPath(roundedRect: bounds, xRadius: stripCornerRadius, yRadius: stripCornerRadius)
+
+        ring.append(NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: stripCornerRadius - 1, yRadius: stripCornerRadius - 1))
+        ring.windingRule = .evenOdd
+        return ring
+    }
+
+    /// Full width, clipped to the rounded rect, so the row ends naturally along the corner arc.
+    private func drawFalloffRow(y: CGFloat, alpha: CGFloat) {
+        NSGraphicsContext.current!.saveGraphicsState()
+        NSBezierPath(roundedRect: bounds, xRadius: stripCornerRadius, yRadius: stripCornerRadius).setClip()
+        NSRect(x: 0, y: y, width: bounds.width, height: 1).clip()
+        drawRimImage(alpha: alpha)
+        NSGraphicsContext.current!.restoreGraphicsState()
+    }
+
+    /// The capture spans the whole panel, which the strip sits in at this offset, and is as tall as the strip.
+    private func drawRimImage(alpha: CGFloat) {
+        let rect = NSRect(x: -convert(NSPoint.zero, to: nil).x, y: 0, width: rimImage!.size.width, height: bounds.height)
+
+        rimImage!.draw(in: rect, from: .zero, operation: .sourceOver, fraction: alpha, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.none])
     }
 
     private func drawItem(_ item: DockItem, cell: NSRect, hovered: Bool) {
@@ -647,6 +702,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     private let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     private let band = NSView()
     private let backdrop = BackdropView()
+    /// NSGlassEffectView draws a dark hairline just outside its bounds; a layer-backed clip view with the same corner radius cuts it off.
+    private let stripClip = NSView()
     private let glass = NSGlassEffectView()
     private let strip = DockStripView()
 
@@ -658,7 +715,6 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
     private var dock = (frame: CGRect.zero, items: [DockItem]())
     private var stripAnimation: Timer?
-    private var backdropRefresh: Timer?
     private var coverRefresh: Timer?
     private var coverHide: DispatchWorkItem?
 
@@ -702,7 +758,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     /// A borderless non-activating panel cannot become key, so clicks on the strip never move focus. It sits one level above
     /// Apple's Dock and spans it, so the Dock keeps reserving the screen band while ours covers it.
     private func buildWindow() {
-        glass.style = .regular
+        glass.style = .clear
         glass.cornerRadius = stripCornerRadius
         glass.contentView = strip
         strip.autoresizingMask = [.width]
@@ -714,9 +770,14 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         strip.onHoverEnded = { [unowned self] in self.tooltipPanel.orderOut(nil) }
         strip.onPointerMoved = { [unowned self] point in self.setAppleLabelCoverShown(self.isOverAppleItem(point)) }
 
+        stripClip.wantsLayer = true
+        stripClip.layer!.cornerRadius = stripCornerRadius
+        stripClip.layer!.masksToBounds = true
+        stripClip.addSubview(glass)
+
         backdrop.autoresizingMask = [.width, .height]
         band.addSubview(backdrop)
-        band.addSubview(glass)
+        band.addSubview(stripClip)
 
         panel.contentView = band
         panel.isOpaque = false
@@ -765,6 +826,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
     private func scheduleRefresh() {
         Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in self.render() }
+        Timer.scheduledTimer(withTimeInterval: backdropRefreshInterval, repeats: true) { _ in self.refreshBackdrop() }
     }
 
     /// The window always spans the whole band; only the glass strip changes width, animated, centered in it.
@@ -788,40 +850,30 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         panel.setFrame(NSRect(x: screen.frame.midX - bandWidth / 2, y: screen.frame.minY + stripBottomMargin, width: bandWidth, height: stripHeight), display: true)
         panel.orderFrontRegardless()
         coverPanel.setFrame(NSRect(x: dock.frame.minX - coverEndSlack, y: panel.frame.maxY, width: dock.frame.width + 2 * coverEndSlack, height: appleLabelBandHeight), display: true)
-        setBackdropShown(collapsed)
+        refreshBackdrop()
+
+        // Collapsed, the wallpaper patch covers the Dock beside the strip; expanded, the strip covers it all once it has grown.
+        if collapsed { backdrop.isHidden = false }
         animateStrip(toWidth: stripWidth, thenHideBackdrop: !collapsed)
     }
 
-    /// Collapsed, the wallpaper patch covers the Dock beside the strip and follows the wallpaper; expanded, the strip covers it all.
-    private func setBackdropShown(_ shown: Bool) {
-        if !shown {
-            backdropRefresh?.invalidate()
-            backdropRefresh = nil
-            return
-        }
-
-        backdrop.isHidden = false
-        refreshBackdrop()
-        if backdropRefresh != nil { return }
-        backdropRefresh = Timer.scheduledTimer(withTimeInterval: backdropRefreshInterval, repeats: true) { [unowned self] _ in refreshBackdrop() }
-    }
-
+    /// The wallpaper behind the band feeds both the patch beside the strip and the rim's tint, so it is captured even while hidden.
     private func refreshBackdrop() {
-        if backdrop.isHidden { return }
         guard let image = captureBackdrop(behind: panel) else { return }
 
         backdrop.image = image
+        strip.rimImage = NSImage(cgImage: buildBrightenedImage(image), size: panel.frame.size)
     }
 
     /// Timer-driven: the view animator would do, but this keeps one code path with the exact end frame and a completion.
     private func animateStrip(toWidth width: CGFloat, thenHideBackdrop: Bool) {
         let target = NSRect(x: round((panel.frame.width - width) / 2), y: 0, width: width, height: stripHeight)
-        let start = glass.frame
+        let start = stripClip.frame
         let startedAt = Date()
 
         stripAnimation?.invalidate()
         if !panel.isVisible || start.width == 0 {
-            glass.frame = target
+            setStripFrame(target)
             backdrop.isHidden = thenHideBackdrop
             strip.refreshHover()
             return
@@ -831,12 +883,17 @@ final class MyDockController: NSObject, NSApplicationDelegate {
             let progress = min(1, Date().timeIntervalSince(startedAt) / stripResizeAnimationDuration)
             let eased = progress < 0.5 ? 2 * progress * progress : 1 - pow(-2 * progress + 2, 2) / 2
 
-            glass.frame = interpolateRect(start, target, eased)
+            setStripFrame(interpolateRect(start, target, eased))
             if progress < 1 { return }
             timer.invalidate()
             backdrop.isHidden = thenHideBackdrop
             strip.refreshHover()
         }
+    }
+
+    private func setStripFrame(_ frame: NSRect) {
+        stripClip.frame = frame
+        glass.frame = stripClip.bounds
     }
 
     private func isOverAppleItem(_ point: NSPoint?) -> Bool {
@@ -881,7 +938,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     /// Centered on the cell in screen coordinates, caret tip a few points above the strip; may overhang the strip's ends.
     private func showTooltip(for item: DockItem, centerX: CGFloat) {
         let size = TooltipView.getSize(for: item.name)
-        let origin = NSPoint(x: round(panel.frame.minX + glass.frame.minX + centerX - size.width / 2), y: panel.frame.maxY + tooltipTipAboveStrip)
+        let origin = NSPoint(x: round(panel.frame.minX + stripClip.frame.minX + centerX - size.width / 2), y: panel.frame.maxY + tooltipTipAboveStrip)
 
         tooltip.text = item.name
         tooltipPanel.setFrame(NSRect(origin: origin, size: size), display: true)
@@ -900,7 +957,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-            print("smoke: frame=\(self.panel.frame) strip=\(self.glass.frame) level=\(self.panel.level.rawValue) backdropShown=\(!self.backdrop.isHidden) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
+            print("smoke: frame=\(self.panel.frame) strip=\(self.stripClip.frame) level=\(self.panel.level.rawValue) backdropShown=\(!self.backdrop.isHidden) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
             print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
             print("smoke: tooltip=\(self.tooltipPanel.frame) visible=\(self.tooltipPanel.isVisible) text=\(self.tooltip.text) badges=\(self.strip.items.filter { $0.badge != nil }.map { "\($0.name)=\($0.badge!)" }) cover=\(self.coverPanel.frame) coverVisible=\(self.coverPanel.isVisible)")
             writeCapture(around: self.panel, path: smokeCapturePath)
@@ -912,7 +969,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     /// Drives the real hover path (tracking area, highlight, tooltip) by moving the pointer onto the cell.
     private func moveMouse(toCellAt index: Int) {
         let cell = strip.getCellFrames()[index]
-        let point = CGPoint(x: panel.frame.minX + glass.frame.minX + cell.midX, y: NSScreen.screens[0].frame.height - (panel.frame.minY + stripHeight / 2))
+        let point = CGPoint(x: panel.frame.minX + stripClip.frame.minX + cell.midX, y: NSScreen.screens[0].frame.height - (panel.frame.minY + stripHeight / 2))
 
         CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: point, mouseButton: .left)!.post(tap: .cghidEventTap)
     }
