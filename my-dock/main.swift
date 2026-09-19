@@ -16,6 +16,11 @@ let runningDotColor = NSColor.white.withAlphaComponent(0.58)
 let separatorVerticalInset: CGFloat = 8
 let separatorColor = NSColor.white.withAlphaComponent(0.3)
 
+let finderPath = "/System/Library/CoreServices/Finder.app"
+let dockDefaults = UserDefaults(suiteName: "com.apple.dock")!
+/// Pinning happens by drag and drop in Apple's Dock, which fires no workspace notification.
+let refreshInterval: TimeInterval = 2
+
 // ponytail: comparison mode floats our strip above Apple's Dock; set to 0 when it replaces the Dock.
 let comparisonOffset: CGFloat = 70
 let smokeCapturePath = "/tmp/my-dock-smoke.png"
@@ -100,6 +105,37 @@ func getFrame(_ element: AXUIElement) -> CGRect {
 }
 
 /// Handoff items (an iPhone app advertised through Handoff) carry no URL and get the generic application icon.
+/// Finder plus the standardized bundle paths of the Dock's persistent-apps tiles.
+func readPinnedPaths() -> Set<String> {
+    let tiles = dockDefaults.array(forKey: "persistent-apps") as! [[String: Any]]
+    let paths = tiles.map { tile -> String in
+        let fileData = (tile["tile-data"] as! [String: Any])["file-data"] as! [String: Any]
+        return URL(string: fileData["_CFURLString"] as! String)!.standardizedFileURL.path
+    }
+
+    return Set(paths + [finderPath])
+}
+
+/// Copies the Dock's own separator (the one before the Trash) in front of the first unpinned app. Handoff items count as unpinned.
+func insertGroupSeparator(into items: [DockItem], pinned: Set<String>) -> [DockItem] {
+    guard let firstUnpinned = items.firstIndex(where: { isUnpinnedApp($0, pinned: pinned) }) else { return items }
+    if items[firstUnpinned - 1].kind == .separator { return items }
+
+    var grouped = items
+    grouped.insert(items.first { $0.kind == .separator }!, at: firstUnpinned)
+    return grouped
+}
+
+func isUnpinnedApp(_ item: DockItem, pinned: Set<String>) -> Bool {
+    if item.kind != .app { return false }
+    return !isPinned(item, pinned: pinned)
+}
+
+func isPinned(_ item: DockItem, pinned: Set<String>) -> Bool {
+    guard let url = item.url else { return false }
+    return pinned.contains(url.standardizedFileURL.path)
+}
+
 func getIcon(_ item: DockItem) -> NSImage {
     if item.kind == .trash { return NSImage(named: isTrashFull() ? NSImage.trashFullName : NSImage.trashEmptyName)! }
     guard let url = item.url else { return NSWorkspace.shared.icon(for: .applicationBundle) }
@@ -167,8 +203,9 @@ final class DockStripView: NSView {
         NSBezierPath(ovalIn: rect).fill()
     }
 
+    /// Snapped like the dot: the second separator lands on a fractional center, which would smear the line over two columns.
     private func drawSeparator(centerX: CGFloat) {
-        let rect = NSRect(x: centerX, y: separatorVerticalInset, width: 1, height: stripHeight - 2 * separatorVerticalInset)
+        let rect = NSRect(x: round(centerX), y: separatorVerticalInset, width: 1, height: stripHeight - 2 * separatorVerticalInset)
 
         separatorColor.setFill()
         rect.fill()
@@ -189,6 +226,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         buildWindow()
         requestAccessibilityTrust()
         observeApplicationChanges()
+        scheduleRefresh()
         render()
         runSmokeTestIfRequested()
     }
@@ -238,15 +276,20 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func scheduleRefresh() {
+        Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in self.render() }
+    }
+
     private func render() {
         dock = readDockItems()
+        let items = insertGroupSeparator(into: dock.items, pinned: readPinnedPaths())
 
         let screen = NSScreen.main!.frame
-        let width = stripEndPadding * 2 + dock.items.reduce(0) { $0 + $1.width }
+        let width = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
         let frame = NSRect(x: screen.midX - width / 2, y: screen.minY + stripBottomMargin + comparisonOffset, width: width, height: stripHeight)
 
         window.setFrame(frame, display: false)
-        strip.items = dock.items
+        strip.items = items
         strip.frame = glass.bounds
         strip.needsDisplay = true
         window.orderFrontRegardless()
@@ -256,8 +299,8 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         guard ProcessInfo.processInfo.environment["MY_DOCK_SMOKE_TEST"] != nil else { return }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            print("smoke: frame=\(self.window.frame) items=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
-            print("smoke: items=\(self.dock.items.map { $0.name })")
+            print("smoke: frame=\(self.window.frame) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
+            print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
             writeCapture(around: self.window, path: smokeCapturePath)
             exit(0)
         }
