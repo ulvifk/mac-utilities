@@ -32,4 +32,8 @@ for PLIST in "$UTILITY"/*.plist; do
 done
 
 echo "installed $APPS_DIR/$APP_NAME"
-echo "Grant Accessibility once in System Settings > Privacy & Security > Accessibility (first install only)."
+if [ "$UTILITY" = my-dock ]; then
+    echo "Core Dock features need no Accessibility permission. Existing access enables badge counts."
+else
+    echo "Grant Accessibility once in System Settings > Privacy & Security > Accessibility (first install only)."
+fi

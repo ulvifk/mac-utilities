@@ -1,96 +1,51 @@
-# my-dock
+# MyDock
 
-Menu bar app that replaces the macOS 27 Dock with a strip replicating it one-to-one:
-same glass, size, corner radius, icons, running dots, badges, separator and trash
-state, at the same place on screen.
+A standalone macOS Dock with a collapsible group of app icons. Requires macOS 26 or later and Xcode command-line tools to build. No third-party app is needed.
 
-Pinned apps grouped on the left, running apps to the right of the chevron:
+- Drag an icon to reorder it.
+- Drop an icon on the chevron to move it into the hidden group, even while collapsed.
+- Click the chevron to expand the group. Drag an app back to the left to make it visible.
+- Right-click an icon for **Move to Hidden/Visible Group**, **Keep in MyDock**, **Open**, **Show in Finder**, and **Quit**.
+- Drag `.app` bundles from Finder into either group to keep them there. This saves references; it does not move app files.
+- Dropping outside MyDock or on Trash cancels the move. Hidden apps keep running, retain their windows, and remain in Cmd+Tab.
 
-![shown](screenshots/shown.png)
-
-After clicking the chevron, only the pinned group and the Trash remain:
-
-![hidden](screenshots/hidden.png)
-
-Hovering a tile shows its name, clicking it switches to the app:
-
-![hover](screenshots/hover.png)
-
-The item list is Apple's own Dock, read through Accessibility (`AXList` of the Dock
-process: app, separator and trash items with their sizes, titles, URLs and running
-state), so it mirrors the real Dock's order and contents. It re-reads and re-renders
-on app launch, termination and activation.
-
-The menu bar item's "Hide unpinned apps" hides every app right of the pinned group
-(Finder and the Dock's persistent apps); the Trash stays. A slot at that boundary
-toggles the same setting without moving focus: "<" collapses the running apps, ">"
-with their count expands them, and a red dot on the slot means a hidden app has a
-badge. Hovering a tile shows its name in a pill above it, like the real Dock. A click is
-forwarded to the matching item of Apple's Dock (`AXPress`), so apps, folders, files,
-minimized windows and the Trash behave exactly like the real Dock; a right click (or a
-ctrl-click) forwards `AXShowMenu` instead, so Apple's own menu for that item opens.
-Apple's Dock keeps labelling whatever its own layout has under the cursor, no matter
-what covers it, so while the cursor is on an item the band above the strip is painted
-with a live capture of what lies behind the Dock; animated content right above the Dock
-can therefore look a frame late during a hover. The strip hides itself while the Dock is off-screen
-(autohide, a fullscreen space) and comes back with it. Badge counts come from the Dock's `AXStatusLabel`; custom overlays some apps paint
-themselves are not exposed and are not shown.
-
-## Sitting on Apple's Dock
-
-Apple's Dock stays visible underneath: it keeps reserving the screen band, so zoomed
-windows still stop above it. The strip is a window one level above the Dock, spanning
-the Dock's width plus a margin, with the same frame as the real strip. Expanded, the
-strip is wider than the Dock and covers it. Collapsed, the strip is narrower, and the
-rest of the band shows a live capture of the wallpaper behind the band (refreshed
-twice a second and on space changes), so the Dock does not peek out beside it.
-Drag-and-drop pinning currently cannot reach the real Dock because ours covers it.
+On first launch, MyDock imports Apple's pinned apps into the visible group. Other running apps enter the hidden group. MyDock then owns its order and saves it to `~/Library/Application Support/MyDock/apps.json`. Group membership and **Keep in MyDock** are separate: an app that is not kept appears only while running, but its assigned group is remembered for its next launch.
 
 ## Install
 
-```sh
-../install.sh my-dock
-```
-
-Builds, copies the app to `~/Applications` and starts it through launchd, so it
-also runs at login. `../uninstall.sh my-dock` reverses it.
-
-## Build
-
-For development, without installing:
+From the repository root:
 
 ```sh
-./build.sh
-open MyDock.app
+./install.sh my-dock
+./my-dock/native-dock.sh enable
 ```
 
-`build.sh` compiles `main.swift`, wraps the binary into `MyDock.app` and signs it
-with the "mac-utilities" certificate, so macOS keeps the granted Accessibility
-permission stable across rebuilds.
+The first command builds, signs, installs to `~/Applications`, and starts MyDock at login. The second moves Apple's Dock to the left and enables auto-hide. Its previous settings are saved before the change. Apple’s Dock remains running for system features. It can still appear if you move to the left screen edge.
 
-## Permissions
-
-Grant Accessibility to `MyDock.app` in
-System Settings > Privacy & Security > Accessibility, then relaunch it.
-Without it the Dock item list cannot be read; the app keeps retrying every 2 seconds
-and renders as soon as the permission is granted.
-
-## Dev
-
-Render once, print the window frame and item list, capture the strip to
-`/tmp/my-dock-smoke.png` and exit:
+To restore Apple's Dock settings:
 
 ```sh
-MY_DOCK_SMOKE_TEST=1 MY_DOCK_SMOKE_HIDE=1 ./MyDock.app/Contents/MacOS/my-dock
+./my-dock/native-dock.sh restore
 ```
 
-`MY_DOCK_SMOKE_HIDE=1/0` writes the "Hide unpinned apps" preference before rendering
-and `MY_DOCK_SMOKE_HOVER=<index>` shows the tooltip of that item before the capture.
+Quit MyDock from its menu bar icon, or remove it with `./uninstall.sh my-dock`. Restore Apple's settings before uninstalling. The saved app groups remain available for reinstalling.
 
-The capture is a screen-region capture of our own windows around the strip, so it
-needs no Screen Recording permission. The capture behind the window (the wallpaper
-patch source) is written next to it as `/tmp/my-dock-smoke-behind.png`.
+## Build and test
 
-Always launch with `install.sh`, launchd or `open MyDock.app`. Running the binary
-directly from a terminal makes the terminal the responsible process for the
-Accessibility permission.
+```sh
+./my-dock/build.sh
+./my-dock/test.sh
+```
+
+The tests run with the command-line tools and do not need XCTest. See
+[the code guide](ARCHITECTURE.md) for where to add features and which checks cover them.
+
+The build uses the repository's `mac-utilities` signing identity. `install.sh` creates it if needed. Use the installer to replace an existing running version; a process lock prevents duplicate Dock instances.
+
+## Implementation
+
+AppKit owns the panel, native drag sessions, drop indicators, and menus. Order changes are saved only after a valid drop. The panel stays visible and keeps the same position throughout a drag. No global mouse event tap, synthetic mouse event, screenshot cover, or drag forwarding is used.
+
+Core features do not require Accessibility or Screen Recording permission. If MyDock already has Accessibility access, it reads notification badges from Apple's Dock. Badges are optional and depend on what Apple exposes.
+
+MyDock handles application icons and opens Trash. It does not reproduce Apple's minimized-window tiles, folder stacks, app-specific Dock menus, or document drops onto app icons. It floats above windows and does not reserve desktop space. Large app lists scale to the screen width.

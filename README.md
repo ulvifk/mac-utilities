@@ -1,6 +1,6 @@
 # mac-utilities
 
-Self-built macOS utilities, one folder per tool. Single Swift files, no Xcode projects.
+Self-built macOS utilities, one folder per tool. Native Swift apps built with Apple’s command-line tools.
 
 ## app-switcher
 
@@ -12,9 +12,9 @@ Replaces Cmd+Tab with a switcher that can be filtered to a whitelist of apps.
 
 ## my-dock
 
-A pixel-matched replica of the macOS Dock that sits on top of Apple's, groups pinned
-apps on the left, and collapses everything else with one click on the chevron. Hover
-names, badges, and click to switch or launch.
+An Apple-like glass Dock with a collapsible group of app icons. Drag apps between
+the visible and hidden groups, reorder them, or move them through native menus.
+MyDock owns its app list and stays visible throughout each drag.
 
 ![shown](my-dock/screenshots/shown.png)
 
@@ -29,7 +29,9 @@ names, badges, and click to switch or launch.
 
 `install.sh <utility>` builds it, copies the app to `~/Applications` and bootstraps
 its launch agent, so it runs now and at login. `uninstall.sh <utility>` stops it and
-removes both. Each app asks for Accessibility once on first launch.
+removes both. AppSwitcher needs Accessibility access. MyDock’s core features do not;
+existing access enables optional badge counts. See [MyDock setup](my-dock/README.md)
+for keeping Apple’s Dock out of the way and restoring its settings.
 
 ## Setup
 

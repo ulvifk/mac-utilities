@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-swiftc -O -o my-dock main.swift
+swiftc -O -warnings-as-errors -o my-dock Sources/Model/*.swift Sources/Application/*.swift Sources/Platform/*.swift Sources/Presentation/*.swift main.swift
 
 APP=MyDock.app
 rm -rf "$APP"
