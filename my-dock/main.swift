@@ -161,17 +161,19 @@ func isTrashFull() -> Bool {
 
 /// Draws the tiles left to right in top-left coordinates, so every inset reads as a distance from the strip's top.
 final class DockStripView: NSView {
-    var items: [DockItem] = []
+    var onSeparatorClicked: () -> Void = {}
+
+    var items: [DockItem] = [] {
+        didSet { needsDisplay = true }
+    }
 
     override var isFlipped: Bool { return true }
 
     override func draw(_ dirtyRect: NSRect) {
         drawDimming()
 
-        var cellX = stripEndPadding
-        for item in items {
-            drawItem(item, cellX: cellX)
-            cellX += item.width
+        for (item, cell) in zip(items, getCellFrames()) {
+            drawItem(item, cell: cell)
         }
     }
 
@@ -183,16 +185,14 @@ final class DockStripView: NSView {
         NSBezierPath(roundedRect: inset, xRadius: stripCornerRadius - 1, yRadius: stripCornerRadius - 1).fill()
     }
 
-    private func drawItem(_ item: DockItem, cellX: CGFloat) {
-        let centerX = cellX + item.width / 2
-
+    private func drawItem(_ item: DockItem, cell: NSRect) {
         if item.kind == .separator {
-            drawSeparator(centerX: centerX)
+            drawSeparator(centerX: cell.midX)
             return
         }
 
-        drawIcon(getIcon(item), centerX: centerX)
-        if item.isRunning { drawRunningDot(centerX: centerX) }
+        drawIcon(getIcon(item), centerX: cell.midX)
+        if item.isRunning { drawRunningDot(centerX: cell.midX) }
     }
 
     private func drawIcon(_ icon: NSImage, centerX: CGFloat) {
@@ -220,13 +220,67 @@ final class DockStripView: NSView {
         separatorColor.setFill()
         rect.fill()
     }
+
+    // MARK: mouse
+
+    /// The panel never becomes key, so the first click must reach the view directly.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if !isSeparator(at: convert(event.locationInWindow, from: nil)) { return }
+
+        onSeparatorClicked()
+    }
+
+    /// Cursor rects and cursorUpdate only work in the key window, so the cursor is set by hand from mouse moves.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        if isSeparator(at: convert(event.locationInWindow, from: nil)) {
+            NSCursor.pointingHand.set()
+            return
+        }
+
+        NSCursor.arrow.set()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
+    private func isSeparator(at point: NSPoint) -> Bool {
+        return getItem(at: point)?.kind == .separator
+    }
+
+    private func getItem(at point: NSPoint) -> DockItem? {
+        return zip(items, getCellFrames()).first { $0.1.contains(point) }?.0
+    }
+
+    /// One full-height cell per item, left to right from the end padding; drawing and hit testing share them.
+    private func getCellFrames() -> [NSRect] {
+        var frames: [NSRect] = []
+        var cellX = stripEndPadding
+
+        for item in items {
+            frames.append(NSRect(x: cellX, y: 0, width: item.width, height: stripHeight))
+            cellX += item.width
+        }
+
+        return frames
+    }
 }
 
 final class MyDockController: NSObject, NSApplicationDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let hideUnpinnedMenuItem = NSMenuItem(title: "Hide unpinned apps", action: #selector(toggleHideUnpinned), keyEquivalent: "")
 
-    private let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
+    private let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     private let glass = NSGlassEffectView()
     private let strip = DockStripView()
 
@@ -269,19 +323,20 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     }
 
     /// Apple's Dock draws the light trash variant in both appearances, so the content draws as aqua.
+    /// A borderless non-activating panel cannot become key, so clicks on the strip never move focus.
     private func buildWindow() {
         glass.style = .regular
         glass.cornerRadius = stripCornerRadius
         glass.contentView = strip
         strip.appearance = NSAppearance(named: .aqua)
+        strip.onSeparatorClicked = { [unowned self] in self.toggleHideUnpinned() }
 
-        window.contentView = glass
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = true
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)))
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        window.ignoresMouseEvents = true
+        panel.contentView = glass
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)))
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
     }
 
     private func requestAccessibilityTrust() {
@@ -317,11 +372,10 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         let width = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
         let frame = NSRect(x: screen.midX - width / 2, y: screen.minY + stripBottomMargin + comparisonOffset, width: width, height: stripHeight)
 
-        window.setFrame(frame, display: false)
-        strip.items = items
+        panel.setFrame(frame, display: false)
         strip.frame = glass.bounds
-        strip.needsDisplay = true
-        window.orderFrontRegardless()
+        strip.items = items
+        panel.orderFrontRegardless()
     }
 
     private func runSmokeTestIfRequested() {
@@ -331,9 +385,9 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(environment["MY_DOCK_SMOKE_HIDE"] == "1", forKey: hideUnpinnedKey)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            print("smoke: frame=\(self.window.frame) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
+            print("smoke: frame=\(self.panel.frame) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
             print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
-            writeCapture(around: self.window, path: smokeCapturePath)
+            writeCapture(around: self.panel, path: smokeCapturePath)
             exit(0)
         }
     }
