@@ -355,7 +355,7 @@ final class SwitcherPanel: NSPanel {
         return dimming
     }
 
-    /// Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
+    /// Icons draw as aqua, so system images keep their light variants on the dark glass.
     private func buildIconRow(state: SwitcherState) -> NSStackView {
         let row = NSStackView()
 

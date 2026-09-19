@@ -10,21 +10,10 @@ Replaces Cmd+Tab with a switcher that can be filtered to a whitelist of apps.
 
 ![filtered to the whitelist](app-switcher/screenshots/filtered.png)
 
-## my-dock
-
-A pixel-matched replica of the macOS Dock that sits on top of Apple's, groups pinned
-apps on the left, and collapses everything else with one click on the chevron. Hover
-names, badges, and click to switch or launch.
-
-![shown](my-dock/screenshots/shown.png)
-
-![hidden](my-dock/screenshots/hidden.png)
-
 ## Install
 
 ```sh
 ./install.sh app-switcher
-./install.sh my-dock
 ```
 
 `install.sh <utility>` builds it, copies the app to `~/Applications` and bootstraps
