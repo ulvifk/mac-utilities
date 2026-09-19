@@ -16,6 +16,7 @@ let runningDotColor = NSColor.white.withAlphaComponent(0.58)
 let separatorVerticalInset: CGFloat = 8
 let separatorColor = NSColor.white.withAlphaComponent(0.3)
 
+let hideUnpinnedKey = "hideUnpinned"
 let finderPath = "/System/Library/CoreServices/Finder.app"
 let dockDefaults = UserDefaults(suiteName: "com.apple.dock")!
 /// Pinning happens by drag and drop in Apple's Dock, which fires no workspace notification.
@@ -126,6 +127,15 @@ func insertGroupSeparator(into items: [DockItem], pinned: Set<String>) -> [DockI
     return grouped
 }
 
+/// Drops the unpinned apps and the separator in front of them; the Trash keeps its own separator.
+func filterHiddenItems(_ items: [DockItem], pinned: Set<String>) -> [DockItem] {
+    guard let firstUnpinned = items.firstIndex(where: { isUnpinnedApp($0, pinned: pinned) }) else { return items }
+
+    let pinnedGroup = items[..<(firstUnpinned - 1)]
+    let trashGroup = items[firstUnpinned...].filter { !isUnpinnedApp($0, pinned: pinned) }
+    return Array(pinnedGroup) + trashGroup
+}
+
 func isUnpinnedApp(_ item: DockItem, pinned: Set<String>) -> Bool {
     if item.kind != .app { return false }
     return !isPinned(item, pinned: pinned)
@@ -214,6 +224,7 @@ final class DockStripView: NSView {
 
 final class MyDockController: NSObject, NSApplicationDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let hideUnpinnedMenuItem = NSMenuItem(title: "Hide unpinned apps", action: #selector(toggleHideUnpinned), keyEquivalent: "")
 
     private let window = NSWindow(contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false)
     private let glass = NSGlassEffectView()
@@ -221,14 +232,15 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
     private var dock = (frame: CGRect.zero, items: [DockItem]())
 
+    /// The smoke test goes first because it writes the preferences the menu and the first render read.
     func applicationDidFinishLaunching(_ notification: Notification) {
+        runSmokeTestIfRequested()
         buildMenu()
         buildWindow()
         requestAccessibilityTrust()
         observeApplicationChanges()
         scheduleRefresh()
         render()
-        runSmokeTestIfRequested()
     }
 
     private func buildMenu() {
@@ -236,9 +248,24 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
 
         statusItem.button?.image = NSImage(systemSymbolName: "dock.rectangle", accessibilityDescription: "My Dock")
+        hideUnpinnedMenuItem.target = self
+        hideUnpinnedMenuItem.state = isHideUnpinnedEnabled ? .on : .off
         quitItem.target = self
+
+        menu.addItem(hideUnpinnedMenuItem)
+        menu.addItem(.separator())
         menu.addItem(quitItem)
         statusItem.menu = menu
+    }
+
+    @objc private func toggleHideUnpinned() {
+        UserDefaults.standard.set(!isHideUnpinnedEnabled, forKey: hideUnpinnedKey)
+        hideUnpinnedMenuItem.state = isHideUnpinnedEnabled ? .on : .off
+        render()
+    }
+
+    private var isHideUnpinnedEnabled: Bool {
+        return UserDefaults.standard.bool(forKey: hideUnpinnedKey)
     }
 
     /// Apple's Dock draws the light trash variant in both appearances, so the content draws as aqua.
@@ -282,7 +309,9 @@ final class MyDockController: NSObject, NSApplicationDelegate {
 
     private func render() {
         dock = readDockItems()
-        let items = insertGroupSeparator(into: dock.items, pinned: readPinnedPaths())
+        let pinned = readPinnedPaths()
+        let grouped = insertGroupSeparator(into: dock.items, pinned: pinned)
+        let items = isHideUnpinnedEnabled ? filterHiddenItems(grouped, pinned: pinned) : grouped
 
         let screen = NSScreen.main!.frame
         let width = stripEndPadding * 2 + items.reduce(0) { $0 + $1.width }
@@ -296,7 +325,10 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     }
 
     private func runSmokeTestIfRequested() {
-        guard ProcessInfo.processInfo.environment["MY_DOCK_SMOKE_TEST"] != nil else { return }
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MY_DOCK_SMOKE_TEST"] != nil else { return }
+
+        UserDefaults.standard.set(environment["MY_DOCK_SMOKE_HIDE"] == "1", forKey: hideUnpinnedKey)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
             print("smoke: frame=\(self.window.frame) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")

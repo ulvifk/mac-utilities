@@ -9,6 +9,9 @@ process: app, separator and trash items with their sizes, titles, URLs and runni
 state), so it mirrors the real Dock's order and contents. It re-reads and re-renders
 on app launch, termination and activation.
 
+The menu bar item's "Hide unpinned apps" hides every app right of the pinned group
+(Finder and the Dock's persistent apps); the Trash and its separator stay.
+
 `comparisonOffset` in `main.swift` floats the strip 70pt above the real Dock for
 side-by-side inspection. Set it to 0 when it replaces the Dock.
 
@@ -46,8 +49,10 @@ Render once, print the window frame and item list, capture the strip to
 `/tmp/my-dock-smoke.png` and exit:
 
 ```sh
-MY_DOCK_SMOKE_TEST=1 ./MyDock.app/Contents/MacOS/my-dock
+MY_DOCK_SMOKE_TEST=1 MY_DOCK_SMOKE_HIDE=1 ./MyDock.app/Contents/MacOS/my-dock
 ```
+
+`MY_DOCK_SMOKE_HIDE=1/0` writes the "Hide unpinned apps" preference before rendering.
 
 The capture is a screen-region capture of our own windows around the strip, so it
 needs no Screen Recording permission. The real Dock is another process and is not in
