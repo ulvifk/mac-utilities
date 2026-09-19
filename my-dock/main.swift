@@ -54,6 +54,14 @@ let tooltipTopRimColor = NSColor.white.withAlphaComponent(0.2)
 let tooltipBottomRimColor = NSColor.white.withAlphaComponent(0.15)
 let tooltipTextAttributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: NSColor.white]
 
+/// Apple's Dock labels the item under the cursor in its own layout even while our strip covers it, and no window order or
+/// preference stops it, so the band above the strip is painted with what lies behind the Dock while the cursor is on an item.
+let appleLabelBandHeight: CGFloat = 48
+/// Apple's labels overhang the Dock's ends for the first and last items.
+let coverEndSlack: CGFloat = 80
+let coverRefreshInterval: TimeInterval = 1 / 30
+let appleLabelFadeOutDuration: TimeInterval = 0.3
+
 let hideUnpinnedKey = "hideUnpinned"
 /// The window spans Apple's Dock plus this margin on each side, so the collapsed strip can hide the Dock behind a wallpaper patch.
 let bandMargin: CGFloat = 12
@@ -143,8 +151,10 @@ struct DockItem {
     let badge: String?
     let width: CGFloat
 
-    /// Apple's own Dock item, which clicks are forwarded to; nil for our own toggle slot, which is never clicked through.
+    /// Apple's own Dock item and its place in Apple's layout, in top-left screen coordinates; nil for our own toggle slot,
+    /// which is neither clicked through nor labelled by Apple.
     let element: AXUIElement?
+    let frame: CGRect?
 
     var toggle: ToggleSlot? = nil
 }
@@ -178,7 +188,8 @@ func buildDockItem(_ element: AXUIElement) -> DockItem? {
         isRunning: getAttribute(element, "AXIsApplicationRunning") as? Bool ?? false,
         badge: getBadge(element, subrole: subrole),
         width: frame.width,
-        element: element
+        element: element,
+        frame: frame
     )
 }
 
@@ -238,7 +249,7 @@ func buildToggleItem(_ runningApps: [DockItem], collapsed: Bool) -> DockItem {
     let slot = ToggleSlot(isCollapsed: collapsed, runningCount: runningApps.count, hasBadge: collapsed && runningApps.contains { $0.badge != nil })
     let name = "\(collapsed ? "Show" : "Hide") \(runningApps.count) running apps"
 
-    return DockItem(kind: .toggle, name: name, url: nil, isRunning: false, badge: nil, width: getToggleWidth(slot), element: nil, toggle: slot)
+    return DockItem(kind: .toggle, name: name, url: nil, isRunning: false, badge: nil, width: getToggleWidth(slot), element: nil, frame: nil, toggle: slot)
 }
 
 /// Widened by the count drawn right of the chevron while collapsed.
@@ -311,6 +322,7 @@ final class DockStripView: NSView {
     var onTileClicked: (DockItem) -> Void = { _ in }
     var onHovered: (DockItem, CGFloat) -> Void = { _, _ in }
     var onHoverEnded: () -> Void = {}
+    var onPointerMoved: (NSPoint?) -> Void = { _ in }
 
     var items: [DockItem] = [] {
         didSet { needsDisplay = true }
@@ -482,10 +494,19 @@ final class DockStripView: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         updateHover(getHoverableIndex(at: convert(event.locationInWindow, from: nil)))
+        onPointerMoved(getScreenPoint(event.locationInWindow))
     }
 
     override func mouseExited(with event: NSEvent) {
         updateHover(nil)
+        onPointerMoved(nil)
+    }
+
+    /// Top-left screen coordinates, the system Apple's Dock reports its item frames in.
+    private func getScreenPoint(_ locationInWindow: NSPoint) -> NSPoint {
+        let onScreen = window!.convertPoint(toScreen: locationInWindow)
+
+        return NSPoint(x: onScreen.x, y: NSScreen.screens[0].frame.height - onScreen.y)
     }
 
     /// Re-evaluates the hover under a resting cursor, once the strip has reached its final geometry.
@@ -495,6 +516,7 @@ final class DockStripView: NSView {
         // The same index may now hold another item, so it is re-reported; a nil index still ends the hover normally.
         if index != nil { hoveredIndex = nil }
         updateHover(index)
+        onPointerMoved(getScreenPoint(window!.mouseLocationOutsideOfEventStream))
     }
 
     /// Reports only changes, with the cell's center x, so the tooltip is not rebuilt on every mouse move.
@@ -631,9 +653,14 @@ final class MyDockController: NSObject, NSApplicationDelegate {
     private let tooltipPanel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     private let tooltip = TooltipView()
 
+    private let coverPanel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    private let tooltipCover = BackdropView()
+
     private var dock = (frame: CGRect.zero, items: [DockItem]())
     private var stripAnimation: Timer?
     private var backdropRefresh: Timer?
+    private var coverRefresh: Timer?
+    private var coverHide: DispatchWorkItem?
 
     /// The smoke test goes first because it writes the preferences the menu and the first render read.
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -685,6 +712,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         strip.onTileClicked = { AXUIElementPerformAction($0.element!, kAXPressAction as CFString) }
         strip.onHovered = { [unowned self] item, centerX in self.showTooltip(for: item, centerX: centerX) }
         strip.onHoverEnded = { [unowned self] in self.tooltipPanel.orderOut(nil) }
+        strip.onPointerMoved = { [unowned self] point in self.setAppleLabelCoverShown(self.isOverAppleItem(point)) }
 
         backdrop.autoresizingMask = [.width, .height]
         band.addSubview(backdrop)
@@ -702,8 +730,16 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         tooltipPanel.backgroundColor = .clear
         tooltipPanel.hasShadow = false
         tooltipPanel.ignoresMouseEvents = true
-        tooltipPanel.level = panel.level
+        tooltipPanel.level = NSWindow.Level(rawValue: panel.level.rawValue + 1)
         tooltipPanel.collectionBehavior = panel.collectionBehavior
+
+        coverPanel.contentView = tooltipCover
+        coverPanel.isOpaque = false
+        coverPanel.backgroundColor = .clear
+        coverPanel.hasShadow = false
+        coverPanel.ignoresMouseEvents = true
+        coverPanel.level = panel.level
+        coverPanel.collectionBehavior = panel.collectionBehavior
     }
 
     private func requestAccessibilityTrust() {
@@ -739,6 +775,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         guard let screen = getScreen(containing: dock.frame) else {
             panel.orderOut(nil)
             tooltipPanel.orderOut(nil)
+            hideAppleLabelCover()
             return
         }
 
@@ -750,6 +787,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         strip.items = items
         panel.setFrame(NSRect(x: screen.frame.midX - bandWidth / 2, y: screen.frame.minY + stripBottomMargin, width: bandWidth, height: stripHeight), display: true)
         panel.orderFrontRegardless()
+        coverPanel.setFrame(NSRect(x: dock.frame.minX - coverEndSlack, y: panel.frame.maxY, width: dock.frame.width + 2 * coverEndSlack, height: appleLabelBandHeight), display: true)
         setBackdropShown(collapsed)
         animateStrip(toWidth: stripWidth, thenHideBackdrop: !collapsed)
     }
@@ -801,6 +839,45 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func isOverAppleItem(_ point: NSPoint?) -> Bool {
+        guard let point else { return false }
+        return dock.items.contains { $0.frame?.contains(point) == true }
+    }
+
+    /// Hiding waits out Apple's fade, so the label never flashes back while the cursor crosses the next item.
+    private func setAppleLabelCoverShown(_ shown: Bool) {
+        coverHide?.cancel()
+        if shown {
+            showAppleLabelCover()
+            return
+        }
+
+        let hide = DispatchWorkItem { [unowned self] in hideAppleLabelCover() }
+        coverHide = hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + appleLabelFadeOutDuration, execute: hide)
+    }
+
+    private func showAppleLabelCover() {
+        if coverPanel.isVisible { return }
+
+        refreshCover()
+        coverPanel.orderFrontRegardless()
+        coverRefresh = Timer.scheduledTimer(withTimeInterval: coverRefreshInterval, repeats: true) { [unowned self] _ in refreshCover() }
+    }
+
+    private func hideAppleLabelCover() {
+        coverPanel.orderOut(nil)
+        coverRefresh?.invalidate()
+        coverRefresh = nil
+    }
+
+    /// Everything below Apple's Dock window in that band: the wallpaper and whatever window lies there, but not its label.
+    private func refreshCover() {
+        guard let image = captureBackdrop(behind: coverPanel) else { return }
+
+        tooltipCover.image = image
+    }
+
     /// Centered on the cell in screen coordinates, caret tip a few points above the strip; may overhang the strip's ends.
     private func showTooltip(for item: DockItem, centerX: CGFloat) {
         let size = TooltipView.getSize(for: item.name)
@@ -825,7 +902,7 @@ final class MyDockController: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
             print("smoke: frame=\(self.panel.frame) strip=\(self.glass.frame) level=\(self.panel.level.rawValue) backdropShown=\(!self.backdrop.isHidden) items=\(self.strip.items.count) dockItems=\(self.dock.items.count) dockListFrame=\(self.dock.frame)")
             print("smoke: items=\(self.strip.items.map { $0.kind == .separator ? "|" : $0.name })")
-            print("smoke: tooltip=\(self.tooltipPanel.frame) visible=\(self.tooltipPanel.isVisible) text=\(self.tooltip.text) badges=\(self.strip.items.filter { $0.badge != nil }.map { "\($0.name)=\($0.badge!)" })")
+            print("smoke: tooltip=\(self.tooltipPanel.frame) visible=\(self.tooltipPanel.isVisible) text=\(self.tooltip.text) badges=\(self.strip.items.filter { $0.badge != nil }.map { "\($0.name)=\($0.badge!)" }) cover=\(self.coverPanel.frame) coverVisible=\(self.coverPanel.isVisible)")
             writeCapture(around: self.panel, path: smokeCapturePath)
             if let behind = captureBackdrop(behind: self.panel) { writePNG(behind, path: smokeBackdropPath) }
             exit(0)
