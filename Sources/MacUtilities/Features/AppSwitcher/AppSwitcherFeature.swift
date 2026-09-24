@@ -1,0 +1,455 @@
+import AppKit
+
+/// Finder is a regular app too, but quitting it closes every Finder window and the desktop icons.
+private let finderBundleIdentifier = "com.apple.finder"
+
+/// Replaces Cmd+Tab with the switcher panel, filtered to the whitelist when the filter is on.
+final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
+    let identifier = "app-switcher"
+    let displayName = "App Switcher"
+
+    private let filterMenuItem = NSMenuItem(title: "Filter enabled", action: #selector(toggleFilter), keyEquivalent: "")
+    private let whitelistMenu = NSMenu(title: "Whitelist")
+
+    private let panel = SwitcherPanel()
+    private let tracker = RecentAppsTracker()
+    private let whitelistStore = WhitelistStore()
+    private var observers: [NSObjectProtocol] = []
+
+    private var candidates: [NSRunningApplication] = []
+    private var iconsPerRow = 1
+    private var selectedIndex = 0
+
+    private var isOpening = false
+    private var commandReleasedWhileOpening = false
+    private var pendingAdvance = 0
+
+    override init() {
+        super.init()
+
+        filterMenuItem.target = self
+        whitelistMenu.delegate = self
+        wirePanelClicks()
+    }
+
+    func start() {
+        observers.append(observeAppTermination())
+        observers.append(contentsOf: observeAppHiding())
+        runSmokeTestIfRequested()
+    }
+
+    func stop() {
+        for observer in observers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        observers = []
+        panel.hide()
+    }
+
+    func handle(type: CGEventType, event: CGEvent) -> Bool {
+        if type == .keyDown {
+            return handleKeyDown(event)
+        }
+
+        if type == .flagsChanged {
+            handleFlagsChanged(event)
+        }
+
+        return false
+    }
+
+    func buildMenuItems() -> [NSMenuItem] {
+        let quitAppsNotInWhitelistItem = NSMenuItem(title: "Quit apps not in the whitelist", action: #selector(quitAppsNotInWhitelist), keyEquivalent: "")
+        let whitelistItem = NSMenuItem(title: "Whitelist", action: nil, keyEquivalent: "")
+
+        filterMenuItem.state = whitelistStore.isFilterEnabled ? .on : .off
+        quitAppsNotInWhitelistItem.target = self
+        whitelistItem.submenu = whitelistMenu
+
+        return [
+            filterMenuItem,
+            quitAppsNotInWhitelistItem,
+            buildHintItem(title: "While switching: Up/Down move between rows"),
+            buildHintItem(title: "While switching: W toggles whitelist"),
+            buildHintItem(title: "While switching: F toggles filter"),
+            buildHintItem(title: "While switching: Q quits app"),
+            buildHintItem(title: "While switching: X quits every app not in the whitelist"),
+            buildHintItem(title: "While switching: H hides app"),
+            buildHintItem(title: "While switching: Esc cancels"),
+            .separator(),
+            whitelistItem,
+        ]
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+
+        let whitelist = whitelistStore.getWhitelist()
+        for app in getRegularRunningApps() {
+            guard let bundleIdentifier = app.bundleIdentifier else { continue }
+            let item = NSMenuItem(title: app.localizedName ?? bundleIdentifier, action: #selector(toggleWhitelistEntry), keyEquivalent: "")
+            item.target = self
+            item.representedObject = bundleIdentifier
+            item.state = whitelist.contains(bundleIdentifier) ? .on : .off
+            menu.addItem(item)
+        }
+    }
+
+    private func runSmokeTestIfRequested() {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["APP_SWITCHER_SMOKE_TEST"] != nil else { return }
+
+        whitelistStore.setFilterEnabled(environment["APP_SWITCHER_SMOKE_FILTER"] == "1")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.loadCandidates()
+            self.selectedIndex = Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!
+            self.panel.show(state: self.buildState())
+            showCaptureBackdrop(behind: self.panel)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) selected=\(self.selectedIndex)")
+            print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName })")
+            writeCapture(around: self.panel, path: smokeCapturePath)
+            exit(0)
+        }
+    }
+
+    // MARK: menu
+
+    private func wirePanelClicks() {
+        panel.onCellClicked = { index in
+            self.selectedIndex = index
+            self.activateSelectedApp()
+        }
+    }
+
+    private func observeAppTermination() -> NSObjectProtocol {
+        return NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            if !self.panel.isVisible { return }
+
+            let app = notification.userInfo![NSWorkspace.applicationUserInfoKey] as! NSRunningApplication
+            guard let index = self.candidates.firstIndex(where: { $0.processIdentifier == app.processIdentifier }) else { return }
+
+            self.removeCandidate(at: index)
+        }
+    }
+
+    /// Redraws the dimming once the app is really hidden or shown, whether it was our Cmd+H or done elsewhere.
+    private func observeAppHiding() -> [NSObjectProtocol] {
+        var observers: [NSObjectProtocol] = []
+
+        for name in [NSWorkspace.didHideApplicationNotification, NSWorkspace.didUnhideApplicationNotification] {
+            observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
+                if !self.panel.isVisible { return }
+
+                self.panel.update(state: self.buildState())
+            })
+        }
+
+        return observers
+    }
+
+    private func buildHintItem(title: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+
+        item.isEnabled = false
+
+        return item
+    }
+
+    @objc private func toggleFilter() {
+        whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
+        filterMenuItem.state = whitelistStore.isFilterEnabled ? .on : .off
+    }
+
+    @objc private func toggleWhitelistEntry(_ sender: NSMenuItem) {
+        whitelistStore.toggleWhitelist(bundleIdentifier: sender.representedObject as! String)
+    }
+
+    /// A normal quit, so an app with unsaved changes shows its dialog and stays running. The switcher itself is an accessory app, never a regular one.
+    @objc private func quitAppsNotInWhitelist() {
+        let whitelist = whitelistStore.getWhitelist()
+
+        for app in getRegularRunningApps() {
+            guard let bundleIdentifier = app.bundleIdentifier else { continue }
+            if bundleIdentifier == finderBundleIdentifier { continue }
+            if whitelist.contains(bundleIdentifier) { continue }
+            app.terminate()
+        }
+    }
+
+    // MARK: events
+
+    /// Never does real work: macOS disables a tap whose callback is slow, and the keystroke then falls through to the Dock.
+    private func handleKeyDown(_ event: CGEvent) -> Bool {
+        if panel.isVisible {
+            return handleKeyDownWhileVisible(event)
+        }
+
+        if !isSwitcherShortcut(event) {
+            return false
+        }
+
+        if isOpening {
+            pendingAdvance += 1
+            return true
+        }
+
+        isOpening = true
+        commandReleasedWhileOpening = false
+        pendingAdvance = 0
+        DispatchQueue.main.async { self.openSwitcher() }
+        return true
+    }
+
+    private func openSwitcher() {
+        loadCandidates()
+        isOpening = false
+
+        if candidates.isEmpty { return }
+
+        selectedIndex = (candidates.count > 1 ? 1 : 0) + pendingAdvance
+        selectedIndex %= candidates.count
+
+        if commandReleasedWhileOpening {
+            activateSelectedApp()
+            return
+        }
+
+        panel.show(state: buildState())
+    }
+
+    private func handleKeyDownWhileVisible(_ event: CGEvent) -> Bool {
+        if isSwitcherShortcut(event) {
+            advanceSelection(backward: event.flags.contains(.maskShift))
+            return true
+        }
+
+        if isForwardShortcut(event) {
+            advanceSelection(backward: false)
+            return true
+        }
+
+        if isBackwardShortcut(event) {
+            advanceSelection(backward: true)
+            return true
+        }
+
+        if isRowUpShortcut(event) {
+            moveSelectionBetweenRows(up: true)
+            return true
+        }
+
+        if isRowDownShortcut(event) {
+            moveSelectionBetweenRows(up: false)
+            return true
+        }
+
+        if isWhitelistToggleShortcut(event) {
+            whitelistStore.toggleWhitelist(bundleIdentifier: candidates[selectedIndex].bundleIdentifier!)
+            panel.update(state: buildState())
+            return true
+        }
+
+        if isFilterToggleShortcut(event) {
+            DispatchQueue.main.async { self.toggleFilterAndRefreshCandidates() }
+            return true
+        }
+
+        if isQuitShortcut(event) {
+            candidates[selectedIndex].terminate()
+            return true
+        }
+
+        if isQuitAppsNotInWhitelistShortcut(event) {
+            DispatchQueue.main.async { self.quitAppsNotInWhitelist() }
+            return true
+        }
+
+        if isHideShortcut(event) {
+            candidates[selectedIndex].hide()
+            return true
+        }
+
+        if isCancelShortcut(event) {
+            panel.hide()
+            return true
+        }
+
+        return false
+    }
+
+    /// Releasing Cmd activates the selection; the release itself always reaches the focused app.
+    private func handleFlagsChanged(_ event: CGEvent) {
+        if event.flags.contains(.maskCommand) { return }
+
+        if isOpening {
+            commandReleasedWhileOpening = true
+            return
+        }
+
+        if !panel.isVisible { return }
+
+        activateSelectedApp()
+    }
+
+    private func isSwitcherShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: tabKeyCode)
+    }
+
+    private func isForwardShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: rightArrowKeyCode)
+    }
+
+    private func isBackwardShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: leftArrowKeyCode)
+    }
+
+    private func isRowUpShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: upArrowKeyCode)
+    }
+
+    private func isRowDownShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: downArrowKeyCode)
+    }
+
+    private func isWhitelistToggleShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: wKeyCode)
+    }
+
+    private func isFilterToggleShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: fKeyCode)
+    }
+
+    private func isQuitShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: qKeyCode)
+    }
+
+    private func isQuitAppsNotInWhitelistShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: xKeyCode)
+    }
+
+    private func isHideShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: hKeyCode)
+    }
+
+    private func isCancelShortcut(_ event: CGEvent) -> Bool {
+        return isKey(event, keyCode: escapeKeyCode)
+    }
+
+    private func isCommandShortcut(_ event: CGEvent, keyCode: Int64) -> Bool {
+        return isShortcut(event, keyCode: keyCode, modifiers: .maskCommand)
+    }
+
+    // MARK: switching
+
+    /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later.
+    private func loadCandidates() {
+        candidates = getCandidates()
+        iconsPerRow = getIconsPerRow()
+    }
+
+    private func getIconsPerRow() -> Int {
+        let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
+
+        return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
+    }
+
+    private func getCandidates() -> [NSRunningApplication] {
+        let recentApps = getRecentRunningApps()
+        if !whitelistStore.isFilterEnabled {
+            return recentApps
+        }
+
+        let whitelist = whitelistStore.getWhitelist()
+        let whitelistedApps = recentApps.filter { whitelist.contains($0.bundleIdentifier!) }
+        if whitelistedApps.isEmpty {
+            return recentApps
+        }
+
+        return whitelistedApps
+    }
+
+    /// Regular running apps, most recently activated first.
+    private func getRecentRunningApps() -> [NSRunningApplication] {
+        var appsByIdentifier: [String: NSRunningApplication] = [:]
+
+        for app in getRegularRunningApps() {
+            guard let bundleIdentifier = app.bundleIdentifier else { continue }
+            appsByIdentifier[bundleIdentifier] = app
+        }
+
+        var recentApps: [NSRunningApplication] = []
+        for bundleIdentifier in tracker.bundleIdentifiers {
+            guard let app = appsByIdentifier[bundleIdentifier] else { continue }
+            recentApps.append(app)
+        }
+
+        return getAppsWithWindows(recentApps)
+    }
+
+    private func advanceSelection(backward: Bool) {
+        let step = backward ? -1 : 1
+        selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
+        panel.update(state: buildState())
+    }
+
+    /// Same column one row up or down, wrapping at the top and bottom; a shorter last row clamps to its last icon.
+    private func moveSelectionBetweenRows(up: Bool) {
+        let rowCount = (candidates.count + iconsPerRow - 1) / iconsPerRow
+        let column = selectedIndex % iconsPerRow
+        let step = up ? -1 : 1
+        let targetRow = (selectedIndex / iconsPerRow + step + rowCount) % rowCount
+
+        selectedIndex = min(targetRow * iconsPerRow + column, candidates.count - 1)
+        panel.update(state: buildState())
+    }
+
+    /// The selection stays on its app; when that is the one gone, it moves to the neighbour.
+    private func removeCandidate(at index: Int) {
+        candidates.remove(at: index)
+        if candidates.isEmpty {
+            panel.hide()
+            return
+        }
+
+        if index < selectedIndex { selectedIndex -= 1 }
+        selectedIndex = min(selectedIndex, candidates.count - 1)
+        panel.removeApp(at: index, state: buildState())
+    }
+
+    private func toggleFilterAndRefreshCandidates() {
+        let selectedIdentifier = candidates[selectedIndex].bundleIdentifier
+
+        toggleFilter()
+        loadCandidates()
+        if candidates.isEmpty {
+            panel.hide()
+            return
+        }
+
+        selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
+        panel.show(state: buildState())
+    }
+
+    private func buildState() -> SwitcherState {
+        return SwitcherState(
+            apps: candidates,
+            iconsPerRow: iconsPerRow,
+            selectedIndex: selectedIndex,
+            filterEnabled: whitelistStore.isFilterEnabled,
+            whitelisted: whitelistStore.getWhitelist()
+        )
+    }
+
+    private func activateSelectedApp() {
+        panel.hide()
+        candidates[selectedIndex].activate(options: [.activateAllWindows])
+    }
+}
