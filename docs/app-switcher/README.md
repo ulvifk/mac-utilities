@@ -75,4 +75,5 @@ APP_SWITCHER_SMOKE_TEST=1 APP_SWITCHER_SMOKE_INDEX=3 APP_SWITCHER_SMOKE_FILTER=1
 panel and `APP_SWITCHER_SMOKE_DARK=1` swaps the gradient behind the panel for a
 dark one. The capture is a screen-region capture of our own windows, so it needs no
 Screen Recording permission but only shows the desktop and this app. A gradient
-window is put behind the panel first, so the glass has something to blur.
+window is put behind the panel first, so the glass has something to blur. The
+smoke test runs from the feature's start, so the App Switcher toggle must be on.
