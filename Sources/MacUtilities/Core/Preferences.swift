@@ -1,31 +1,27 @@
 import Foundation
 
-/// Which features run, in UserDefaults. Every feature is enabled until switched off.
+/// Which features are switched off, in UserDefaults. A feature the store has never heard of runs, so new features start enabled.
 final class Preferences {
-    private let enabledFeaturesKey = "enabledFeatures"
+    private let disabledFeaturesKey = "disabledFeatures"
     private let defaults = UserDefaults.standard
 
-    init(featureIdentifiers: [String]) {
-        defaults.register(defaults: [enabledFeaturesKey: featureIdentifiers])
-    }
-
     func isFeatureEnabled(_ identifier: String) -> Bool {
-        return getEnabledFeatures().contains(identifier)
+        return !getDisabledFeatures().contains(identifier)
     }
 
     func setFeatureEnabled(_ identifier: String, _ enabled: Bool) {
-        var enabledFeatures = getEnabledFeatures()
+        var disabledFeatures = getDisabledFeatures()
 
         if enabled {
-            enabledFeatures.insert(identifier)
+            disabledFeatures.remove(identifier)
         } else {
-            enabledFeatures.remove(identifier)
+            disabledFeatures.insert(identifier)
         }
 
-        defaults.set(Array(enabledFeatures), forKey: enabledFeaturesKey)
+        defaults.set(Array(disabledFeatures), forKey: disabledFeaturesKey)
     }
 
-    private func getEnabledFeatures() -> Set<String> {
-        return Set(defaults.stringArray(forKey: enabledFeaturesKey)!)
+    private func getDisabledFeatures() -> Set<String> {
+        return Set(defaults.stringArray(forKey: disabledFeaturesKey) ?? [])
     }
 }

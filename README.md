@@ -66,5 +66,6 @@ A feature implements `Feature`: a stable `identifier` (the key its enabled state
 stored under), a `displayName`, `start()`, `stop()`, `handle(type:event:) -> Bool`
 and `buildMenuItems()`. The core tap hands every key press and modifier change to
 the enabled features in order; the first one returning `true` swallows the event.
-Enabled features are stored in UserDefaults under `enabledFeatures`, every feature
-enabled until switched off. New features are registered in `main.swift`.
+Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
+feature runs until it is switched off, new ones included. New features are
+registered in `main.swift`.

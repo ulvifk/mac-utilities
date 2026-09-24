@@ -4,7 +4,7 @@ import AppKit
 final class AppController: NSObject, NSApplicationDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let features: [Feature]
-    private let preferences: Preferences
+    private let preferences = Preferences()
 
     private var eventTap: EventTap!
     /// The running features, in the order the tap offers events to them.
@@ -12,7 +12,6 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     init(features: [Feature]) {
         self.features = features
-        preferences = Preferences(featureIdentifiers: features.map { $0.identifier })
         super.init()
 
         eventTap = EventTap { [unowned self] type, event in self.handle(type: type, event: event) }
