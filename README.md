@@ -36,6 +36,13 @@ wanted, disables sleep with the lid closed through `pmset`; optional auto-off ti
 See [docs/keep-awake](docs/keep-awake/README.md) for the sudoers line it needs and
 what is restored on quit or crash.
 
+### hotkeys
+
+Global shortcuts that open or toggle an app, run a shell command or toggle keep-awake,
+kept in `~/.config/mac-utilities/hotkeys.json` and edited in the Hotkeys tab, which
+records combos, picks apps with their icons and warns about taken keys. See
+[docs/hotkeys](docs/hotkeys/README.md) for the file format and the actions.
+
 ## Install
 
 ```sh
