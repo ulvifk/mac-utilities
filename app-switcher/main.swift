@@ -16,6 +16,8 @@ let downArrowKeyCode: Int64 = 125
 let upArrowKeyCode: Int64 = 126
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
+/// Finder is a regular app too, but quitting it closes every Finder window and the desktop icons.
+let finderBundleIdentifier = "com.apple.finder"
 
 /// The icon image; Tahoe icons fill ~80.5% of their canvas, so the visible squircle is ~55 wide. The cell is as wide as the image.
 let iconSize: CGFloat = 68
@@ -600,9 +602,9 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         filterMenuItem.target = self
         filterMenuItem.state = isFilterEnabled ? .on : .off
         menu.addItem(filterMenuItem)
-        let quitOthersItem = NSMenuItem(title: "Quit apps not in the whitelist", action: #selector(quitAppsNotInWhitelist), keyEquivalent: "")
-        quitOthersItem.target = self
-        menu.addItem(quitOthersItem)
+        let quitAppsNotInWhitelistItem = NSMenuItem(title: "Quit apps not in the whitelist", action: #selector(quitAppsNotInWhitelist), keyEquivalent: "")
+        quitAppsNotInWhitelistItem.target = self
+        menu.addItem(quitAppsNotInWhitelistItem)
         menu.addItem(buildHintItem(title: "While switching: Up/Down move between rows"))
         menu.addItem(buildHintItem(title: "While switching: W toggles whitelist"))
         menu.addItem(buildHintItem(title: "While switching: F toggles filter"))
@@ -674,6 +676,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
         for app in getRegularRunningApps() {
             guard let bundleIdentifier = app.bundleIdentifier else { continue }
+            if bundleIdentifier == finderBundleIdentifier { continue }
             if whitelist.contains(bundleIdentifier) { continue }
             app.terminate()
         }
@@ -830,7 +833,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return nil
         }
 
-        if isQuitOthersShortcut(event) {
+        if isQuitAppsNotInWhitelistShortcut(event) {
             DispatchQueue.main.async { self.quitAppsNotInWhitelist() }
             return nil
         }
@@ -898,7 +901,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         return isCommandShortcut(event, keyCode: qKeyCode)
     }
 
-    private func isQuitOthersShortcut(_ event: CGEvent) -> Bool {
+    private func isQuitAppsNotInWhitelistShortcut(_ event: CGEvent) -> Bool {
         return isCommandShortcut(event, keyCode: xKeyCode)
     }
 
