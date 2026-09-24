@@ -39,7 +39,9 @@ Filter on, only the whitelist, green highlight:
 - Cmd+W while the switcher is open toggles the whitelist membership of the selected
   app. The visible list is not re-filtered until the switcher closes.
 - Cmd+Q while the switcher is open quits the selected app; it leaves the list once it
-  has actually quit, so an app asking for confirmation stays listed.
+  has actually quit, so an app asking for confirmation stays listed. Its icon fades and
+  shrinks out, then the others slide together and the panel shrinks around them; the
+  highlight stays on the same app, or moves to a neighbour when that was the one quit.
 - Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything.

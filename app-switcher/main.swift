@@ -34,6 +34,8 @@ let rowSpacing: CGFloat = -8
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
 let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
+let iconFrameInCell = NSRect(x: 0, y: nameBandHeight + nameTopSpacing, width: iconSize, height: iconSize)
+let dotFrameInCell = NSRect(x: (iconSize - dotSize) / 2, y: cellHeight - dotCenterFromCellTop - dotSize / 2, width: dotSize, height: dotSize)
 let panelCornerRadius: CGFloat = 28
 /// Clear glass keeps the backdrop's colour where regular glass washes it out; this pulls it down to the native
 /// switcher's body, roughly 0.63 * backdrop + 19 per channel. The 1pt rim is left undimmed.
@@ -49,6 +51,10 @@ let highlightCornerRadius: CGFloat = 15.5
 let highlightIconInset: CGFloat = 3.5
 /// Hidden apps stay listed, dimmed like in the native switcher, so they can be brought back.
 let hiddenIconAlpha: CGFloat = 0.4
+/// After Cmd+Q the icon fades and shrinks out for this long, then the rest slide into place for as long again.
+let removalStepDuration: TimeInterval = 0.15
+/// How far the leaving icon's edges pull in while it fades: to half its size.
+let leavingIconShrink: CGFloat = iconSize / 4
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -162,11 +168,33 @@ final class RecentAppsTracker {
     }
 }
 
-/// A clickable icon cell. hitTest keeps the icon image view from swallowing the click.
+/// A clickable icon cell: the whitelist dot above the icon, room for the selected app name below it, the icon centered between them.
 final class IconCellView: NSView {
+    let icon = NSImageView()
+    let dot = NSView()
     var index = 0
     var onClick: (Int) -> Void = { _ in }
 
+    convenience init(app: NSRunningApplication, whitelisted: Bool) {
+        self.init(frame: .zero)
+
+        icon.image = app.icon ?? NSImage()
+        icon.image?.size = NSSize(width: iconSize, height: iconSize)
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.alphaValue = getIconAlpha(app: app)
+        icon.frame = alignToPixels(iconFrameInCell)
+
+        dot.wantsLayer = true
+        dot.layer?.cornerRadius = dotSize / 2
+        dot.layer?.backgroundColor = NSColor.systemGreen.cgColor
+        dot.frame = alignToPixels(dotFrameInCell)
+        dot.isHidden = !whitelisted
+
+        addSubview(icon)
+        addSubview(dot)
+    }
+
+    /// Keeps the icon image view from swallowing the click.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = convert(point, from: superview)
         if !bounds.contains(localPoint) { return nil }
@@ -181,6 +209,11 @@ final class IconCellView: NSView {
     override func mouseDown(with event: NSEvent) {
         onClick(index)
     }
+}
+
+func getIconAlpha(app: NSRunningApplication) -> CGFloat {
+    if app.isHidden { return hiddenIconAlpha }
+    return 1
 }
 
 /// Top and bottom edges only, along the straight run between the corner arcs; lets clicks through to the cells beneath.
@@ -212,15 +245,65 @@ struct SwitcherState {
     let whitelisted: Set<String>
 }
 
+func getRowWidth(iconCount: Int) -> CGFloat {
+    return CGFloat(iconCount) * iconSize + CGFloat(iconCount - 1) * itemSpacing
+}
+
+/// Rounds every edge to a whole pixel of the main screen, as Auto Layout would: on a 1x screen the half-point constants would otherwise blur the icons.
+func alignToPixels(_ rect: NSRect) -> NSRect {
+    let scale = NSScreen.main!.backingScaleFactor
+    let minX = (rect.minX * scale).rounded() / scale
+    let minY = (rect.minY * scale).rounded() / scale
+    let maxX = (rect.maxX * scale).rounded() / scale
+    let maxY = (rect.maxY * scale).rounded() / scale
+
+    return NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+}
+
+/// Where the cells sit for an app count: full rows from the top down, centered on each other, the last one possibly shorter.
+struct SwitcherLayout {
+    let contentSize: NSSize
+    /// [index] -> the cell's frame in the content
+    let cellFrames: [NSRect]
+
+    init(appCount: Int, iconsPerRow: Int) {
+        let rowCount = (appCount + iconsPerRow - 1) / iconsPerRow
+        let width = getRowWidth(iconCount: min(appCount, iconsPerRow)) + 2 * horizontalPadding
+        let height = CGFloat(rowCount) * cellHeight + CGFloat(rowCount - 1) * rowSpacing + 2 * verticalPadding
+
+        var frames: [NSRect] = []
+        for index in 0..<appCount {
+            let row = index / iconsPerRow
+            let column = index % iconsPerRow
+            let rowWidth = getRowWidth(iconCount: min(iconsPerRow, appCount - row * iconsPerRow))
+            let x = (width - rowWidth) / 2 + CGFloat(column) * (iconSize + itemSpacing)
+            let y = height - verticalPadding - cellHeight - CGFloat(row) * (cellHeight + rowSpacing)
+
+            frames.append(alignToPixels(NSRect(x: x, y: y, width: iconSize, height: cellHeight)))
+        }
+
+        contentSize = NSSize(width: width, height: height)
+        cellFrames = frames
+    }
+
+    func getIconFrame(index: Int) -> NSRect {
+        return iconFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY)
+    }
+
+    /// Hugs the selected icon's squircle rather than boxing the whole cell; the name sits below it, outside.
+    func getHighlightFrame(index: Int) -> NSRect {
+        return alignToPixels(getIconFrame(index: index).insetBy(dx: highlightIconInset, dy: highlightIconInset))
+    }
+}
+
 final class SwitcherPanel: NSPanel {
     var onCellClicked: (Int) -> Void = { _ in }
 
+    /// The last state shown. The slide after a removal reads it once the icon has gone, so an overlapping removal cannot leave it stale.
+    private var state: SwitcherState!
+    private var cells: [IconCellView] = []
     private var highlight = NSView()
-    private var iconViews: [NSImageView] = []
-    private var whitelistDots: [NSView] = []
-
     private var nameLabel = NSTextField(labelWithString: "")
-    private var nameConstraints: [NSLayoutConstraint] = []
 
     init() {
         super.init(
@@ -240,11 +323,11 @@ final class SwitcherPanel: NSPanel {
     }
 
     func show(state: SwitcherState) {
+        self.state = state
         let wasVisible = isVisible
 
-        buildContent(state: state)
+        buildContent()
         center()
-        applySelection(state: state, animated: false)
 
         if wasVisible {
             orderFrontRegardless()
@@ -260,56 +343,136 @@ final class SwitcherPanel: NSPanel {
     }
 
     func update(state: SwitcherState) {
-        nameLabel.stringValue = state.apps[state.selectedIndex].localizedName ?? ""
+        self.state = state
+        let layout = buildLayout()
 
-        for (index, app) in state.apps.enumerated() {
-            iconViews[index].alphaValue = getIconAlpha(app: app)
-            whitelistDots[index].isHidden = !state.whitelisted.contains(app.bundleIdentifier ?? "")
+        for (cell, app) in zip(cells, state.apps) {
+            cell.icon.alphaValue = getIconAlpha(app: app)
+            cell.dot.isHidden = !state.whitelisted.contains(app.bundleIdentifier ?? "")
         }
 
-        applySelection(state: state, animated: true)
+        nameLabel.stringValue = getSelectedName()
+        nameLabel.frame = getNameFrame(layout: layout)
+        highlight.layer?.backgroundColor = getHighlightColor().cgColor
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
+        }
+    }
+
+    /// Fades and shrinks the leaving icon out, then slides the rest into place while the panel shrinks around them.
+    func removeApp(at index: Int, state: SwitcherState) {
+        self.state = state
+        let cell = cells.remove(at: index)
+        for later in cells[index...] { later.index -= 1 }
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = removalStepDuration
+            cell.animator().alphaValue = 0
+            cell.icon.animator().frame = cell.icon.frame.insetBy(dx: leavingIconShrink, dy: leavingIconShrink)
+        }, completionHandler: {
+            cell.removeFromSuperview()
+            self.slideCellsIntoPlace()
+        })
     }
 
     func hide() {
         orderOut(nil)
     }
 
-    private func buildContent(state: SwitcherState) {
-        let iconRows = buildIconRows(state: state)
-        iconRows.translatesAutoresizingMaskIntoConstraints = false
+    private func buildContent() {
+        let layout = buildLayout()
+        let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
+        let rim = RimView(frame: container.bounds)
 
-        nameLabel = buildNameLabel(text: state.apps[state.selectedIndex].localizedName ?? "")
+        // Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
+        container.appearance = NSAppearance(named: .aqua)
+        rim.autoresizingMask = [.width, .height]
+        highlight = buildHighlight()
+        nameLabel = buildNameLabel(text: getSelectedName())
+        cells = buildCells(layout: layout)
 
-        highlight = NSView()
-        highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = highlightCornerRadius
-
-        let container = NSView()
+        container.addSubview(buildDimmingView(size: layout.contentSize))
+        container.addSubview(rim)
         container.addSubview(highlight)
-        container.addSubview(iconRows)
+        for cell in cells {
+            container.addSubview(cell)
+        }
         container.addSubview(nameLabel)
 
-        NSLayoutConstraint.activate([
-            iconRows.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
-            iconRows.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
-            iconRows.topAnchor.constraint(equalTo: container.topAnchor, constant: verticalPadding),
-            iconRows.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -verticalPadding)
-        ])
+        highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
+        nameLabel.frame = getNameFrame(layout: layout)
 
-        let rowSize = iconRows.fittingSize
-        let contentSize = NSSize(width: rowSize.width + horizontalPadding * 2, height: rowSize.height + verticalPadding * 2)
-        container.frame = NSRect(origin: .zero, size: contentSize)
-        container.addSubview(buildDimmingView(size: contentSize), positioned: .below, relativeTo: highlight)
-        container.addSubview(RimView(frame: container.bounds), positioned: .below, relativeTo: highlight)
-
-        let glass = buildGlassView(size: contentSize)
+        let glass = buildGlassView(size: layout.contentSize)
         glass.contentView = container
 
         contentView = glass
-        setContentSize(contentSize)
+        setContentSize(layout.contentSize)
     }
 
-    /// Truncates rather than widening the panel: the width comes from the icon row alone.
+    private func buildCells(layout: SwitcherLayout) -> [IconCellView] {
+        var cells: [IconCellView] = []
+
+        for (index, app) in state.apps.enumerated() {
+            let cell = IconCellView(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? ""))
+
+            cell.index = index
+            cell.frame = layout.cellFrames[index]
+            cell.onClick = { [unowned self] index in self.onCellClicked(index) }
+            cells.append(cell)
+        }
+
+        return cells
+    }
+
+    private func slideCellsIntoPlace() {
+        let layout = buildLayout()
+
+        nameLabel.stringValue = getSelectedName()
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = removalStepDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().setFrame(getFrameKeepingCenter(contentSize: layout.contentSize), display: true)
+            highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
+            nameLabel.animator().frame = getNameFrame(layout: layout)
+
+            for (index, cell) in cells.enumerated() {
+                cell.animator().frame = layout.cellFrames[index]
+            }
+        }
+    }
+
+    private func buildLayout() -> SwitcherLayout {
+        return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
+    }
+
+    private func getSelectedName() -> String {
+        return state.apps[state.selectedIndex].localizedName ?? ""
+    }
+
+    /// The panel shrinks around its middle, so the icons on both sides of the gap close it together.
+    private func getFrameKeepingCenter(contentSize: NSSize) -> NSRect {
+        return alignToPixels(NSRect(
+            x: frame.midX - contentSize.width / 2,
+            y: frame.midY - contentSize.height / 2,
+            width: contentSize.width,
+            height: contentSize.height
+        ))
+    }
+
+    /// Centered under the selected icon and no wider than twice the run to the nearer panel edge, so it truncates instead of crossing it.
+    private func getNameFrame(layout: SwitcherLayout) -> NSRect {
+        let iconFrame = layout.getIconFrame(index: state.selectedIndex)
+        let maxWidth = 2 * min(iconFrame.midX - horizontalPadding, layout.contentSize.width - horizontalPadding - iconFrame.midX)
+        let nameSize = nameLabel.intrinsicContentSize
+        let width = min(nameSize.width, maxWidth)
+
+        return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.minY - nameTopSpacing - nameSize.height, width: width, height: nameSize.height))
+    }
+
     private func buildNameLabel(text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
 
@@ -318,11 +481,18 @@ final class SwitcherPanel: NSPanel {
         label.alignment = .center
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
-        label.setContentCompressionResistancePriority(.init(260), for: .horizontal)
-        label.setContentHuggingPriority(.init(1), for: .horizontal)
-        label.translatesAutoresizingMaskIntoConstraints = false
 
         return label
+    }
+
+    private func buildHighlight() -> NSView {
+        let highlight = NSView()
+
+        highlight.wantsLayer = true
+        highlight.layer?.cornerRadius = highlightCornerRadius
+        highlight.layer?.backgroundColor = getHighlightColor().cgColor
+
+        return highlight
     }
 
     private func buildGlassView(size: NSSize) -> NSGlassEffectView {
@@ -340,150 +510,13 @@ final class SwitcherPanel: NSPanel {
         dimming.wantsLayer = true
         dimming.layer?.cornerRadius = panelCornerRadius - 1
         dimming.layer?.backgroundColor = panelDimmingColor.cgColor
+        dimming.autoresizingMask = [.width, .height]
 
         return dimming
     }
 
-    /// Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
-    private func buildIconRows(state: SwitcherState) -> NSStackView {
-        let rows = NSStackView()
-
-        rows.orientation = .vertical
-        rows.spacing = rowSpacing
-        rows.alignment = .centerX
-        rows.appearance = NSAppearance(named: .aqua)
-
-        iconViews = []
-        whitelistDots = []
-
-        for rowStart in stride(from: 0, to: state.apps.count, by: state.iconsPerRow) {
-            let row = NSStackView()
-
-            row.orientation = .horizontal
-            row.spacing = itemSpacing
-
-            for index in rowStart..<min(rowStart + state.iconsPerRow, state.apps.count) {
-                let app = state.apps[index]
-
-                row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
-            }
-
-            rows.addArrangedSubview(row)
-        }
-
-        return rows
-    }
-
-    /// Whitelist dot above the icon, room for the selected app name below it, icon centered between them.
-    private func buildCell(app: NSRunningApplication, whitelisted: Bool) -> NSView {
-        let icon = NSImageView(image: app.icon ?? NSImage())
-        let dot = buildWhitelistDot()
-        let cell = IconCellView()
-
-        cell.index = iconViews.count
-        cell.onClick = { [unowned self] index in self.onCellClicked(index) }
-
-        icon.image?.size = NSSize(width: iconSize, height: iconSize)
-        icon.imageScaling = .scaleProportionallyUpOrDown
-        icon.alphaValue = getIconAlpha(app: app)
-        icon.translatesAutoresizingMaskIntoConstraints = false
-        dot.isHidden = !whitelisted
-
-        iconViews.append(icon)
-        whitelistDots.append(dot)
-
-        cell.translatesAutoresizingMaskIntoConstraints = false
-        cell.addSubview(icon)
-        cell.addSubview(dot)
-
-        NSLayoutConstraint.activate([
-            cell.widthAnchor.constraint(equalToConstant: iconSize),
-            cell.heightAnchor.constraint(equalToConstant: cellHeight),
-            icon.widthAnchor.constraint(equalToConstant: iconSize),
-            icon.heightAnchor.constraint(equalToConstant: iconSize),
-            icon.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            dot.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
-            dot.centerYAnchor.constraint(equalTo: cell.topAnchor, constant: dotCenterFromCellTop)
-        ])
-
-        return cell
-    }
-
-    private func getIconAlpha(app: NSRunningApplication) -> CGFloat {
-        if app.isHidden { return hiddenIconAlpha }
-        return 1
-    }
-
-    private func buildWhitelistDot() -> NSView {
-        let dot = NSView()
-
-        dot.wantsLayer = true
-        dot.layer?.cornerRadius = dotSize / 2
-        dot.layer?.backgroundColor = NSColor.systemGreen.cgColor
-        dot.translatesAutoresizingMaskIntoConstraints = false
-
-        NSLayoutConstraint.activate([
-            dot.widthAnchor.constraint(equalToConstant: dotSize),
-            dot.heightAnchor.constraint(equalToConstant: dotSize)
-        ])
-
-        return dot
-    }
-
-    private func applySelection(state: SwitcherState, animated: Bool) {
-        contentView?.layoutSubtreeIfNeeded()
-        placeNameUnderSelectedIcon(selectedIndex: state.selectedIndex)
-        contentView?.layoutSubtreeIfNeeded()
-
-        let frame = getHighlightFrame(selectedIndex: state.selectedIndex)
-        highlight.layer?.backgroundColor = getHighlightColor(filterEnabled: state.filterEnabled).cgColor
-
-        if !animated {
-            highlight.frame = frame
-            return
-        }
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            highlight.animator().frame = frame
-        }
-    }
-
-    private func placeNameUnderSelectedIcon(selectedIndex: Int) {
-        NSLayoutConstraint.deactivate(nameConstraints)
-
-        let icon = iconViews[selectedIndex]
-
-        nameConstraints = [
-            nameLabel.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
-            nameLabel.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: nameTopSpacing),
-            nameLabel.widthAnchor.constraint(lessThanOrEqualToConstant: getNameMaxWidth(selectedIndex: selectedIndex))
-        ]
-        NSLayoutConstraint.activate(nameConstraints)
-    }
-
-    /// The widest a name centered on this icon can be without crossing either panel edge, so it truncates instead of sliding.
-    private func getNameMaxWidth(selectedIndex: Int) -> CGFloat {
-        let icon = iconViews[selectedIndex]
-        let iconFrame = icon.superview!.convert(icon.frame, to: highlight.superview!)
-        let iconCenterX = iconFrame.midX
-        let containerWidth = highlight.superview!.bounds.width
-
-        return 2 * min(iconCenterX - horizontalPadding, containerWidth - horizontalPadding - iconCenterX)
-    }
-
-    /// Hugs the selected icon's squircle rather than boxing the whole cell; the name sits below it, outside.
-    private func getHighlightFrame(selectedIndex: Int) -> NSRect {
-        let icon = iconViews[selectedIndex]
-        let frame = icon.superview!.convert(icon.frame, to: highlight.superview!)
-
-        return frame.insetBy(dx: highlightIconInset, dy: highlightIconInset)
-    }
-
-    private func getHighlightColor(filterEnabled: Bool) -> NSColor {
-        if filterEnabled { return filteredHighlightColor }
+    private func getHighlightColor() -> NSColor {
+        if state.filterEnabled { return filteredHighlightColor }
         return highlightColor
     }
 }
@@ -935,6 +968,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         panel.update(state: buildState())
     }
 
+    /// The selection stays on its app; when that is the one gone, it moves to the neighbour.
     private func removeCandidate(at index: Int) {
         candidates.remove(at: index)
         if candidates.isEmpty {
@@ -942,8 +976,9 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return
         }
 
+        if index < selectedIndex { selectedIndex -= 1 }
         selectedIndex = min(selectedIndex, candidates.count - 1)
-        panel.show(state: buildState())
+        panel.removeApp(at: index, state: buildState())
     }
 
     private func toggleFilterAndRefreshCandidates() {
