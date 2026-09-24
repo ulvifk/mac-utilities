@@ -51,8 +51,8 @@ let highlightCornerRadius: CGFloat = 15.5
 let highlightIconInset: CGFloat = 3.5
 /// Hidden apps stay listed, dimmed like in the native switcher, so they can be brought back.
 let hiddenIconAlpha: CGFloat = 0.4
-/// After Cmd+Q the icon fades and shrinks out for this long, then the rest slide into place for as long again.
-let removalStepDuration: TimeInterval = 0.15
+/// After Cmd+Q the icon fades and shrinks out while the rest slide into place, over this long.
+let removalDuration: TimeInterval = 0.15
 /// How far the leaving icon's edges pull in while it fades: to half its size.
 let leavingIconShrink: CGFloat = iconSize / 4
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
@@ -249,15 +249,9 @@ func getRowWidth(iconCount: Int) -> CGFloat {
     return CGFloat(iconCount) * iconSize + CGFloat(iconCount - 1) * itemSpacing
 }
 
-/// Rounds every edge to a whole pixel of the main screen, as Auto Layout would: on a 1x screen the half-point constants would otherwise blur the icons.
+/// Whole pixels of the main screen, as Auto Layout gave the old constraints: on a 1x screen the half-point constants would otherwise blur.
 func alignToPixels(_ rect: NSRect) -> NSRect {
-    let scale = NSScreen.main!.backingScaleFactor
-    let minX = (rect.minX * scale).rounded() / scale
-    let minY = (rect.minY * scale).rounded() / scale
-    let maxX = (rect.maxX * scale).rounded() / scale
-    let maxY = (rect.maxY * scale).rounded() / scale
-
-    return NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    return NSScreen.main!.backingAlignedRect(rect, options: .alignAllEdgesNearest)
 }
 
 /// Where the cells sit for an app count: full rows from the top down, centered on each other, the last one possibly shorter.
@@ -299,7 +293,7 @@ struct SwitcherLayout {
 final class SwitcherPanel: NSPanel {
     var onCellClicked: (Int) -> Void = { _ in }
 
-    /// The last state shown. The slide after a removal reads it once the icon has gone, so an overlapping removal cannot leave it stale.
+    /// The last state shown.
     private var state: SwitcherState!
     private var cells: [IconCellView] = []
     private var highlight = NSView()
@@ -362,19 +356,30 @@ final class SwitcherPanel: NSPanel {
         }
     }
 
-    /// Fades and shrinks the leaving icon out, then slides the rest into place while the panel shrinks around them.
+    /// Fades and shrinks the leaving icon out while the rest slide into place and the panel shrinks around them.
     func removeApp(at index: Int, state: SwitcherState) {
         self.state = state
+        let layout = buildLayout()
         let cell = cells.remove(at: index)
+
+        cell.onClick = { _ in }
         for later in cells[index...] { later.index -= 1 }
+        nameLabel.stringValue = getSelectedName()
 
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = removalStepDuration
+            context.duration = removalDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             cell.animator().alphaValue = 0
             cell.icon.animator().frame = cell.icon.frame.insetBy(dx: leavingIconShrink, dy: leavingIconShrink)
+            animator().setFrame(getFrameKeepingCenter(contentSize: layout.contentSize), display: true)
+            highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
+            nameLabel.animator().frame = getNameFrame(layout: layout)
+
+            for (index, cell) in cells.enumerated() {
+                cell.animator().frame = layout.cellFrames[index]
+            }
         }, completionHandler: {
             cell.removeFromSuperview()
-            self.slideCellsIntoPlace()
         })
     }
 
@@ -427,24 +432,6 @@ final class SwitcherPanel: NSPanel {
         return cells
     }
 
-    private func slideCellsIntoPlace() {
-        let layout = buildLayout()
-
-        nameLabel.stringValue = getSelectedName()
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = removalStepDuration
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            animator().setFrame(getFrameKeepingCenter(contentSize: layout.contentSize), display: true)
-            highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
-            nameLabel.animator().frame = getNameFrame(layout: layout)
-
-            for (index, cell) in cells.enumerated() {
-                cell.animator().frame = layout.cellFrames[index]
-            }
-        }
-    }
-
     private func buildLayout() -> SwitcherLayout {
         return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
     }
@@ -467,7 +454,7 @@ final class SwitcherPanel: NSPanel {
     private func getNameFrame(layout: SwitcherLayout) -> NSRect {
         let iconFrame = layout.getIconFrame(index: state.selectedIndex)
         let maxWidth = 2 * min(iconFrame.midX - horizontalPadding, layout.contentSize.width - horizontalPadding - iconFrame.midX)
-        let nameSize = nameLabel.intrinsicContentSize
+        let nameSize = nameLabel.fittingSize
         let width = min(nameSize.width, maxWidth)
 
         return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.minY - nameTopSpacing - nameSize.height, width: width, height: nameSize.height))
