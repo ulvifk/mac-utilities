@@ -1,9 +1,14 @@
 import AppKit
 
 let application = NSApplication.shared
-let controller = AppController(features: [
+let keepAwake: KeepAwakeFeature = KeepAwakeFeature(setMenuBarSymbol: { controller.setMenuBarSymbol($0) })
+let controller: AppController = AppController(features: [
     AppSwitcherFeature(),
-    KeepAwakeFeature(setMenuBarSymbol: { controller.setMenuBarSymbol($0) }),
+    keepAwake,
+    HotkeysFeature(toggleKeepAwake: {
+        if !controller.isFeatureEnabled(keepAwake) { return }
+        keepAwake.toggle()
+    }),
 ])
 
 application.setActivationPolicy(.accessory)
