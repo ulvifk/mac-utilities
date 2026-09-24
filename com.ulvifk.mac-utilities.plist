@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.ulvifk.app-switcher</string>
+    <string>com.ulvifk.mac-utilities</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/ulvifk/Applications/AppSwitcher.app/Contents/MacOS/app-switcher</string>
+        <string>/Users/ulvifk/Applications/MacUtilities.app/Contents/MacOS/MacUtilities</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
