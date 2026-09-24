@@ -46,8 +46,9 @@ bindings, each with a `key` and an `action`:
 
 The file is written on every change made in the tab (pretty-printed, keys sorted)
 and the directory is watched, so a hand edit applies on the spot while the app runs.
-A file that does not parse is reported on stdout and the bindings in use stay as they
-were until it parses again.
+A file that does not parse is reported on stdout, the bindings in use stay as they
+were, and the tab shows the parse error in place of the rows and writes nothing
+until it parses again, so hand edits are never overwritten.
 
 ## Actions
 
@@ -56,7 +57,9 @@ were until it parses again.
 - `toggleApp`: same target. Hides the app when it is frontmost, otherwise the same
   as `activateApp`.
 - `runCommand`: `target` is a command line, run through `/bin/sh -c` and not waited
-  for; it outlives the app.
+  for; it outlives the app. It runs with the app's environment, which at login is
+  launchd's (`PATH` is `/usr/bin:/bin:/usr/sbin:/sbin`), and its output is
+  discarded, so use absolute paths.
 - `toggleKeepAwake`: `target` is empty. Toggles the Keep awake menu entry, the same
   as clicking it. Does nothing while the keep-awake feature is switched off in
   Settings > General.
@@ -66,9 +69,9 @@ were until it parses again.
 One row per binding: the recorder button, the action, its target and a warning when
 the key is taken. Click the recorder and press the combo; it shows as symbols
 (⌥⌘T). Esc or a click elsewhere stops recording. Only combos with at least one
-modifier are recorded; a bare function key can still be set in the file. A combo
-that is already bound fires its action instead of being recorded again, since the
-tap swallows it before the window sees it: clear the other binding first.
+modifier are recorded; a bare function key can still be set in the file. While
+recording, no binding fires, so a combo that is already bound can be recorded again;
+the duplicate then shows through the warning.
 
 The target is an app picker (every `.app` in `/Applications`, `/System/Applications`,
 `~/Applications` and their `Utilities` folders, with icons) for the app actions, a
