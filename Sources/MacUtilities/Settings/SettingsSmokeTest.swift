@@ -10,7 +10,7 @@ func runSettingsSmokeTestIfRequested(controller: AppController) {
     controller.settingsWindow.orderFrontRegardless()
     for (index, tabIdentifier) in tabIdentifiers.enumerated() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5 + Double(index)) {
-            UserDefaults.standard.set(tabIdentifier, forKey: selectedSettingsTabKey)
+            controller.selectedSettingsTabIdentifier = tabIdentifier
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 + Double(index)) {
             let window = controller.settingsWindow

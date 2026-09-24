@@ -4,7 +4,7 @@ private let accessibilityPaneURL = URL(string: "x-apple.systempreferences:com.ap
 
 /// Green or red dot for the Accessibility grant, re-checked whenever the window comes back to the front, and a button to the pane that grants it.
 struct AccessibilityStatusRow: View {
-    @StateObject private var status = AccessibilityStatus()
+    @ObservedObject var state: GeneralSettingsState
 
     var body: some View {
         LabeledContent {
@@ -12,13 +12,13 @@ struct AccessibilityStatusRow: View {
         } label: {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(status.isTrusted ? Color.green : Color.red)
+                    .fill(state.isAccessibilityTrusted ? Color.green : Color.red)
                     .frame(width: 10, height: 10)
-                Text(status.isTrusted ? "Accessibility granted" : "Accessibility not granted")
+                Text(state.isAccessibilityTrusted ? "Accessibility granted" : "Accessibility not granted")
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            status.refresh()
+            state.refreshAccessibilityTrust()
         }
     }
 }

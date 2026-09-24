@@ -1,16 +1,13 @@
 import SwiftUI
 
 let generalTabIdentifier = "general"
-/// The tab shown last time, so the window reopens on it.
-let selectedSettingsTabKey = "selectedSettingsTab"
 
 /// The General tab followed by one tab per feature.
 struct SettingsView: View {
     @ObservedObject var controller: AppController
-    @AppStorage(selectedSettingsTabKey) private var selectedTabIdentifier = generalTabIdentifier
 
     var body: some View {
-        TabView(selection: $selectedTabIdentifier) {
+        TabView(selection: $controller.selectedSettingsTabIdentifier) {
             GeneralSettingsView(controller: controller)
                 .tabItem { Text("General") }
                 .tag(generalTabIdentifier)

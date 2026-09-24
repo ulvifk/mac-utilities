@@ -29,7 +29,7 @@ struct AppSwitcherSettingsView: View {
                 ForEach(runningApps.apps, id: \.processIdentifier) { app in
                     Toggle(isOn: buildWhitelistedBinding(bundleIdentifier: app.bundleIdentifier!)) {
                         HStack(spacing: 8) {
-                            Image(nsImage: app.icon ?? NSImage())
+                            Image(nsImage: app.icon!)
                                 .resizable()
                                 .frame(width: 24, height: 24)
                             Text(getAppName(app))

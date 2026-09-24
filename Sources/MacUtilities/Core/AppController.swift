@@ -6,7 +6,6 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let pauseMenuItem = NSMenuItem(title: "Paused", action: #selector(togglePause), keyEquivalent: "")
     private let preferences = Preferences()
     private(set) lazy var settingsWindow = SettingsWindow(rootView: SettingsView(controller: self))
 
@@ -15,6 +14,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     @Published private(set) var enabledFeatures: [Feature] = []
     /// While paused every event passes through untouched; the features keep running.
     private var isPaused = false
+    @Published var selectedSettingsTabIdentifier = generalTabIdentifier
 
     init(features: [Feature]) {
         self.features = features
@@ -73,24 +73,25 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
 
     private func buildMenu() {
         let menu = NSMenu()
+        let pauseItem = NSMenuItem(title: "Paused", action: #selector(togglePause), keyEquivalent: "")
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
 
         statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Mac Utilities")
-        pauseMenuItem.target = self
+        pauseItem.target = self
         settingsItem.target = self
         quitItem.target = self
 
-        menu.addItem(pauseMenuItem)
+        menu.addItem(pauseItem)
         menu.addItem(.separator())
         menu.addItem(settingsItem)
         menu.addItem(quitItem)
         statusItem.menu = menu
     }
 
-    @objc private func togglePause() {
+    @objc private func togglePause(_ sender: NSMenuItem) {
         isPaused = !isPaused
-        pauseMenuItem.state = isPaused ? .on : .off
+        sender.state = isPaused ? .on : .off
     }
 
     @objc private func quit() {

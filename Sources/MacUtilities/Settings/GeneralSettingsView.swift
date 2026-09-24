@@ -3,6 +3,7 @@ import SwiftUI
 /// Feature switches, launch at login and the Accessibility grant.
 struct GeneralSettingsView: View {
     @ObservedObject var controller: AppController
+    @StateObject private var state = GeneralSettingsState()
 
     var body: some View {
         Form {
@@ -13,8 +14,8 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                LaunchAtLoginToggle()
-                AccessibilityStatusRow()
+                LaunchAtLoginToggle(state: state)
+                AccessibilityStatusRow(state: state)
             }
         }
         .formStyle(.grouped)
