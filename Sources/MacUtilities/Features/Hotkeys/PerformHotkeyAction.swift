@@ -9,13 +9,8 @@ func performHotkeyAction(_ action: HotkeyAction, toggleKeepAwake: () -> Void) {
     }
 }
 
-/// Brings the app's windows to the front, launching it first when it is not running.
+/// Launches the app or brings it to the front; a running app with no windows gets the reopen that makes it open one.
 func activateOrLaunchApp(bundleIdentifier: String) {
-    if let app = getRunningApp(bundleIdentifier: bundleIdentifier) {
-        app.activate(options: [.activateAllWindows])
-        return
-    }
-
     guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
         print("hotkeys: no app installed with bundle identifier \(bundleIdentifier)")
         return
@@ -34,11 +29,13 @@ func toggleApp(bundleIdentifier: String) {
     activateOrLaunchApp(bundleIdentifier: bundleIdentifier)
 }
 
-/// Through /bin/sh -c, not waited for; the command outlives the app.
+/// Through /bin/sh -c with the app's environment, output discarded, not waited for; the command outlives the app.
 func runShellCommand(_ command: String) {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/sh")
     process.arguments = ["-c", command]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
 
     try! process.run()
 }

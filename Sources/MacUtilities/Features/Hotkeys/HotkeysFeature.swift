@@ -18,9 +18,10 @@ final class HotkeysFeature: Feature {
 
     func stop() {}
 
-    /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again.
+    /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again. While the settings tab records a shortcut every combo passes, so a bound one can be recorded again.
     func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type != .keyDown { return false }
+        if isRecordingShortcut() { return false }
 
         let combo = KeyCombo(tappedEvent: event)
         guard let binding = store.bindings.first(where: { $0.key == combo }) else { return false }
@@ -33,6 +34,10 @@ final class HotkeysFeature: Feature {
 
     func buildSettingsView() -> AnyView {
         return AnyView(HotkeysSettingsView(store: store))
+    }
+
+    private func isRecordingShortcut() -> Bool {
+        return NSApp.keyWindow?.firstResponder is KeyRecorderButton
     }
 
     private func isAutorepeat(_ event: CGEvent) -> Bool {

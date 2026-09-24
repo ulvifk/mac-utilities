@@ -6,6 +6,8 @@ final class HotkeyBindingsStore: ObservableObject {
     let path: String
 
     @Published private(set) var bindings: [HotkeyBinding] = []
+    /// Why the file does not parse right now; the tab shows it and writes nothing while it is set, so hand edits are never overwritten.
+    @Published private(set) var loadError: String?
 
     private let directory: String
     private var directoryWatcher: DispatchSourceFileSystemObject!
@@ -53,9 +55,11 @@ final class HotkeyBindingsStore: ObservableObject {
 
         do {
             let loaded = try JSONDecoder().decode([HotkeyBinding].self, from: data)
+            loadError = nil
             if loaded == bindings { return }
             bindings = loaded
         } catch {
+            loadError = "\(error)"
             print("hotkeys: \(path) not loaded, keeping the current bindings: \(error)")
         }
     }
