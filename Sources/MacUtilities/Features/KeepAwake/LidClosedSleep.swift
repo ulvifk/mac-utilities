@@ -2,8 +2,9 @@ import Foundation
 
 private let pmsetPath = "/usr/bin/pmset"
 
-/// `pmset -a disablesleep`, through the sudoers line install.sh installs, so a closed lid does not sleep the machine.
-func setLidClosedSleepDisabled(_ disabled: Bool) {
+/// `pmset -a disablesleep`, through the sudoers line install.sh installs, so a closed lid does not sleep the machine. False when sudo refuses it.
+@discardableResult
+func setLidClosedSleepDisabled(_ disabled: Bool) -> Bool {
     let pmset = Process()
     pmset.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
     pmset.arguments = ["-n", pmsetPath, "-a", "disablesleep", disabled ? "1" : "0"]
@@ -11,11 +12,10 @@ func setLidClosedSleepDisabled(_ disabled: Bool) {
     try! pmset.run()
     pmset.waitUntilExit()
 
-    if pmset.terminationStatus == 0 { return }
-    print("pmset -a disablesleep failed with status \(pmset.terminationStatus): run install.sh to install the sudoers line.")
+    return pmset.terminationStatus == 0
 }
 
-/// A shell that outlives the app and re-enables lid-closed sleep once this process is gone, so a crash never leaves it disabled.
+/// A child shell that outlives the app and re-enables lid-closed sleep once this process is gone, so a crash never leaves it disabled.
 func launchLidClosedSleepWatchdog() -> Process {
     let processIdentifier = ProcessInfo.processInfo.processIdentifier
     let watchdog = Process()

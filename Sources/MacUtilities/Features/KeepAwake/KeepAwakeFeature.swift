@@ -3,6 +3,7 @@ import SwiftUI
 
 private let menuItemTitle = "Keep awake"
 private let activeSymbolName = "cup.and.saucer.fill"
+private let pmsetRefusedTitle = "\(menuItemTitle) (pmset not allowed, see README)"
 
 /// Keeps the Mac awake from the menu bar: a power assertion and, when wanted, lid-closed sleep disabled through pmset; turns itself off after the set time.
 final class KeepAwakeFeature: Feature {
@@ -49,8 +50,13 @@ final class KeepAwakeFeature: Feature {
     }
 
     private func activate() {
-        session = KeepAwakeSession(preferences: preferences)
-        minuteTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [unowned self] _ in self.handleMinutePassed() }
+        guard let session = KeepAwakeSession(preferences: preferences) else {
+            menuItem.title = pmsetRefusedTitle
+            return
+        }
+
+        self.session = session
+        minuteTimer = buildMinuteTimer()
 
         menuItem.state = .on
         updateMenuItemTitle()
@@ -66,6 +72,13 @@ final class KeepAwakeFeature: Feature {
         menuItem.state = .off
         menuItem.title = menuItemTitle
         setMenuBarSymbol(nil)
+    }
+
+    /// In the common run loop modes, so it also fires while the menu is open.
+    private func buildMinuteTimer() -> Timer {
+        let timer = Timer(timeInterval: 60, repeats: true) { [unowned self] _ in self.handleMinutePassed() }
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
     }
 
     private func handleMinutePassed() {
