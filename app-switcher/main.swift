@@ -8,6 +8,7 @@ let wKeyCode: Int64 = 13
 let fKeyCode: Int64 = 3
 let qKeyCode: Int64 = 12
 let hKeyCode: Int64 = 4
+let xKeyCode: Int64 = 7
 let escapeKeyCode: Int64 = 53
 let leftArrowKeyCode: Int64 = 123
 let rightArrowKeyCode: Int64 = 124
@@ -15,6 +16,8 @@ let downArrowKeyCode: Int64 = 125
 let upArrowKeyCode: Int64 = 126
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
+/// Finder is a regular app too, but quitting it closes every Finder window and the desktop icons.
+let finderBundleIdentifier = "com.apple.finder"
 
 /// The icon image; Tahoe icons fill ~80.5% of their canvas, so the visible squircle is ~55 wide. The cell is as wide as the image.
 let iconSize: CGFloat = 68
@@ -599,10 +602,14 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         filterMenuItem.target = self
         filterMenuItem.state = isFilterEnabled ? .on : .off
         menu.addItem(filterMenuItem)
+        let quitAppsNotInWhitelistItem = NSMenuItem(title: "Quit apps not in the whitelist", action: #selector(quitAppsNotInWhitelist), keyEquivalent: "")
+        quitAppsNotInWhitelistItem.target = self
+        menu.addItem(quitAppsNotInWhitelistItem)
         menu.addItem(buildHintItem(title: "While switching: Up/Down move between rows"))
         menu.addItem(buildHintItem(title: "While switching: W toggles whitelist"))
         menu.addItem(buildHintItem(title: "While switching: F toggles filter"))
         menu.addItem(buildHintItem(title: "While switching: Q quits app"))
+        menu.addItem(buildHintItem(title: "While switching: X quits every app not in the whitelist"))
         menu.addItem(buildHintItem(title: "While switching: H hides app"))
         menu.addItem(buildHintItem(title: "While switching: Esc cancels"))
         menu.addItem(.separator())
@@ -661,6 +668,18 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         }
 
         UserDefaults.standard.set(Array(whitelist), forKey: whitelistKey)
+    }
+
+    /// A normal quit, so an app with unsaved changes shows its dialog and stays running. The switcher itself is an accessory app, never a regular one.
+    @objc private func quitAppsNotInWhitelist() {
+        let whitelist = getWhitelist()
+
+        for app in getRegularRunningApps() {
+            guard let bundleIdentifier = app.bundleIdentifier else { continue }
+            if bundleIdentifier == finderBundleIdentifier { continue }
+            if whitelist.contains(bundleIdentifier) { continue }
+            app.terminate()
+        }
     }
 
     @objc private func quit() {
@@ -814,6 +833,11 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return nil
         }
 
+        if isQuitAppsNotInWhitelistShortcut(event) {
+            DispatchQueue.main.async { self.quitAppsNotInWhitelist() }
+            return nil
+        }
+
         if isHideShortcut(event) {
             candidates[selectedIndex].hide()
             return nil
@@ -875,6 +899,10 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     private func isQuitShortcut(_ event: CGEvent) -> Bool {
         return isCommandShortcut(event, keyCode: qKeyCode)
+    }
+
+    private func isQuitAppsNotInWhitelistShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: xKeyCode)
     }
 
     private func isHideShortcut(_ event: CGEvent) -> Bool {
