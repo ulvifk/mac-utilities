@@ -6,9 +6,11 @@ every running app. While the feature is on, the native Cmd+Tab switcher is never
 shown: if the filter is on but no whitelisted app is running, the switcher lists
 every running app instead, so the shortcuts below always stay reachable.
 
-The menu bar item toggles the filter, quits every running regular app not in the
-whitelist, lists the in-switcher shortcuts as a reminder, and manages the whitelist
-(every running regular app is listed, checkmark = whitelisted).
+The App Switcher tab of the settings window toggles the filter, quits every running
+regular app not in the whitelist, manages the whitelist (every running regular app
+is listed by name with its icon, switch on = whitelisted) and lists the in-switcher
+shortcuts as a reminder. Changes made there and with the shortcuts below show up in
+each other on the spot.
 
 Filter off, every running app listed:
 
@@ -43,7 +45,7 @@ Filter on, only the whitelist, green highlight:
   shrinks out while the others slide together and the panel shrinks around them; the
   highlight stays on the same app, or moves to a neighbour when that was the one quit.
 - Cmd+X while the switcher is open quits every running regular app not in the
-  whitelist, the same as the menu bar item; Finder is always kept. Each app gets a
+  whitelist, the same as the settings button; Finder is always kept. Each app gets a
   normal quit, so one with unsaved changes shows its dialog and stays running; the
   others leave the list as they quit.
 - Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
@@ -53,12 +55,13 @@ Filter on, only the whitelist, green highlight:
 ## Code
 
 `Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
-keys, keeps the candidates and the selection and owns the menu entries;
-`SwitcherPanel` draws the glass panel from a `SwitcherState` using `SwitcherLayout`,
-`IconCellView` and `RimView`, with the sizes and colours in `SwitcherMetrics`;
-`WhitelistStore` keeps the filter switch and the whitelist in UserDefaults;
-`RecentAppsTracker` and `RunningApps` provide the most-recently-used order and the
-windowed apps.
+keys and keeps the candidates and the selection; `AppSwitcherSettingsView` is the
+settings tab, listing the apps `RunningRegularApps` keeps current; `SwitcherPanel`
+draws the glass panel from a `SwitcherState` using `SwitcherLayout`, `IconCellView`
+and `RimView`, with the sizes and colours in `SwitcherMetrics`; `WhitelistStore`
+keeps the filter switch and the whitelist in UserDefaults and publishes changes to
+the tab; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order
+and the windowed apps.
 
 ## Dev
 

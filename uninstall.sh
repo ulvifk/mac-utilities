@@ -1,14 +1,12 @@
 #!/bin/bash
-# Stops the app, removes its launch agent and its copy in ~/Applications.
+# Stops the app and removes its copy in ~/Applications. Switch off "Launch at login" in its settings first, or remove the stale entry in System Settings > General > Login Items.
 set -euo pipefail
 
 APP=MacUtilities.app
-LABEL=com.ulvifk.mac-utilities
+EXECUTABLE=MacUtilities
 APPS_DIR=$HOME/Applications
-AGENTS_DIR=$HOME/Library/LaunchAgents
 
-launchctl bootout "gui/$(id -u)/$LABEL" || true
-rm -f "$AGENTS_DIR/$LABEL.plist"
+pkill -x "$EXECUTABLE" || true
 rm -rf "${APPS_DIR:?}/$APP"
 
 echo "removed $APPS_DIR/$APP"
