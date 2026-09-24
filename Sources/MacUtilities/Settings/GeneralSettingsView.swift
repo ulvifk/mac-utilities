@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Feature switches, launch at login and the Accessibility grant.
+/// Feature switches, launch at login and the Accessibility grant; the last two are re-read whenever the window comes back to the front.
 struct GeneralSettingsView: View {
     @ObservedObject var controller: AppController
     @StateObject private var state = GeneralSettingsState()
@@ -19,6 +19,9 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            state.refresh()
+        }
     }
 
     private func buildEnabledBinding(feature: Feature) -> Binding<Bool> {
