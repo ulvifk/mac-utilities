@@ -202,14 +202,9 @@ final class RimView: NSView {
     }
 }
 
-func getIconsPerRow() -> Int {
-    let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
-
-    return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
-}
-
 struct SwitcherState {
     let apps: [NSRunningApplication]
+    let iconsPerRow: Int
     let selectedIndex: Int
     let filterEnabled: Bool
     let whitelisted: Set<String>
@@ -358,15 +353,13 @@ final class SwitcherPanel: NSPanel {
         iconViews = []
         whitelistDots = []
 
-        let iconsPerRow = getIconsPerRow()
-
-        for rowStart in stride(from: 0, to: state.apps.count, by: iconsPerRow) {
+        for rowStart in stride(from: 0, to: state.apps.count, by: state.iconsPerRow) {
             let row = NSStackView()
 
             row.orientation = .horizontal
             row.spacing = itemSpacing
 
-            for index in rowStart..<min(rowStart + iconsPerRow, state.apps.count) {
+            for index in rowStart..<min(rowStart + state.iconsPerRow, state.apps.count) {
                 let app = state.apps[index]
 
                 row.addArrangedSubview(buildCell(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? "")))
@@ -496,6 +489,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     private var eventTap: CFMachPort?
     private var candidates: [NSRunningApplication] = []
+    private var iconsPerRow = 1
     private var selectedIndex = 0
 
     private var isOpening = false
@@ -518,7 +512,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         UserDefaults.standard.set(environment["APP_SWITCHER_SMOKE_FILTER"] == "1", forKey: filterEnabledKey)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.candidates = self.getCandidates()
+            self.loadCandidates()
             self.selectedIndex = Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!
             self.panel.show(state: self.buildState())
             showCaptureBackdrop(behind: self.panel)
@@ -721,7 +715,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     }
 
     private func openSwitcher() {
-        candidates = getCandidates()
+        loadCandidates()
         isOpening = false
 
         if candidates.isEmpty { return }
@@ -859,6 +853,18 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     // MARK: switching
 
+    /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later.
+    private func loadCandidates() {
+        candidates = getCandidates()
+        iconsPerRow = getIconsPerRow()
+    }
+
+    private func getIconsPerRow() -> Int {
+        let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
+
+        return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
+    }
+
     private func getCandidates() -> [NSRunningApplication] {
         let recentApps = getRecentRunningApps()
         if !isFilterEnabled {
@@ -900,7 +906,6 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     /// Same column one row up or down, wrapping at the top and bottom; a shorter last row clamps to its last icon.
     private func moveSelectionBetweenRows(up: Bool) {
-        let iconsPerRow = getIconsPerRow()
         let rowCount = (candidates.count + iconsPerRow - 1) / iconsPerRow
         let column = selectedIndex % iconsPerRow
         let step = up ? -1 : 1
@@ -925,7 +930,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         let selectedIdentifier = candidates[selectedIndex].bundleIdentifier
 
         toggleFilter()
-        candidates = getCandidates()
+        loadCandidates()
         if candidates.isEmpty {
             panel.hide()
             return
@@ -938,6 +943,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     private func buildState() -> SwitcherState {
         return SwitcherState(
             apps: candidates,
+            iconsPerRow: iconsPerRow,
             selectedIndex: selectedIndex,
             filterEnabled: isFilterEnabled,
             whitelisted: getWhitelist()
