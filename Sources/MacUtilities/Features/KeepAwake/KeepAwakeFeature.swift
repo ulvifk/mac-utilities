@@ -41,7 +41,7 @@ final class KeepAwakeFeature: Feature {
         return AnyView(KeepAwakeSettingsView(preferences: preferences))
     }
 
-    @objc private func toggle() {
+    @objc func toggle() {
         if session == nil {
             activate()
         } else {
