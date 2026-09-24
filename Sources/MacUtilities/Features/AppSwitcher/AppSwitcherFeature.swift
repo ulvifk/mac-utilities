@@ -1,15 +1,10 @@
 import AppKit
-
-/// Finder is a regular app too, but quitting it closes every Finder window and the desktop icons.
-private let finderBundleIdentifier = "com.apple.finder"
+import SwiftUI
 
 /// Replaces Cmd+Tab with the switcher panel, filtered to the whitelist when the filter is on.
-final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
+final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
-
-    private let filterMenuItem = NSMenuItem(title: "Filter enabled", action: #selector(toggleFilter), keyEquivalent: "")
-    private let whitelistMenu = NSMenu(title: "Whitelist")
 
     private let panel = SwitcherPanel()
     private let tracker = RecentAppsTracker()
@@ -24,11 +19,7 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
     private var commandReleasedWhileOpening = false
     private var pendingAdvance = 0
 
-    override init() {
-        super.init()
-
-        filterMenuItem.target = self
-        whitelistMenu.delegate = self
+    init() {
         wirePanelClicks()
     }
 
@@ -60,41 +51,8 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
         return false
     }
 
-    func buildMenuItems() -> [NSMenuItem] {
-        let quitAppsNotInWhitelistItem = NSMenuItem(title: "Quit apps not in the whitelist", action: #selector(quitAppsNotInWhitelist), keyEquivalent: "")
-        let whitelistItem = NSMenuItem(title: "Whitelist", action: nil, keyEquivalent: "")
-
-        filterMenuItem.state = whitelistStore.isFilterEnabled ? .on : .off
-        quitAppsNotInWhitelistItem.target = self
-        whitelistItem.submenu = whitelistMenu
-
-        return [
-            filterMenuItem,
-            quitAppsNotInWhitelistItem,
-            buildHintItem(title: "While switching: Up/Down move between rows"),
-            buildHintItem(title: "While switching: W toggles whitelist"),
-            buildHintItem(title: "While switching: F toggles filter"),
-            buildHintItem(title: "While switching: Q quits app"),
-            buildHintItem(title: "While switching: X quits every app not in the whitelist"),
-            buildHintItem(title: "While switching: H hides app"),
-            buildHintItem(title: "While switching: Esc cancels"),
-            .separator(),
-            whitelistItem,
-        ]
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        let whitelist = whitelistStore.getWhitelist()
-        for app in getRegularRunningApps() {
-            guard let bundleIdentifier = app.bundleIdentifier else { continue }
-            let item = NSMenuItem(title: app.localizedName ?? bundleIdentifier, action: #selector(toggleWhitelistEntry), keyEquivalent: "")
-            item.target = self
-            item.representedObject = bundleIdentifier
-            item.state = whitelist.contains(bundleIdentifier) ? .on : .off
-            menu.addItem(item)
-        }
+    func buildSettingsView() -> AnyView {
+        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore))
     }
 
     private func runSmokeTestIfRequested() {
@@ -118,7 +76,7 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
         }
     }
 
-    // MARK: menu
+    // MARK: wiring
 
     private func wirePanelClicks() {
         panel.onCellClicked = { index in
@@ -155,35 +113,6 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
         }
 
         return observers
-    }
-
-    private func buildHintItem(title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-
-        item.isEnabled = false
-
-        return item
-    }
-
-    @objc private func toggleFilter() {
-        whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
-        filterMenuItem.state = whitelistStore.isFilterEnabled ? .on : .off
-    }
-
-    @objc private func toggleWhitelistEntry(_ sender: NSMenuItem) {
-        whitelistStore.toggleWhitelist(bundleIdentifier: sender.representedObject as! String)
-    }
-
-    /// A normal quit, so an app with unsaved changes shows its dialog and stays running. The switcher itself is an accessory app, never a regular one.
-    @objc private func quitAppsNotInWhitelist() {
-        let whitelist = whitelistStore.getWhitelist()
-
-        for app in getRegularRunningApps() {
-            guard let bundleIdentifier = app.bundleIdentifier else { continue }
-            if bundleIdentifier == finderBundleIdentifier { continue }
-            if whitelist.contains(bundleIdentifier) { continue }
-            app.terminate()
-        }
     }
 
     // MARK: events
@@ -254,7 +183,8 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
         }
 
         if isWhitelistToggleShortcut(event) {
-            whitelistStore.toggleWhitelist(bundleIdentifier: candidates[selectedIndex].bundleIdentifier!)
+            let bundleIdentifier = candidates[selectedIndex].bundleIdentifier!
+            whitelistStore.setWhitelisted(bundleIdentifier, !whitelistStore.isWhitelisted(bundleIdentifier))
             panel.update(state: buildState())
             return true
         }
@@ -270,7 +200,7 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
         }
 
         if isQuitAppsNotInWhitelistShortcut(event) {
-            DispatchQueue.main.async { self.quitAppsNotInWhitelist() }
+            DispatchQueue.main.async { quitRegularAppsNotIn(whitelist: self.whitelistStore.getWhitelist()) }
             return true
         }
 
@@ -429,7 +359,7 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
     private func toggleFilterAndRefreshCandidates() {
         let selectedIdentifier = candidates[selectedIndex].bundleIdentifier
 
-        toggleFilter()
+        whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
         loadCandidates()
         if candidates.isEmpty {
             panel.hide()

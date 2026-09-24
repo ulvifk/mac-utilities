@@ -1,14 +1,20 @@
 import AppKit
+import Combine
 
-/// Owns the menu bar item, the event tap and the features; starts and stops features as their toggles change.
-final class AppController: NSObject, NSApplicationDelegate {
+/// Owns the menu bar item, the event tap, the settings window and the features; starts and stops features as their toggles change.
+final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
+    let features: [Feature]
+
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let features: [Feature]
+    private let pauseMenuItem = NSMenuItem(title: "Paused", action: #selector(togglePause), keyEquivalent: "")
     private let preferences = Preferences()
+    private(set) lazy var settingsWindow = SettingsWindow(rootView: SettingsView(controller: self))
 
     private var eventTap: EventTap!
     /// The running features, in the order the tap offers events to them.
-    private var enabledFeatures: [Feature] = []
+    @Published private(set) var enabledFeatures: [Feature] = []
+    /// While paused every event passes through untouched; the features keep running.
+    private var isPaused = false
 
     init(features: [Feature]) {
         self.features = features
@@ -22,9 +28,31 @@ final class AppController: NSObject, NSApplicationDelegate {
         startEnabledFeatures()
         requestAccessibilityTrust()
         eventTap.start()
+        runSettingsSmokeTestIfRequested(controller: self)
+    }
+
+    func isFeatureEnabled(_ feature: Feature) -> Bool {
+        return preferences.isFeatureEnabled(feature.identifier)
+    }
+
+    func setFeatureEnabled(_ feature: Feature, _ enabled: Bool) {
+        preferences.setFeatureEnabled(feature.identifier, enabled)
+        enabledFeatures = getEnabledFeatures()
+
+        if enabled {
+            feature.start()
+        } else {
+            feature.stop()
+        }
+    }
+
+    @objc func openSettings() {
+        settingsWindow.open()
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
+        if isPaused { return false }
+
         for feature in enabledFeatures {
             if feature.handle(type: type, event: event) { return true }
         }
@@ -45,51 +73,24 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func buildMenu() {
         let menu = NSMenu()
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
 
         statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Mac Utilities")
-
-        for feature in features {
-            menu.addItem(buildToggleItem(feature: feature))
-        }
-        menu.addItem(.separator())
-
-        for feature in features {
-            for item in feature.buildMenuItems() {
-                menu.addItem(item)
-            }
-            menu.addItem(.separator())
-        }
-
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+        pauseMenuItem.target = self
+        settingsItem.target = self
         quitItem.target = self
-        menu.addItem(quitItem)
 
+        menu.addItem(pauseMenuItem)
+        menu.addItem(.separator())
+        menu.addItem(settingsItem)
+        menu.addItem(quitItem)
         statusItem.menu = menu
     }
 
-    private func buildToggleItem(feature: Feature) -> NSMenuItem {
-        let item = NSMenuItem(title: feature.displayName, action: #selector(toggleFeature), keyEquivalent: "")
-
-        item.target = self
-        item.representedObject = feature
-        item.state = preferences.isFeatureEnabled(feature.identifier) ? .on : .off
-
-        return item
-    }
-
-    @objc private func toggleFeature(_ sender: NSMenuItem) {
-        let feature = sender.representedObject as! Feature
-        let enabled = !preferences.isFeatureEnabled(feature.identifier)
-
-        preferences.setFeatureEnabled(feature.identifier, enabled)
-        sender.state = enabled ? .on : .off
-        enabledFeatures = getEnabledFeatures()
-
-        if enabled {
-            feature.start()
-        } else {
-            feature.stop()
-        }
+    @objc private func togglePause() {
+        isPaused = !isPaused
+        pauseMenuItem.state = isPaused ? .on : .off
     }
 
     @objc private func quit() {
