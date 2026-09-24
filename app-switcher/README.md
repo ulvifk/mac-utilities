@@ -26,7 +26,9 @@ Filter on, only the whitelist, green highlight:
 - Up / Down arrow move the selection one row up or down, keeping the same column;
   when the target row is shorter, the selection lands on its last icon.
 - Click an icon to switch to it.
-- Apps without open windows are hidden.
+- Apps without open windows are left out.
+- Hidden apps stay listed with a dimmed icon, whether they were hidden with Cmd+H here
+  or anywhere else; releasing Cmd on one unhides and activates it.
 - The highlight is a rounded square hugging the selected icon; the app's name sits
   under it, clamped to the panel edges and truncated rather than ever widening the
   panel.
@@ -38,7 +40,8 @@ Filter on, only the whitelist, green highlight:
   app. The visible list is not re-filtered until the switcher closes.
 - Cmd+Q while the switcher is open quits the selected app; it leaves the list once it
   has actually quit, so an app asking for confirmation stays listed.
-- Cmd+H while the switcher is open hides the selected app and drops it from the list.
+- Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
+  a second press does nothing.
 - Esc closes the switcher without activating anything.
 
 ## Install

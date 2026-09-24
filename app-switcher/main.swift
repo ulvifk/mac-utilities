@@ -47,6 +47,8 @@ let filteredHighlightColor = NSColor.systemGreen.withAlphaComponent(0.45)
 let highlightCornerRadius: CGFloat = 15.5
 /// The 68pt image has a ~6.5pt transparent margin around the squircle, and the highlight sits 3pt outside it.
 let highlightIconInset: CGFloat = 3.5
+/// Hidden apps stay listed, dimmed like in the native switcher, so they can be brought back.
+let hiddenIconAlpha: CGFloat = 0.4
 let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 
 /// Screen-region capture of our own windows. CGWindowListCreateImage is gone from the SDK but still in the dylib.
@@ -260,8 +262,9 @@ final class SwitcherPanel: NSPanel {
     func update(state: SwitcherState) {
         nameLabel.stringValue = state.apps[state.selectedIndex].localizedName ?? ""
 
-        for (index, dot) in whitelistDots.enumerated() {
-            dot.isHidden = !state.whitelisted.contains(state.apps[index].bundleIdentifier ?? "")
+        for (index, app) in state.apps.enumerated() {
+            iconViews[index].alphaValue = getIconAlpha(app: app)
+            whitelistDots[index].isHidden = !state.whitelisted.contains(app.bundleIdentifier ?? "")
         }
 
         applySelection(state: state, animated: true)
@@ -382,6 +385,7 @@ final class SwitcherPanel: NSPanel {
 
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
         icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.alphaValue = getIconAlpha(app: app)
         icon.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = !whitelisted
 
@@ -404,6 +408,11 @@ final class SwitcherPanel: NSPanel {
         ])
 
         return cell
+    }
+
+    private func getIconAlpha(app: NSRunningApplication) -> CGFloat {
+        if app.isHidden { return hiddenIconAlpha }
+        return 1
     }
 
     private func buildWhitelistDot() -> NSView {
@@ -500,6 +509,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         buildMenu()
         wirePanelClicks()
         observeAppTermination()
+        observeAppHiding()
         requestAccessibilityTrust()
         startEventTap()
         runSmokeTestIfRequested()
@@ -547,6 +557,17 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             guard let index = self.candidates.firstIndex(where: { $0.processIdentifier == app.processIdentifier }) else { return }
 
             self.removeCandidate(at: index)
+        }
+    }
+
+    /// Redraws the dimming once the app is really hidden or shown, whether it was our Cmd+H or done elsewhere.
+    private func observeAppHiding() {
+        for name in [NSWorkspace.didHideApplicationNotification, NSWorkspace.didUnhideApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
+                if !self.panel.isVisible { return }
+
+                self.panel.update(state: self.buildState())
+            }
         }
     }
 
@@ -775,7 +796,6 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
         if isHideShortcut(event) {
             candidates[selectedIndex].hide()
-            removeCandidate(at: selectedIndex)
             return nil
         }
 
