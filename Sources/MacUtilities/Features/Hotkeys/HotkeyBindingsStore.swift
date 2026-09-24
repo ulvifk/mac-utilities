@@ -48,6 +48,7 @@ final class HotkeyBindingsStore: ObservableObject {
 
     /// A file that does not parse, half-typed in an editor for instance, leaves the current bindings in place.
     private func load() {
+        loadError = nil
         guard let data = FileManager.default.contents(atPath: path) else {
             bindings = []
             return
@@ -55,7 +56,6 @@ final class HotkeyBindingsStore: ObservableObject {
 
         do {
             let loaded = try JSONDecoder().decode([HotkeyBinding].self, from: data)
-            loadError = nil
             if loaded == bindings { return }
             bindings = loaded
         } catch {
