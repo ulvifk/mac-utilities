@@ -6,6 +6,8 @@ protocol Feature {
     /// Stable key the enabled state is stored under; never rename it.
     var identifier: String { get }
     var displayName: String { get }
+    /// Entries the feature adds to the menu bar menu while it is enabled; the feature keeps them current.
+    var menuItems: [NSMenuItem] { get }
 
     func start()
     func stop()
