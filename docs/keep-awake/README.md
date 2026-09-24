@@ -26,10 +26,13 @@ Both apply the next time Keep awake is turned on.
 
 - when Keep awake is toggled off, the feature is switched off in Settings > General
   or the app quits (`applicationWillTerminate` stops every enabled feature);
-- when the app dies any other way: activating spawns a detached watchdog shell,
-  `while kill -0 <pid>; do sleep 5; done; sudo -n /usr/bin/pmset -a disablesleep 0`,
-  that is killed again on deactivation. So after a crash sleep is back to normal
-  within five seconds.
+- when the app dies any other way: activating spawns a child watchdog shell that
+  outlives the app, `while kill -0 <pid>; do sleep 5; done; sudo -n /usr/bin/pmset -a
+  disablesleep 0`, and is killed again on deactivation. So after a crash sleep is
+  back to normal within five seconds.
+
+After a power loss or kernel panic while active no process survives to restore it,
+so `disablesleep` stays `1` until Keep awake is toggled again or `uninstall.sh` runs.
 
 `uninstall.sh` runs `pmset -a disablesleep 0` once more before removing the sudoers
 line, in case the app was killed while active.
@@ -44,9 +47,9 @@ line, in case the app was killed while active.
 ```
 
 for the installing user, after checking it with `visudo -c`; nothing else can be run
-through it. `uninstall.sh` removes the file. Without it the `pmset` call fails, the
-app prints a hint to run `install.sh`, and the assertion alone still holds off idle
-sleep.
+through it. `uninstall.sh` removes the file. Without it sudo refuses the `pmset`
+call, Keep awake stays off with nothing held, and the menu entry reads "Keep awake
+(pmset not allowed, see README)" until the next toggle.
 
 ## Code
 
