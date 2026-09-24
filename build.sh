@@ -1,13 +1,14 @@
 #!/bin/bash
+# Builds the package and wraps the binary into MacUtilities.app, signed with the "mac-utilities" certificate.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-swiftc -O -o app-switcher main.swift
+swift build -c release
 
-APP=AppSwitcher.app
+APP=MacUtilities.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp app-switcher "$APP/Contents/MacOS/app-switcher"
+cp .build/release/MacUtilities "$APP/Contents/MacOS/MacUtilities"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -15,11 +16,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.ulvifk.app-switcher</string>
+    <string>com.ulvifk.mac-utilities</string>
     <key>CFBundleExecutable</key>
-    <string>app-switcher</string>
+    <string>MacUtilities</string>
     <key>CFBundleName</key>
-    <string>AppSwitcher</string>
+    <string>MacUtilities</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSUIElement</key>
