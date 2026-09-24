@@ -12,8 +12,8 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
     private let whitelistMenu = NSMenu(title: "Whitelist")
 
     private let panel = SwitcherPanel()
+    private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
-    private var tracker: RecentAppsTracker!
     private var observers: [NSObjectProtocol] = []
 
     private var candidates: [NSRunningApplication] = []
@@ -33,7 +33,7 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
     }
 
     func start() {
-        tracker = RecentAppsTracker()
+        tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
         runSmokeTestIfRequested()
@@ -45,7 +45,6 @@ final class AppSwitcherFeature: NSObject, Feature, NSMenuDelegate {
         }
         observers = []
         tracker.stop()
-        tracker = nil
         panel.hide()
     }
 

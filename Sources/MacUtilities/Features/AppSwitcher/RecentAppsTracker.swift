@@ -3,9 +3,9 @@ import AppKit
 /// Most-recently-activated bundle identifiers, front of the array is the most recent.
 final class RecentAppsTracker {
     private(set) var bundleIdentifiers: [String] = []
-    private var observer: NSObjectProtocol!
+    private var observer: NSObjectProtocol?
 
-    init() {
+    func start() {
         bundleIdentifiers = getRegularRunningApps().compactMap { $0.bundleIdentifier }
 
         if let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
@@ -25,6 +25,7 @@ final class RecentAppsTracker {
 
     func stop() {
         NSWorkspace.shared.notificationCenter.removeObserver(observer!)
+        observer = nil
     }
 
     func moveToFront(_ bundleIdentifier: String) {
