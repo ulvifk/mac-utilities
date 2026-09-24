@@ -1,11 +1,17 @@
 import AppKit
 import Combine
 
+private let appSymbolName = "square.stack.3d.up"
+
 /// Owns the menu bar item, the event tap, the settings window and the features; starts and stops features as their toggles change.
 final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let menu = NSMenu()
+    private let pauseItem = NSMenuItem(title: "Paused", action: #selector(AppController.togglePause), keyEquivalent: "")
+    private let settingsItem = NSMenuItem(title: "Settings...", action: #selector(AppController.openSettings), keyEquivalent: ",")
+    private let quitItem = NSMenuItem(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")
     private let preferences = Preferences()
     private(set) lazy var settingsWindow = SettingsWindow(rootView: SettingsView(controller: self))
 
@@ -21,14 +27,25 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         super.init()
 
         eventTap = EventTap { [unowned self] type, event in self.handle(type: type, event: event) }
+        pauseItem.target = self
+        settingsItem.target = self
+        quitItem.target = self
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        buildMenu()
+        setMenuBarSymbol(nil)
+        statusItem.menu = menu
         startEnabledFeatures()
+        populateMenu()
         requestAccessibilityTrust()
         eventTap.start()
         runSettingsSmokeTestIfRequested(controller: self)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        for feature in enabledFeatures {
+            feature.stop()
+        }
     }
 
     func isFeatureEnabled(_ feature: Feature) -> Bool {
@@ -38,12 +55,18 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     func setFeatureEnabled(_ feature: Feature, _ enabled: Bool) {
         preferences.setFeatureEnabled(feature.identifier, enabled)
         enabledFeatures = getEnabledFeatures()
+        populateMenu()
 
         if enabled {
             feature.start()
         } else {
             feature.stop()
         }
+    }
+
+    /// A feature doing something in the background shows its own symbol in the menu bar; nil shows the app's.
+    func setMenuBarSymbol(_ symbolName: String?) {
+        statusItem.button?.image = NSImage(systemSymbolName: symbolName ?? appSymbolName, accessibilityDescription: "Mac Utilities")
     }
 
     @objc func openSettings() {
@@ -71,22 +94,19 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         return features.filter { preferences.isFeatureEnabled($0.identifier) }
     }
 
-    private func buildMenu() {
-        let menu = NSMenu()
-        let pauseItem = NSMenuItem(title: "Paused", action: #selector(togglePause), keyEquivalent: "")
-        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
-
-        statusItem.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Mac Utilities")
-        pauseItem.target = self
-        settingsItem.target = self
-        quitItem.target = self
+    /// Paused, then the enabled features' entries, then Settings and Quit.
+    private func populateMenu() {
+        menu.removeAllItems()
 
         menu.addItem(pauseItem)
+        for feature in enabledFeatures {
+            for item in feature.menuItems {
+                menu.addItem(item)
+            }
+        }
         menu.addItem(.separator())
         menu.addItem(settingsItem)
         menu.addItem(quitItem)
-        statusItem.menu = menu
     }
 
     @objc private func togglePause(_ sender: NSMenuItem) {

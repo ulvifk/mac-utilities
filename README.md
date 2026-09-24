@@ -6,9 +6,9 @@ one login item. Swift Package, no Xcode project.
 
 ## Menu bar item and settings
 
-The menu bar item has three entries: Paused, which lets every key press through
-untouched until it is unchecked; Settings..., which opens the settings window; and
-Quit.
+The menu bar item's menu has Paused, which lets every key press through untouched
+until it is unchecked; the entries of the enabled features, such as Keep awake;
+Settings..., which opens the settings window; and Quit.
 
 The settings window has a General tab and one tab per feature. General holds a
 switch per feature (a feature switched off stops on the spot and stays off across
@@ -29,18 +29,27 @@ smoke test.
 
 ![filtered to the whitelist](docs/app-switcher/screenshots/filtered.png)
 
+### keep-awake
+
+A "Keep awake" entry in the menu bar menu that holds a power assertion and, when
+wanted, disables sleep with the lid closed through `pmset`; optional auto-off timer.
+See [docs/keep-awake](docs/keep-awake/README.md) for the sudoers line it needs and
+what is restored on quit or crash.
+
 ## Install
 
 ```sh
 ./install.sh
 ```
 
-Builds the app, copies it to `~/Applications` and launches it. Switch on "Launch at
-login" in Settings > General to have it start at login; that registers the app as a
-login item through `SMAppService`, listed under System Settings > General > Login
-Items. `./uninstall.sh` stops the app and removes the copy; switch the login item
-off first, or remove the stale entry from Login Items afterwards. The app asks for
-Accessibility once on first launch.
+Builds the app, copies it to `~/Applications` and launches it. It also asks for your
+password once to install `/etc/sudoers.d/mac-utilities-pmset`, the line that lets
+keep-awake run `pmset -a disablesleep` without a prompt. Switch on "Launch at login"
+in Settings > General to have it start at login; that registers the app as a login
+item through `SMAppService`, listed under System Settings > General > Login Items.
+`./uninstall.sh` stops the app, restores normal sleep and removes the copy and the
+sudoers line; switch the login item off first, or remove the stale entry from Login
+Items afterwards. The app asks for Accessibility once on first launch.
 
 ## Build
 
@@ -84,10 +93,12 @@ docs/<name>/          the feature's README and screenshots
 ```
 
 A feature implements `Feature`: a stable `identifier` (the key its enabled state is
-stored under), a `displayName`, `start()`, `stop()`, `handle(type:event:) -> Bool`
-and `buildSettingsView() -> AnyView`, its tab in the settings window. The core tap
-hands every key press and modifier change to the enabled features in order; the
-first one returning `true` swallows the event.
+stored under), a `displayName`, `menuItems` (its entries in the menu bar menu while
+enabled, empty for most), `start()`, `stop()`, `handle(type:event:) -> Bool` and
+`buildSettingsView() -> AnyView`, its tab in the settings window. The core tap hands
+every key press and modifier change to the enabled features in order; the first one
+returning `true` swallows the event. Enabled features are stopped when the app
+quits.
 Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
 feature runs until it is switched off, new ones included. New features are
 registered in `main.swift`.

@@ -5,6 +5,7 @@ import SwiftUI
 final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
+    let menuItems: [NSMenuItem] = []
 
     private let panel = SwitcherPanel()
     private let tracker = RecentAppsTracker()
