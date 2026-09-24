@@ -11,6 +11,8 @@ let hKeyCode: Int64 = 4
 let escapeKeyCode: Int64 = 53
 let leftArrowKeyCode: Int64 = 123
 let rightArrowKeyCode: Int64 = 124
+let downArrowKeyCode: Int64 = 125
+let upArrowKeyCode: Int64 = 126
 let filterEnabledKey = "filterEnabled"
 let whitelistKey = "whitelist"
 
@@ -198,6 +200,12 @@ final class RimView: NSView {
             straight.offsetBy(dx: 0, dy: CGFloat(row)).fill()
         }
     }
+}
+
+func getIconsPerRow() -> Int {
+    let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
+
+    return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
 }
 
 struct SwitcherState {
@@ -472,12 +480,6 @@ final class SwitcherPanel: NSPanel {
         return frame.insetBy(dx: highlightIconInset, dy: highlightIconInset)
     }
 
-    private func getIconsPerRow() -> Int {
-        let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
-
-        return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
-    }
-
     private func getHighlightColor(filterEnabled: Bool) -> NSColor {
         if filterEnabled { return filteredHighlightColor }
         return highlightColor
@@ -562,6 +564,7 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
         filterMenuItem.target = self
         filterMenuItem.state = isFilterEnabled ? .on : .off
         menu.addItem(filterMenuItem)
+        menu.addItem(buildHintItem(title: "While switching: Up/Down move between rows"))
         menu.addItem(buildHintItem(title: "While switching: W toggles whitelist"))
         menu.addItem(buildHintItem(title: "While switching: F toggles filter"))
         menu.addItem(buildHintItem(title: "While switching: Q quits app"))
@@ -750,6 +753,16 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
             return nil
         }
 
+        if isRowUpShortcut(event) {
+            moveSelectionBetweenRows(up: true)
+            return nil
+        }
+
+        if isRowDownShortcut(event) {
+            moveSelectionBetweenRows(up: false)
+            return nil
+        }
+
         if isWhitelistToggleShortcut(event) {
             toggleWhitelist(bundleIdentifier: candidates[selectedIndex].bundleIdentifier!)
             panel.update(state: buildState())
@@ -808,6 +821,14 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
 
     private func isBackwardShortcut(_ event: CGEvent) -> Bool {
         return isCommandShortcut(event, keyCode: leftArrowKeyCode)
+    }
+
+    private func isRowUpShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: upArrowKeyCode)
+    }
+
+    private func isRowDownShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: downArrowKeyCode)
     }
 
     private func isWhitelistToggleShortcut(_ event: CGEvent) -> Bool {
@@ -874,6 +895,18 @@ final class AppSwitcherController: NSObject, NSApplicationDelegate, NSMenuDelega
     private func advanceSelection(backward: Bool) {
         let step = backward ? -1 : 1
         selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
+        panel.update(state: buildState())
+    }
+
+    /// Same column one row up or down, wrapping at the top and bottom; a shorter last row clamps to its last icon.
+    private func moveSelectionBetweenRows(up: Bool) {
+        let iconsPerRow = getIconsPerRow()
+        let rowCount = (candidates.count + iconsPerRow - 1) / iconsPerRow
+        let column = selectedIndex % iconsPerRow
+        let step = up ? -1 : 1
+        let targetRow = (selectedIndex / iconsPerRow + step + rowCount) % rowCount
+
+        selectedIndex = min(targetRow * iconsPerRow + column, candidates.count - 1)
         panel.update(state: buildState())
     }
 
