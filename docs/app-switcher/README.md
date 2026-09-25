@@ -51,6 +51,11 @@ Filter on, only the whitelist, green highlight:
 - Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything.
+- Dragging the panel's left or right edge with the mouse changes its width by whole
+  icons, the rows re-wrapping live; the panel stays centered. The horizontal resize
+  cursor shows over the edge. The width is clamped between one icon and the visible
+  screen width and remembered across launches; until the edge has been dragged once,
+  the panel is about 70% of the screen wide.
 
 ## Code
 
@@ -60,8 +65,10 @@ settings tab, listing the apps `RunningRegularApps` keeps current; `SwitcherPane
 draws the glass panel from a `SwitcherState` using `SwitcherLayout`, `IconCellView`
 and `RimView`, with the sizes and colours in `SwitcherMetrics`; `WhitelistStore`
 keeps the filter switch and the whitelist in UserDefaults and publishes changes to
-the tab; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order
-and the windowed apps.
+the tab; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is the
+strip along each side edge that takes the drag and `BackgroundCursor.swift` lets the
+panel show the resize cursor while the app is inactive; `RecentAppsTracker` and
+`RunningApps` provide the most-recently-used order and the windowed apps.
 
 ## Dev
 

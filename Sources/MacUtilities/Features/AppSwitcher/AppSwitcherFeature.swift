@@ -10,6 +10,7 @@ final class AppSwitcherFeature: Feature {
     private let panel = SwitcherPanel()
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
+    private let panelWidthStore = PanelWidthStore()
     private var observers: [NSObjectProtocol] = []
 
     private var candidates: [NSRunningApplication] = []
@@ -21,10 +22,11 @@ final class AppSwitcherFeature: Feature {
     private var pendingAdvance = 0
 
     init() {
-        wirePanelClicks()
+        wirePanel()
     }
 
     func start() {
+        enableCursorChangesWhileInactive()
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
@@ -79,10 +81,13 @@ final class AppSwitcherFeature: Feature {
 
     // MARK: wiring
 
-    private func wirePanelClicks() {
+    private func wirePanel() {
         panel.onCellClicked = { index in
             self.selectedIndex = index
             self.activateSelectedApp()
+        }
+        panel.onWidthDragged = { width in
+            self.resizePanel(toWidth: width)
         }
     }
 
@@ -288,10 +293,23 @@ final class AppSwitcherFeature: Feature {
         iconsPerRow = getIconsPerRow()
     }
 
+    /// The count nearest the panel width, so a drag has to travel half an icon either way before a column comes or goes; held between one and
+    /// what fits on the visible screen, so a width dragged past the screen or remembered from a wider one still fits.
     private func getIconsPerRow() -> Int {
-        let availableWidth = NSScreen.main!.visibleFrame.width * maxPanelWidthFraction - 2 * horizontalPadding
+        let nearest = Int(getIconCount(forPanelWidth: getPanelWidth()).rounded())
+        let fitting = Int(getIconCount(forPanelWidth: NSScreen.main!.visibleFrame.width).rounded(.down))
 
-        return max(1, Int((availableWidth + itemSpacing) / (iconSize + itemSpacing)))
+        return max(1, min(nearest, fitting))
+    }
+
+    /// How many icons a row of this panel width holds, fractional.
+    private func getIconCount(forPanelWidth width: CGFloat) -> CGFloat {
+        return (width - 2 * horizontalPadding + itemSpacing) / (iconSize + itemSpacing)
+    }
+
+    /// The remembered width, or the default share of the screen until the edge has been dragged once.
+    private func getPanelWidth() -> CGFloat {
+        return panelWidthStore.width ?? NSScreen.main!.visibleFrame.width * defaultPanelWidthFraction
     }
 
     private func getCandidates() -> [NSRunningApplication] {
@@ -325,6 +343,15 @@ final class AppSwitcherFeature: Feature {
         }
 
         return getAppsWithWindows(recentApps)
+    }
+
+    /// Remembers the dragged width and re-wraps the icons to it on the spot. A drag outliving the panel, Cmd released mid-drag, is ignored.
+    private func resizePanel(toWidth width: CGFloat) {
+        if !panel.isVisible { return }
+
+        panelWidthStore.setWidth(width)
+        iconsPerRow = getIconsPerRow()
+        panel.resize(state: buildState())
     }
 
     private func advanceSelection(backward: Bool) {
