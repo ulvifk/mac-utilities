@@ -4,8 +4,10 @@ import AppKit
 let iconSize: CGFloat = 68
 let itemSpacing: CGFloat = 5
 let horizontalPadding: CGFloat = 22
-/// The widest the panel gets, as a share of the screen, before the icons wrap to the next row.
-let maxPanelWidthFraction: CGFloat = 0.7
+/// The panel width until its edge is dragged once, as a share of the screen; the icons wrap to the next row around it.
+let defaultPanelWidthFraction: CGFloat = 0.7
+/// The strip along each side edge that shows the resize cursor and takes the drag; it fits inside the padding, clear of the icons.
+let resizeHandleWidth: CGFloat = 12
 let verticalPadding: CGFloat = 7.5
 let dotSize: CGFloat = 5
 

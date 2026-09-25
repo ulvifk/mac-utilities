@@ -3,6 +3,8 @@ import QuartzCore
 
 final class SwitcherPanel: NSPanel {
     var onCellClicked: (Int) -> Void = { _ in }
+    /// The width the edge drag asks for, before clamping.
+    var onWidthDragged: (CGFloat) -> Void = { _ in }
 
     /// The last state shown.
     private var state: SwitcherState!
@@ -82,7 +84,7 @@ final class SwitcherPanel: NSPanel {
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             cell.animator().alphaValue = 0
             cell.icon.animator().frame = cell.icon.frame.insetBy(dx: leavingIconShrink, dy: leavingIconShrink)
-            animator().setFrame(getFrameKeepingCenter(contentSize: layout.contentSize), display: true)
+            animator().setFrame(getFrame(centeredOnX: frame.midX, contentSize: layout.contentSize), display: true)
             highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
             nameLabel.animator().frame = getNameFrame(layout: layout)
 
@@ -92,6 +94,19 @@ final class SwitcherPanel: NSPanel {
         }, completionHandler: {
             cell.removeFromSuperview()
         })
+    }
+
+    /// Re-wraps the icons to the state's row width without animation, so they follow the edge drag live; the panel stays centered.
+    func resize(state: SwitcherState) {
+        self.state = state
+        let layout = buildLayout()
+
+        for (cell, frame) in zip(cells, layout.cellFrames) {
+            cell.frame = frame
+        }
+        highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
+        nameLabel.frame = getNameFrame(layout: layout)
+        setFrame(getFrame(centeredOnX: screen!.visibleFrame.midX, contentSize: layout.contentSize), display: true)
     }
 
     func hide() {
@@ -117,6 +132,9 @@ final class SwitcherPanel: NSPanel {
             container.addSubview(cell)
         }
         container.addSubview(nameLabel)
+        for handle in buildResizeHandles(size: layout.contentSize) {
+            container.addSubview(handle)
+        }
 
         highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
         nameLabel.frame = getNameFrame(layout: layout)
@@ -143,6 +161,22 @@ final class SwitcherPanel: NSPanel {
         return cells
     }
 
+    /// A drag asks for the width that keeps the panel centered with the dragged edge under the mouse: twice the mouse's distance from the middle, negative once it crosses over.
+    private func buildResizeHandles(size: NSSize) -> [ResizeHandleView] {
+        let left = ResizeHandleView()
+        let right = ResizeHandleView()
+
+        left.frame = NSRect(x: 0, y: 0, width: resizeHandleWidth, height: size.height)
+        left.autoresizingMask = [.maxXMargin, .height]
+        left.onDragged = { [unowned self] mouseX in self.onWidthDragged(2 * (self.frame.midX - mouseX)) }
+
+        right.frame = NSRect(x: size.width - resizeHandleWidth, y: 0, width: resizeHandleWidth, height: size.height)
+        right.autoresizingMask = [.minXMargin, .height]
+        right.onDragged = { [unowned self] mouseX in self.onWidthDragged(2 * (mouseX - self.frame.midX)) }
+
+        return [left, right]
+    }
+
     private func buildLayout() -> SwitcherLayout {
         return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
     }
@@ -151,10 +185,11 @@ final class SwitcherPanel: NSPanel {
         return state.apps[state.selectedIndex].localizedName ?? ""
     }
 
-    /// The panel shrinks around its middle, so the icons on both sides of the gap close it together.
-    private func getFrameKeepingCenter(contentSize: NSSize) -> NSRect {
+    /// At the panel's current height. Removal shrinks around the panel's own middle; a resize centers on the screen instead, because keeping the
+    /// current center would drift half a pixel every other snap as the widths alternate between odd and even.
+    private func getFrame(centeredOnX centerX: CGFloat, contentSize: NSSize) -> NSRect {
         return alignToPixels(NSRect(
-            x: frame.midX - contentSize.width / 2,
+            x: centerX - contentSize.width / 2,
             y: frame.midY - contentSize.height / 2,
             width: contentSize.width,
             height: contentSize.height
