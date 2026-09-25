@@ -25,8 +25,8 @@ Filter on, only the whitelist, green highlight:
 - Cmd+Tab / Cmd+Shift+Tab cycle forward and backward; releasing Cmd activates the
   selection.
 - Right / Left arrow do the same while the switcher is open.
-- Up / Down arrow move the selection one row up or down, keeping the same column;
-  when the target row is shorter, the selection lands on its last icon.
+- Up / Down arrow move the selection to the icon drawn nearest above or below it,
+  wrapping between the top and bottom rows; of two equally near icons, the left one.
 - Click an icon to switch to it.
 - Apps without open windows are left out.
 - Hidden apps stay listed with a dimmed icon, whether they were hidden with Cmd+H here

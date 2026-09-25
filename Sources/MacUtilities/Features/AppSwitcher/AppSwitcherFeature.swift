@@ -360,15 +360,23 @@ final class AppSwitcherFeature: Feature {
         panel.update(state: buildState())
     }
 
-    /// Same column one row up or down, wrapping at the top and bottom; a shorter last row clamps to its last icon.
+    /// The icon drawn nearest above or below, wrapping at the top and bottom; of two equally near, the left one, as `min` keeps the first.
     private func moveSelectionBetweenRows(up: Bool) {
         let rowCount = (candidates.count + iconsPerRow - 1) / iconsPerRow
-        let column = selectedIndex % iconsPerRow
         let step = up ? -1 : 1
         let targetRow = (selectedIndex / iconsPerRow + step + rowCount) % rowCount
+        let targetRowIndices = targetRow * iconsPerRow..<min((targetRow + 1) * iconsPerRow, candidates.count)
 
-        selectedIndex = min(targetRow * iconsPerRow + column, candidates.count - 1)
+        selectedIndex = targetRowIndices.min { getColumnDistance(from: $0, to: selectedIndex) < getColumnDistance(from: $1, to: selectedIndex) }!
         panel.update(state: buildState())
+    }
+
+    /// How far apart the two icons are drawn, in columns.
+    private func getColumnDistance(from index: Int, to otherIndex: Int) -> CGFloat {
+        let column = getVisualColumn(index: index, appCount: candidates.count, iconsPerRow: iconsPerRow)
+        let otherColumn = getVisualColumn(index: otherIndex, appCount: candidates.count, iconsPerRow: iconsPerRow)
+
+        return abs(column - otherColumn)
     }
 
     /// The selection stays on its app; when that is the one gone, it moves to the neighbour.
