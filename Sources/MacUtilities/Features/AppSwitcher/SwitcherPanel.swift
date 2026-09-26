@@ -54,13 +54,11 @@ final class SwitcherPanel: NSPanel {
         let layout = buildLayout()
 
         for (cell, app) in zip(cells, state.apps) {
-            cell.icon.alphaValue = getIconAlpha(app: app)
-            cell.dot.isHidden = !state.whitelisted.contains(app.bundleIdentifier ?? "")
+            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
         }
 
         nameLabel.stringValue = getSelectedName()
         nameLabel.frame = getNameFrame(layout: layout)
-        highlight.layer?.backgroundColor = getHighlightColor().cgColor
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.12
@@ -116,18 +114,17 @@ final class SwitcherPanel: NSPanel {
     private func buildContent() {
         let layout = buildLayout()
         let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
-        let rim = RimView(frame: container.bounds)
 
         // Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
         container.appearance = NSAppearance(named: .aqua)
-        rim.autoresizingMask = [.width, .height]
         highlight = buildHighlight()
         nameLabel = buildNameLabel(text: getSelectedName())
         cells = buildCells(layout: layout)
 
-        container.addSubview(buildDimmingView(size: layout.contentSize))
-        container.addSubview(rim)
         container.addSubview(highlight)
+        if state.isFiltered {
+            container.addSubview(buildWhitelistBadge(size: layout.contentSize))
+        }
         for cell in cells {
             container.addSubview(cell)
         }
@@ -150,8 +147,9 @@ final class SwitcherPanel: NSPanel {
         var cells: [IconCellView] = []
 
         for (index, app) in state.apps.enumerated() {
-            let cell = IconCellView(app: app, whitelisted: state.whitelisted.contains(app.bundleIdentifier ?? ""))
+            let cell = IconCellView(app: app)
 
+            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
             cell.index = index
             cell.frame = layout.cellFrames[index]
             cell.onClick = { [unowned self] index in self.onCellClicked(index) }
@@ -179,6 +177,10 @@ final class SwitcherPanel: NSPanel {
 
     private func buildLayout() -> SwitcherLayout {
         return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
+    }
+
+    private func isWhitelisted(_ app: NSRunningApplication) -> Bool {
+        return state.whitelisted.contains(app.bundleIdentifier ?? "")
     }
 
     private func getSelectedName() -> String {
@@ -223,7 +225,7 @@ final class SwitcherPanel: NSPanel {
 
         highlight.wantsLayer = true
         highlight.layer?.cornerRadius = highlightCornerRadius
-        highlight.layer?.backgroundColor = getHighlightColor().cgColor
+        highlight.layer?.backgroundColor = highlightColor.cgColor
 
         return highlight
     }
@@ -233,23 +235,24 @@ final class SwitcherPanel: NSPanel {
 
         glass.style = .clear
         glass.cornerRadius = panelCornerRadius
+        glass.tintColor = panelTintColor
 
         return glass
     }
 
-    private func buildDimmingView(size: NSSize) -> NSView {
-        let dimming = NSView(frame: NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1))
+    /// Centered in the band above the top row's icons, following the top edge as the panel resizes.
+    private func buildWhitelistBadge(size: NSSize) -> WhitelistBadgeView {
+        let badge = WhitelistBadgeView()
+        let badgeSize = badge.frame.size
 
-        dimming.wantsLayer = true
-        dimming.layer?.cornerRadius = panelCornerRadius - 1
-        dimming.layer?.backgroundColor = panelDimmingColor.cgColor
-        dimming.autoresizingMask = [.width, .height]
+        badge.frame = alignToPixels(NSRect(
+            x: (size.width - badgeSize.width) / 2,
+            y: size.height - verticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
+            width: badgeSize.width,
+            height: badgeSize.height
+        ))
+        badge.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin]
 
-        return dimming
-    }
-
-    private func getHighlightColor() -> NSColor {
-        if state.filterEnabled { return filteredHighlightColor }
-        return highlightColor
+        return badge
     }
 }

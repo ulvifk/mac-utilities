@@ -14,6 +14,7 @@ final class AppSwitcherFeature: Feature {
     private var observers: [NSObjectProtocol] = []
 
     private var candidates: [NSRunningApplication] = []
+    private var isFiltered = false
     private var iconsPerRow = 1
     private var selectedIndex = 0
 
@@ -290,6 +291,7 @@ final class AppSwitcherFeature: Feature {
     /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later.
     private func loadCandidates() {
         candidates = getCandidates()
+        isFiltered = isListingWhitelistOnly()
         iconsPerRow = getIconsPerRow()
     }
 
@@ -325,6 +327,14 @@ final class AppSwitcherFeature: Feature {
         }
 
         return whitelistedApps
+    }
+
+    /// False in the fallback to every running app, when the filter is on but no whitelisted app is running.
+    private func isListingWhitelistOnly() -> Bool {
+        if !whitelistStore.isFilterEnabled { return false }
+
+        let whitelist = whitelistStore.getWhitelist()
+        return candidates.contains { whitelist.contains($0.bundleIdentifier!) }
     }
 
     /// Regular running apps, most recently activated first.
@@ -411,7 +421,7 @@ final class AppSwitcherFeature: Feature {
             apps: candidates,
             iconsPerRow: iconsPerRow,
             selectedIndex: selectedIndex,
-            filterEnabled: whitelistStore.isFilterEnabled,
+            isFiltered: isFiltered,
             whitelisted: whitelistStore.getWhitelist()
         )
     }
