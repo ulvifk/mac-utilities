@@ -29,9 +29,10 @@ struct SwitcherLayout {
         return iconFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY)
     }
 
-    /// Hugs the selected icon's squircle rather than boxing the whole cell; the name sits below it, outside.
+    /// Hugs the selected, grown icon's squircle rather than boxing the whole cell; the name sits below it, outside.
     func getHighlightFrame(index: Int) -> NSRect {
-        return alignToPixels(getIconFrame(index: index).insetBy(dx: highlightIconInset, dy: highlightIconInset))
+        let iconFrame = selectedIconFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY)
+        return alignToPixels(iconFrame.insetBy(dx: highlightIconInset, dy: highlightIconInset))
     }
 }
 

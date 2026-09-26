@@ -31,10 +31,13 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Apps without open windows are left out.
 - Hidden apps stay listed with a dimmed icon, whether they were hidden with Cmd+H here
   or anywhere else; releasing Cmd on one unhides and activates it.
-- The highlight is a rounded square hugging the selected icon; the app's name sits
-  under it, clamped to the panel edges and truncated rather than ever widening the
-  panel.
-- The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
+- The highlight is a drop of glass hugging the selected icon, which grows a little;
+  the app's name sits under it on a small dark glass capsule, clamped to the panel
+  edges and truncated rather than ever widening the panel.
+- Moving to a neighbouring icon, sideways or a row up or down, the highlight first
+  stretches over both and then lets go of the old one; a wrap to the far end slides.
+- The panel is Liquid Glass tinted dark, its corners concentric with the highlight's,
+  casting a soft shadow; it springs up from slightly smaller as it opens.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -69,12 +72,12 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 tapped keys and keeps the candidates and the selection; `AppSwitcherSettingsView` is
 the settings tab, listing the apps `RunningRegularApps` keeps current;
 `SwitcherPanel` draws the glass panel from a `SwitcherState` using `SwitcherLayout`,
-`IconCellView` and `WhitelistBadgeView`, with the sizes and colours in
-`SwitcherMetrics`; `WhitelistStore` keeps the filter switch and the whitelist in
-UserDefaults and publishes changes to the tab; `PanelWidthStore` keeps the dragged
-panel width, `ResizeHandleView` is the strip along each side edge that takes the
-drag and `BackgroundCursor.swift` lets the panel show the resize cursor while the
-app is inactive; `RecentAppsTracker` and `RunningApps` provide the
+`IconCellView`, `WhitelistBadgeView` and `PanelShadowView`, with the sizes and
+colours in `SwitcherMetrics`; `WhitelistStore` keeps the filter switch and the
+whitelist in UserDefaults and publishes changes to the tab; `PanelWidthStore` keeps
+the dragged panel width, `ResizeHandleView` is the strip along each side edge that
+takes the drag and `BackgroundCursor.swift` lets the panel show the resize cursor
+while the app is inactive; `RecentAppsTracker` and `RunningApps` provide the
 most-recently-used order and the windowed apps.
 
 ## Dev

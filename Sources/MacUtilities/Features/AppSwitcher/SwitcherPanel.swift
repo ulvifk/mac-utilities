@@ -9,7 +9,8 @@ final class SwitcherPanel: NSPanel {
     /// The last state shown.
     private var state: SwitcherState!
     private var cells: [IconCellView] = []
-    private var highlight = NSView()
+    private var highlight = NSGlassEffectView()
+    private var nameCapsule = NSGlassEffectView()
     private var nameLabel = NSTextField(labelWithString: "")
 
     init() {
@@ -43,6 +44,7 @@ final class SwitcherPanel: NSPanel {
 
         alphaValue = 0
         orderFrontRegardless()
+        contentView!.layer!.add(buildOpeningAnimation(), forKey: nil)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.1
             animator().alphaValue = 1
@@ -50,6 +52,7 @@ final class SwitcherPanel: NSPanel {
     }
 
     func update(state: SwitcherState) {
+        let previousIndex = self.state.selectedIndex
         self.state = state
         let layout = buildLayout()
 
@@ -58,13 +61,17 @@ final class SwitcherPanel: NSPanel {
         }
 
         nameLabel.stringValue = getSelectedName()
-        nameLabel.frame = getNameFrame(layout: layout)
+        placeName(capsuleFrame: getNameCapsuleFrame(layout: layout))
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
+            context.duration = highlightSettleDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
+
+            for (index, cell) in cells.enumerated() {
+                cell.icon.animator().frame = getIconFrameInCell(index: index)
+            }
         }
+        moveHighlight(from: layout.getHighlightFrame(index: previousIndex), to: layout.getHighlightFrame(index: state.selectedIndex))
     }
 
     /// Fades and shrinks the leaving icon out while the rest slide into place and the panel shrinks around them.
@@ -77,6 +84,7 @@ final class SwitcherPanel: NSPanel {
         for later in cells[index...] { later.index -= 1 }
         nameLabel.stringValue = getSelectedName()
 
+        let nameCapsuleFrame = getNameCapsuleFrame(layout: layout)
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = removalDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -84,14 +92,16 @@ final class SwitcherPanel: NSPanel {
             cell.icon.animator().frame = cell.icon.frame.insetBy(dx: leavingIconShrink, dy: leavingIconShrink)
             animator().setFrame(getFrame(centeredOnX: frame.midX, contentSize: layout.contentSize), display: true)
             highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
-            nameLabel.animator().frame = getNameFrame(layout: layout)
+            nameCapsule.animator().frame = nameCapsuleFrame
 
             for (index, cell) in cells.enumerated() {
                 cell.animator().frame = layout.cellFrames[index]
+                cell.icon.animator().frame = getIconFrameInCell(index: index)
             }
         }, completionHandler: {
             cell.removeFromSuperview()
         })
+        nameLabel.frame = getNameLabelFrame(capsuleFrame: nameCapsuleFrame)
     }
 
     /// Re-wraps the icons to the state's row width without animation, so they follow the edge drag live; the panel stays centered.
@@ -103,7 +113,7 @@ final class SwitcherPanel: NSPanel {
             cell.frame = frame
         }
         highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
-        nameLabel.frame = getNameFrame(layout: layout)
+        placeName(capsuleFrame: getNameCapsuleFrame(layout: layout))
         setFrame(getFrame(centeredOnX: screen!.visibleFrame.midX, contentSize: layout.contentSize), display: true)
     }
 
@@ -111,14 +121,21 @@ final class SwitcherPanel: NSPanel {
         orderOut(nil)
     }
 
+    /// The glass sits inside a window larger by the shadow margin on every side, over the shadow it casts.
     private func buildContent() {
         let layout = buildLayout()
+        let windowSize = getWindowSize(contentSize: layout.contentSize)
+        let glassFrame = NSRect(origin: NSPoint(x: shadowMargin, y: shadowMargin), size: layout.contentSize)
         let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
+        let glass = buildGlassView(frame: glassFrame)
+        let shadow = PanelShadowView()
+        let root = NSView(frame: NSRect(origin: .zero, size: windowSize))
 
         // Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
         container.appearance = NSAppearance(named: .aqua)
         highlight = buildHighlight()
         nameLabel = buildNameLabel(text: getSelectedName())
+        nameCapsule = buildNameCapsule(label: nameLabel)
         cells = buildCells(layout: layout)
 
         container.addSubview(highlight)
@@ -128,19 +145,23 @@ final class SwitcherPanel: NSPanel {
         for cell in cells {
             container.addSubview(cell)
         }
-        container.addSubview(nameLabel)
+        container.addSubview(nameCapsule)
         for handle in buildResizeHandles(size: layout.contentSize) {
             container.addSubview(handle)
         }
 
         highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
-        nameLabel.frame = getNameFrame(layout: layout)
+        placeName(capsuleFrame: getNameCapsuleFrame(layout: layout))
 
-        let glass = buildGlassView(size: layout.contentSize)
         glass.contentView = container
+        shadow.frame = glassFrame
+        shadow.autoresizingMask = [.width, .height]
+        root.wantsLayer = true
+        root.addSubview(shadow)
+        root.addSubview(glass)
 
-        contentView = glass
-        setContentSize(layout.contentSize)
+        contentView = root
+        setContentSize(windowSize)
     }
 
     private func buildCells(layout: SwitcherLayout) -> [IconCellView] {
@@ -150,6 +171,7 @@ final class SwitcherPanel: NSPanel {
             let cell = IconCellView(app: app)
 
             cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+            cell.icon.frame = getIconFrameInCell(index: index)
             cell.index = index
             cell.frame = layout.cellFrames[index]
             cell.onClick = { [unowned self] index in self.onCellClicked(index) }
@@ -175,6 +197,63 @@ final class SwitcherPanel: NSPanel {
         return [left, right]
     }
 
+    /// To a neighbouring icon the highlight stretches over both first and then lets go of the old one, like a drop of liquid; further away it
+    /// just slides.
+    private func moveHighlight(from previousFrame: NSRect, to frame: NSRect) {
+        if !areNeighbours(previousFrame, frame) {
+            slideHighlight(to: frame)
+            return
+        }
+
+        let stretchedFrame = previousFrame.union(frame)
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = highlightStretchDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            highlight.animator().frame = stretchedFrame
+        }, completionHandler: {
+            // A later move, removal or resize has taken the highlight elsewhere meanwhile.
+            if self.highlight.frame != stretchedFrame { return }
+
+            self.slideHighlight(to: frame)
+        })
+    }
+
+    private func slideHighlight(to frame: NSRect) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = highlightSettleDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            highlight.animator().frame = frame
+        }
+    }
+
+    /// At most one icon apart sideways and one row up or down; the half step of slack absorbs the pixel rounding and the half-column shift
+    /// of a shorter last row.
+    private func areNeighbours(_ frame: NSRect, _ otherFrame: NSRect) -> Bool {
+        if abs(frame.midX - otherFrame.midX) > 1.5 * (iconSize + itemSpacing) { return false }
+        if abs(frame.midY - otherFrame.midY) > 1.5 * (cellHeight + rowSpacing) { return false }
+        return true
+    }
+
+    /// From slightly smaller around the middle up to full size, springing a little past it.
+    private func buildOpeningAnimation() -> CASpringAnimation {
+        let layer = contentView!.layer!
+        let center = CGPoint(x: layer.bounds.width * (0.5 - layer.anchorPoint.x), y: layer.bounds.height * (0.5 - layer.anchorPoint.y))
+        let shrink = CATransform3DScale(
+            CATransform3DMakeTranslation(center.x * (1 - openingScale), center.y * (1 - openingScale), 0),
+            openingScale,
+            openingScale,
+            1
+        )
+        let animation = CASpringAnimation(perceptualDuration: openingDuration, bounce: openingBounce)
+
+        animation.keyPath = "transform"
+        animation.fromValue = shrink
+        animation.toValue = CATransform3DIdentity
+        animation.duration = animation.settlingDuration
+
+        return animation
+    }
+
     private func buildLayout() -> SwitcherLayout {
         return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
     }
@@ -187,25 +266,52 @@ final class SwitcherPanel: NSPanel {
         return state.apps[state.selectedIndex].localizedName ?? ""
     }
 
+    private func getIconFrameInCell(index: Int) -> NSRect {
+        if index == state.selectedIndex { return alignToPixels(selectedIconFrameInCell) }
+        return alignToPixels(iconFrameInCell)
+    }
+
     /// At the panel's current height. Removal shrinks around the panel's own middle; a resize centers on the screen instead, because keeping the
     /// current center would drift half a pixel every other snap as the widths alternate between odd and even.
     private func getFrame(centeredOnX centerX: CGFloat, contentSize: NSSize) -> NSRect {
+        let windowSize = getWindowSize(contentSize: contentSize)
+
         return alignToPixels(NSRect(
-            x: centerX - contentSize.width / 2,
-            y: frame.midY - contentSize.height / 2,
-            width: contentSize.width,
-            height: contentSize.height
+            x: centerX - windowSize.width / 2,
+            y: frame.midY - windowSize.height / 2,
+            width: windowSize.width,
+            height: windowSize.height
         ))
     }
 
-    /// Centered under the selected icon and no wider than twice the run to the nearer panel edge, so it truncates instead of crossing it.
-    private func getNameFrame(layout: SwitcherLayout) -> NSRect {
+    /// The glass plus room for its shadow on every side.
+    private func getWindowSize(contentSize: NSSize) -> NSSize {
+        return NSSize(width: contentSize.width + 2 * shadowMargin, height: contentSize.height + 2 * shadowMargin)
+    }
+
+    /// Hugs the name centered under the selected icon, no wider than twice the run to the nearer panel edge, so the name truncates instead
+    /// of crossing it.
+    private func getNameCapsuleFrame(layout: SwitcherLayout) -> NSRect {
         let iconFrame = layout.getIconFrame(index: state.selectedIndex)
         let maxWidth = 2 * min(iconFrame.midX - horizontalPadding, layout.contentSize.width - horizontalPadding - iconFrame.midX)
         let nameSize = nameLabel.fittingSize
-        let width = min(nameSize.width, maxWidth)
+        let width = min(nameSize.width + 2 * nameCapsuleHorizontalPadding, maxWidth)
 
-        return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.minY - nameTopSpacing - nameSize.height, width: width, height: nameSize.height))
+        return alignToPixels(NSRect(
+            x: iconFrame.midX - width / 2,
+            y: iconFrame.minY - nameTopSpacing - nameSize.height - nameCapsuleVerticalPadding,
+            width: width,
+            height: nameSize.height + 2 * nameCapsuleVerticalPadding
+        ))
+    }
+
+    private func getNameLabelFrame(capsuleFrame: NSRect) -> NSRect {
+        return NSRect(origin: .zero, size: capsuleFrame.size).insetBy(dx: nameCapsuleHorizontalPadding, dy: nameCapsuleVerticalPadding)
+    }
+
+    private func placeName(capsuleFrame: NSRect) {
+        nameCapsule.frame = capsuleFrame
+        nameLabel.frame = getNameLabelFrame(capsuleFrame: capsuleFrame)
     }
 
     private func buildNameLabel(text: String) -> NSTextField {
@@ -220,22 +326,36 @@ final class SwitcherPanel: NSPanel {
         return label
     }
 
-    private func buildHighlight() -> NSView {
-        let highlight = NSView()
+    private func buildNameCapsule(label: NSTextField) -> NSGlassEffectView {
+        let capsule = NSGlassEffectView()
+        let content = NSView()
 
-        highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = highlightCornerRadius
-        highlight.layer?.backgroundColor = highlightColor.cgColor
+        content.addSubview(label)
+        capsule.contentView = content
+        capsule.appearance = NSAppearance(named: .darkAqua)
+        capsule.cornerRadius = nameBandHeight / 2 + nameCapsuleVerticalPadding
+        capsule.tintColor = nameCapsuleTintColor
+
+        return capsule
+    }
+
+    private func buildHighlight() -> NSGlassEffectView {
+        let highlight = NSGlassEffectView()
+
+        highlight.style = .clear
+        highlight.cornerRadius = highlightCornerRadius
+        highlight.tintColor = highlightColor
 
         return highlight
     }
 
-    private func buildGlassView(size: NSSize) -> NSGlassEffectView {
-        let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
+    private func buildGlassView(frame: NSRect) -> NSGlassEffectView {
+        let glass = NSGlassEffectView(frame: frame)
 
         glass.style = .clear
         glass.cornerRadius = panelCornerRadius
         glass.tintColor = panelTintColor
+        glass.autoresizingMask = [.width, .height]
 
         return glass
     }
