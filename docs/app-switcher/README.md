@@ -16,7 +16,7 @@ Filter off, every running app listed:
 
 ![all apps](screenshots/all-apps.png)
 
-Filter on, only the whitelist, green highlight:
+Filter on, only the whitelist, the Whitelist capsule above the icons:
 
 ![filtered](screenshots/filtered.png)
 
@@ -34,12 +34,18 @@ Filter on, only the whitelist, green highlight:
 - The highlight is a rounded square hugging the selected icon; the app's name sits
   under it, clamped to the panel edges and truncated rather than ever widening the
   panel.
-- The highlight is green when the filter is on and neutral when it is off.
-- A small green dot above an icon means the app is whitelisted.
+- The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
+- While only the whitelist is listed, a green "Whitelist" capsule sits above the top
+  row. When the filter is on but no whitelisted app is running, every app is listed
+  and the panel looks as with the filter off.
+- With the filter off, a small green dot above an icon means the app is whitelisted.
+  With only the whitelist listed there are no dots; an app taken off the whitelist
+  with Cmd+W turns gray instead.
 - Cmd+F while the switcher is open toggles the filter itself and re-filters the list
   on the spot, keeping the selected app selected when it survives.
 - Cmd+W while the switcher is open toggles the whitelist membership of the selected
-  app. The visible list is not re-filtered until the switcher closes.
+  app: its dot comes or goes, or with only the whitelist listed it turns gray or back.
+  The visible list is not re-filtered until the switcher closes.
 - Cmd+Q while the switcher is open quits the selected app; it leaves the list once it
   has actually quit, so an app asking for confirmation stays listed. Its icon fades and
   shrinks out while the others slide together and the panel shrinks around them; the
@@ -59,16 +65,17 @@ Filter on, only the whitelist, green highlight:
 
 ## Code
 
-`Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
-keys and keeps the candidates and the selection; `AppSwitcherSettingsView` is the
-settings tab, listing the apps `RunningRegularApps` keeps current; `SwitcherPanel`
-draws the glass panel from a `SwitcherState` using `SwitcherLayout`, `IconCellView`
-and `RimView`, with the sizes and colours in `SwitcherMetrics`; `WhitelistStore`
-keeps the filter switch and the whitelist in UserDefaults and publishes changes to
-the tab; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is the
-strip along each side edge that takes the drag and `BackgroundCursor.swift` lets the
-panel show the resize cursor while the app is inactive; `RecentAppsTracker` and
-`RunningApps` provide the most-recently-used order and the windowed apps.
+`Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the
+tapped keys and keeps the candidates and the selection; `AppSwitcherSettingsView` is
+the settings tab, listing the apps `RunningRegularApps` keeps current;
+`SwitcherPanel` draws the glass panel from a `SwitcherState` using `SwitcherLayout`,
+`IconCellView` and `WhitelistBadgeView`, with the sizes and colours in
+`SwitcherMetrics`; `WhitelistStore` keeps the filter switch and the whitelist in
+UserDefaults and publishes changes to the tab; `PanelWidthStore` keeps the dragged
+panel width, `ResizeHandleView` is the strip along each side edge that takes the
+drag and `BackgroundCursor.swift` lets the panel show the resize cursor while the
+app is inactive; `RecentAppsTracker` and `RunningApps` provide the
+most-recently-used order and the windowed apps.
 
 ## Dev
 
