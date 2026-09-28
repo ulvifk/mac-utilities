@@ -38,6 +38,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
   Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
   window. Both, and the tint's darkness, apply from the next time the switcher opens.
+  Changing either in the settings tab previews it live: the running apps show on the
+  new glass until a second after the last change, and clicks pass through to the tab.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
