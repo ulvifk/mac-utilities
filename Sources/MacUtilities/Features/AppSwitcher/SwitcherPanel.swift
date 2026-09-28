@@ -13,6 +13,11 @@ final class SwitcherPanel: NSPanel {
     private var cells: [SwitcherCellView] = []
     private var highlight = NSView()
     private var nameLabel = NSTextField(labelWithString: "")
+    private let hintBand = HintBandView()
+
+    /// From the moment the hints come in until the panel hides.
+    private var isShowingHintBand = false
+    private var hintShowing: DispatchWorkItem?
 
     init() {
         super.init(
@@ -68,6 +73,7 @@ final class SwitcherPanel: NSPanel {
         } else {
             showAppStatus(layout: layout)
         }
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.12
@@ -85,6 +91,7 @@ final class SwitcherPanel: NSPanel {
         cell.onClick = { _ in }
         for later in cells[index...] { later.index -= 1 }
         nameLabel.stringValue = getSelectedName()
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = removalDuration
@@ -94,6 +101,7 @@ final class SwitcherPanel: NSPanel {
             animator().setFrame(getFrame(centeredOnX: frame.midX, contentSize: layout.contentSize), display: true)
             highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
             nameLabel.animator().frame = getNameFrame(layout: layout)
+            hintBand.animator().frame = layout.hintBandFrame
 
             for (index, cell) in cells.enumerated() {
                 cell.animator().frame = layout.cellFrames[index]
@@ -115,10 +123,25 @@ final class SwitcherPanel: NSPanel {
         if !state.isListingWindows {
             nameLabel.frame = getNameFrame(layout: layout)
         }
+        hintBand.frame = layout.hintBandFrame
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
         setFrame(getFrame(centeredOnX: screen!.visibleFrame.midX, contentSize: layout.contentSize), display: true)
     }
 
+    /// Once the panel has stayed open a moment, so a quick Cmd+Tab never shows them.
+    func showHintsAfterDelay() {
+        hintShowing = DispatchWorkItem {
+            self.showHintBand()
+            self.hintBand.showHints()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + hintDelay, execute: hintShowing!)
+    }
+
+    /// Drops the hints still to come and takes the band away, so the next opening starts without it.
     func hide() {
+        hintShowing?.cancel()
+        isShowingHintBand = false
+        hintBand.clear()
         orderOut(nil)
     }
 
@@ -143,6 +166,9 @@ final class SwitcherPanel: NSPanel {
             nameLabel.frame = getNameFrame(layout: layout)
             container.addSubview(nameLabel)
         }
+        hintBand.frame = layout.hintBandFrame
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
+        container.addSubview(hintBand)
         for handle in buildResizeHandles(size: layout.contentSize) {
             container.addSubview(handle)
         }
@@ -233,7 +259,59 @@ final class SwitcherPanel: NSPanel {
     private func buildLayout() -> SwitcherLayout {
         let cellCount = state.isListingWindows ? state.windows.count : state.apps.count
 
-        return SwitcherLayout(cellCount: cellCount, cellsPerRow: state.cellsPerRow, metrics: getCellMetrics(listingWindows: state.isListingWindows))
+        return SwitcherLayout(
+            cellCount: cellCount,
+            cellsPerRow: state.cellsPerRow,
+            metrics: getCellMetrics(listingWindows: state.isListingWindows),
+            showsHintBand: isShowingHintBand
+        )
+    }
+
+    /// Grows the panel down by the band, its top edge staying put: the content counts from the top, so the rows keep their place and the band,
+    /// waiting under them, comes into view.
+    private func showHintBand() {
+        isShowingHintBand = true
+        let height = buildLayout().contentSize.height
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = hintFadeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().setFrame(alignToPixels(NSRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)), display: true)
+        }
+    }
+
+    /// What can be done now: for apps worded for the selected app and the filter, for windows only moving the selection and cancelling.
+    private func buildShortcutHints() -> [ShortcutHint] {
+        if state.isListingWindows { return buildWindowShortcutHints() }
+        return buildAppShortcutHints()
+    }
+
+    /// The band drops them from the end as the panel narrows. Hide is left out for a hidden app, where it does nothing.
+    private func buildAppShortcutHints() -> [ShortcutHint] {
+        let app = state.apps[state.selectedIndex]
+        var hints = [
+            ShortcutHint(keys: "⌘W", action: isWhitelisted(app) ? "Remove from Whitelist" : "Add to Whitelist"),
+            ShortcutHint(keys: "⌘F", action: state.isFilterEnabled ? "Turn Filter Off" : "Turn Filter On"),
+        ]
+
+        if !app.isHidden {
+            hints.append(ShortcutHint(keys: "⌘H", action: "Hide"))
+        }
+        hints.append(ShortcutHint(keys: "⌘Q", action: "Quit"))
+        hints.append(ShortcutHint(keys: "⇧⌘Q", action: "Batch Quit"))
+        hints.append(ShortcutHint(keys: "esc", action: "Cancel"))
+
+        return hints
+    }
+
+    /// Up and down only with a second row to move to.
+    private func buildWindowShortcutHints() -> [ShortcutHint] {
+        let arrowKeys = state.windows.count > state.cellsPerRow ? "← → ↑ ↓" : "← →"
+
+        return [
+            ShortcutHint(keys: arrowKeys, action: "Select"),
+            ShortcutHint(keys: "esc", action: "Cancel"),
+        ]
     }
 
     private func isWhitelisted(_ app: NSRunningApplication) -> Bool {

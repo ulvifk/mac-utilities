@@ -109,7 +109,7 @@ final class AppSwitcherFeature: Feature {
             showCaptureBackdrop(behind: self.panel)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + hintDelay) {
             print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) windows=\(self.windows.count) selected=\(self.selectedIndex)")
             print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName }) windows=\(self.windows.map { $0.title }) thumbnails=\(self.thumbnails.count)")
             writeCapture(around: self.panel, path: smokeCapturePath)
@@ -412,13 +412,13 @@ final class AppSwitcherFeature: Feature {
     }
 
     /// The count nearest the panel width, so a drag has to travel half a cell either way before a column comes or goes; raised when that many
-    /// rows would run past the visible screen's height, then held between one and what fits on its width, so a width dragged past the screen
-    /// or remembered from a wider one still fits.
+    /// rows and the hint band would run past the visible screen's height, then held between one and what fits on its width, so a width dragged
+    /// past the screen or remembered from a wider one still fits.
     private func getCellsPerRow() -> Int {
         let metrics = getCellMetrics(listingWindows: isListingWindows)
         let screenSize = NSScreen.main!.visibleFrame.size
         let nearest = Int(metrics.getCellCount(forPanelWidth: getPanelWidth()).rounded())
-        let fittingRows = max(1, Int(metrics.getRowCount(forPanelHeight: screenSize.height).rounded(.down)))
+        let fittingRows = max(1, Int(metrics.getRowCount(forPanelHeight: screenSize.height - metrics.hintBandHeight).rounded(.down)))
         let fewestForHeight = (getItemCount() + fittingRows - 1) / fittingRows
         let fitting = Int(metrics.getCellCount(forPanelWidth: screenSize.width).rounded(.down))
 
@@ -545,6 +545,7 @@ final class AppSwitcherFeature: Feature {
     /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.
     private func showPanel() {
         panel.show(state: buildState(), glassStore: getGlassStore())
+        panel.showHintsAfterDelay()
         refreshThumbnails(of: windows.map { $0.windowID }, in: panel)
     }
 
@@ -574,6 +575,7 @@ final class AppSwitcherFeature: Feature {
             cellsPerRow: cellsPerRow,
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,
+            isFilterEnabled: whitelistStore.isFilterEnabled,
             whitelisted: whitelistStore.getWhitelist()
         )
     }
