@@ -69,8 +69,9 @@ open MacUtilities.app
 ```
 
 `build.sh` runs `swift build -c release`, wraps the binary into `MacUtilities.app`
-and signs it with the "mac-utilities" certificate, so macOS keeps the granted
-Accessibility permission stable across rebuilds.
+with the icon from `Resources/AppIcon.icns` and signs it with the "mac-utilities"
+certificate, so macOS keeps the granted Accessibility permission stable across
+rebuilds.
 
 Always launch with `install.sh`, the login item or `open MacUtilities.app`. Running
 the binary directly from a terminal makes the terminal the responsible process for
@@ -82,6 +83,22 @@ To check the settings window without installing, open it once, capture every tab
 ```sh
 SETTINGS_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
 ```
+
+The app icon, three frosted glass tiles cascading on a midnight blue body with a ⌘
+key in front, is drawn in code by `scripts/render-app-icon.swift`.
+`Resources/AppIcon.icns` is the script's committed output, so a build needs no extra
+step. After changing the script, re-render the icon and rebuild:
+
+```sh
+swift scripts/render-app-icon.swift
+./build.sh
+```
+
+The script draws every size from the same 1024pt canvas into
+`.build/AppIcon.iconset` and runs `iconutil` on it. At 32 pixels, 16pt on a Retina
+screen, the tiles fan out further and drop the ⌘. There are no 16 and 32 pixel 1x
+sizes: `iconutil` stores those in a legacy format that macOS 26 draws shrunk inside a
+gray frame, while without them it scales the 64 pixel one down.
 
 ## Setup
 
@@ -97,6 +114,8 @@ Sources/MacUtilities/
                       Accessibility trust, window capture for the smoke tests
   Settings/           the settings window, its General tab and the settings smoke test
   Features/<Name>/    one folder per feature
+scripts/              render-app-icon.swift, which draws the app icon
+Resources/            AppIcon.icns, the rendered app icon that build.sh bundles
 docs/<name>/          the feature's README and screenshots
 ```
 
