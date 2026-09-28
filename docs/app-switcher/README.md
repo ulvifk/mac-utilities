@@ -101,7 +101,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   blurs it away first; the fill starts at 30%. With "Cards around windows" off, the
   thumbnails and titles sit on the glass and only the highlight marks the selection.
 - Thumbnails need Screen Recording permission (System Settings > Privacy & Security >
-  Screen & System Audio Recording); macOS asks the first time Cmd+` opens the panel.
+  Screen & System Audio Recording); macOS asks the first time one is captured, when
+  Cmd+` opens the panel or the settings tab previews the windows' glass or the cards.
   Without it every window shows its app's icon.
 - Arrows, the highlight, clicking a window, Esc and dragging an edge work as with
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
