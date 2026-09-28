@@ -14,3 +14,8 @@ struct SwitcherCellMetrics {
         return (width - 2 * horizontalPadding + itemSpacing) / (cellSize.width + itemSpacing)
     }
 }
+
+func getCellMetrics(listingWindows: Bool) -> SwitcherCellMetrics {
+    if listingWindows { return windowCellMetrics }
+    return iconCellMetrics
+}

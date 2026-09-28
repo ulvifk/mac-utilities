@@ -34,7 +34,8 @@ struct SwitcherLayout {
         return iconFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY)
     }
 
-    /// Hugs the selected icon's squircle rather than boxing the whole cell; the name sits below it, outside.
+    /// Hugs the selected icon's squircle rather than boxing the whole cell, the name sitting below it, outside; around a window's thumbnail and
+    /// title together.
     func getHighlightFrame(index: Int) -> NSRect {
         return alignToPixels(highlightFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY))
     }

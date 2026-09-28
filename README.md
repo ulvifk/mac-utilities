@@ -21,9 +21,10 @@ immediately.
 
 ### app-switcher
 
-Replaces Cmd+Tab with a switcher that can be filtered to a whitelist of apps.
-See [docs/app-switcher](docs/app-switcher/README.md) for the shortcuts and the
-smoke test.
+Replaces Cmd+Tab with a switcher that can be filtered to a whitelist of apps, and
+Cmd+` with the same panel showing thumbnails of the current app's windows (needs
+Screen Recording permission for the thumbnails). See
+[docs/app-switcher](docs/app-switcher/README.md) for the shortcuts and the smoke test.
 
 ![all apps](docs/app-switcher/screenshots/all-apps.png)
 

@@ -35,6 +35,32 @@ let iconCellMetrics = SwitcherCellMetrics(
     rowSpacing: iconRowSpacing,
     verticalPadding: iconVerticalPadding
 )
+
+/// A window's thumbnail is fitted into this box keeping its aspect ratio, and never scaled up.
+let windowThumbnailSize = NSSize(width: 224, height: 140)
+let windowTitleHeight: CGFloat = 16
+let windowTitleTopSpacing: CGFloat = 5
+/// From the cell's edge to the thumbnail and title: the highlight sits as far inside the cell as around an icon, and the content 7pt inside the highlight.
+let windowContentInset: CGFloat = highlightIconInset + 7
+let windowCellSize = NSSize(
+    width: windowThumbnailSize.width + 2 * windowContentInset,
+    height: windowThumbnailSize.height + windowTitleTopSpacing + windowTitleHeight + 2 * windowContentInset
+)
+let windowTitleFrameInCell = NSRect(x: windowContentInset, y: windowContentInset, width: windowThumbnailSize.width, height: windowTitleHeight)
+let windowThumbnailFrameInCell = NSRect(
+    x: windowContentInset,
+    y: windowTitleFrameInCell.maxY + windowTitleTopSpacing,
+    width: windowThumbnailSize.width,
+    height: windowThumbnailSize.height
+)
+/// Padded like the sides, so the highlight stays concentric with the panel at the top and bottom corners too; rows as far apart as columns.
+let windowCellMetrics = SwitcherCellMetrics(
+    cellSize: windowCellSize,
+    highlightFrameInCell: NSRect(origin: .zero, size: windowCellSize).insetBy(dx: highlightIconInset, dy: highlightIconInset),
+    rowSpacing: itemSpacing,
+    verticalPadding: horizontalPadding
+)
+
 /// The black tint's opacity until the darkness slider is moved; it pulls the glass down so the icons and the name stand out.
 let defaultGlassDarkness: CGFloat = 0.14
 let maxGlassDarkness: CGFloat = 0.6

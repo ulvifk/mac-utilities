@@ -3,6 +3,7 @@ import SwiftUI
 /// [shortcut while the switcher is open] -> what it does
 private let switcherShortcuts: [(String, String)] = [
     ("Cmd+Tab / Cmd+Shift+Tab", "Cycle forward / backward"),
+    ("Cmd+` / Cmd+Shift+`", "Cycle the current app's windows"),
     ("Right / Left", "Cycle forward / backward"),
     ("Up / Down", "Move one row up / down"),
     ("Cmd+F", "Toggle the filter"),

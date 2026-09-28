@@ -2,7 +2,8 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// Replaces Cmd+Tab with the switcher panel, filtered to the whitelist when the filter is on.
+/// Replaces Cmd+Tab with the switcher panel, filtered to the whitelist when the filter is on, and Cmd+` with the same panel listing the
+/// frontmost app's windows.
 final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
@@ -19,7 +20,13 @@ final class AppSwitcherFeature: Feature {
     private var glassChanges: AnyCancellable?
     private var previewHiding: DispatchWorkItem?
 
+    private var isListingWindows = false
+    /// Empty while windows are listed.
     private var candidates: [NSRunningApplication] = []
+    /// Empty while apps are listed.
+    private var windows: [AppWindow] = []
+    /// [window id] -> the window's latest thumbnail, kept until another app's windows are listed so reopening shows it at once
+    private var thumbnails: [CGWindowID: NSImage] = [:]
     private var isFiltered = false
     private var cellsPerRow = 1
     private var selectedIndex = 0
@@ -79,15 +86,15 @@ final class AppSwitcherFeature: Feature {
         whitelistStore.setFilterEnabled(environment["APP_SWITCHER_SMOKE_FILTER"] == "1")
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.loadCandidates()
+            self.loadCandidates(listingWindows: environment["APP_SWITCHER_SMOKE_WINDOWS"] == "1")
             self.selectedIndex = Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!
-            self.panel.show(state: self.buildState())
+            self.showPanel()
             showCaptureBackdrop(behind: self.panel)
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) selected=\(self.selectedIndex)")
-            print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName })")
+            print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) windows=\(self.windows.count) selected=\(self.selectedIndex)")
+            print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName }) windows=\(self.windows.map { $0.title }) thumbnails=\(self.thumbnails.count)")
             writeCapture(around: self.panel, path: smokeCapturePath)
             exit(0)
         }
@@ -98,7 +105,7 @@ final class AppSwitcherFeature: Feature {
     private func wirePanel() {
         panel.onCellClicked = { index in
             self.selectedIndex = index
-            self.activateSelectedApp()
+            self.activateSelection()
         }
         panel.onWidthDragged = { width in
             self.resizePanel(toWidth: width)
@@ -150,41 +157,52 @@ final class AppSwitcherFeature: Feature {
             return handleKeyDownWhileVisible(event)
         }
 
-        if !isSwitcherShortcut(event) {
-            return false
+        if isSwitcherShortcut(event) {
+            requestOpening(listingWindows: false)
+            return true
         }
 
+        if isWindowSwitcherShortcut(event) {
+            requestOpening(listingWindows: true)
+            return true
+        }
+
+        return false
+    }
+
+    /// Presses arriving before the panel is up only advance the selection it opens with.
+    private func requestOpening(listingWindows: Bool) {
         if isOpening {
             pendingAdvance += 1
-            return true
+            return
         }
 
         isOpening = true
         commandReleasedWhileOpening = false
         pendingAdvance = 0
-        DispatchQueue.main.async { self.openSwitcher() }
-        return true
+        DispatchQueue.main.async { self.openSwitcher(listingWindows: listingWindows) }
     }
 
-    private func openSwitcher() {
-        loadCandidates()
+    private func openSwitcher(listingWindows: Bool) {
+        loadCandidates(listingWindows: listingWindows)
         isOpening = false
 
-        if candidates.isEmpty { return }
+        let itemCount = getItemCount()
+        if itemCount == 0 { return }
 
-        selectedIndex = (candidates.count > 1 ? 1 : 0) + pendingAdvance
-        selectedIndex %= candidates.count
+        selectedIndex = (itemCount > 1 ? 1 : 0) + pendingAdvance
+        selectedIndex %= itemCount
 
         if commandReleasedWhileOpening {
-            activateSelectedApp()
+            activateSelection()
             return
         }
 
-        panel.show(state: buildState())
+        showPanel()
     }
 
     private func handleKeyDownWhileVisible(_ event: CGEvent) -> Bool {
-        if isSwitcherShortcut(event) {
+        if isListedSwitcherShortcut(event) {
             advanceSelection(backward: event.flags.contains(.maskShift))
             return true
         }
@@ -207,6 +225,15 @@ final class AppSwitcherFeature: Feature {
         if isRowDownShortcut(event) {
             moveSelectionBetweenRows(up: false)
             return true
+        }
+
+        if isCancelShortcut(event) {
+            panel.hide()
+            return true
+        }
+
+        if isListingWindows {
+            return isAppShortcut(event)
         }
 
         if isWhitelistToggleShortcut(event) {
@@ -236,11 +263,6 @@ final class AppSwitcherFeature: Feature {
             return true
         }
 
-        if isCancelShortcut(event) {
-            panel.hide()
-            return true
-        }
-
         return false
     }
 
@@ -255,11 +277,33 @@ final class AppSwitcherFeature: Feature {
 
         if !panel.isVisible { return }
 
-        activateSelectedApp()
+        activateSelection()
     }
 
     private func isSwitcherShortcut(_ event: CGEvent) -> Bool {
         return isCommandShortcut(event, keyCode: tabKeyCode)
+    }
+
+    private func isWindowSwitcherShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: graveKeyCode)
+    }
+
+    /// Cmd+Tab while apps are listed, Cmd+` while windows are.
+    private func isListedSwitcherShortcut(_ event: CGEvent) -> Bool {
+        if isListingWindows { return isWindowSwitcherShortcut(event) }
+        return isSwitcherShortcut(event)
+    }
+
+    /// Swallowed while windows are listed: passed on, Cmd+Tab would open the system switcher over the panel and the others would act on the
+    /// app behind it.
+    private func isAppShortcut(_ event: CGEvent) -> Bool {
+        if isSwitcherShortcut(event) { return true }
+        if isWhitelistToggleShortcut(event) { return true }
+        if isFilterToggleShortcut(event) { return true }
+        if isQuitShortcut(event) { return true }
+        if isQuitAppsNotInWhitelistShortcut(event) { return true }
+        if isHideShortcut(event) { return true }
+        return false
     }
 
     private func isForwardShortcut(_ event: CGEvent) -> Bool {
@@ -308,9 +352,12 @@ final class AppSwitcherFeature: Feature {
 
     // MARK: switching
 
-    /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later.
-    private func loadCandidates() {
-        candidates = getCandidates()
+    /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later. The windows are
+    /// the frontmost app's, whatever the whitelist and the filter say.
+    private func loadCandidates(listingWindows: Bool) {
+        isListingWindows = listingWindows
+        candidates = listingWindows ? [] : getCandidates()
+        windows = listingWindows ? getWindows(of: NSWorkspace.shared.frontmostApplication!) : []
         isFiltered = isListingWhitelistOnly()
         cellsPerRow = getCellsPerRow()
     }
@@ -318,8 +365,9 @@ final class AppSwitcherFeature: Feature {
     /// The count nearest the panel width, so a drag has to travel half a cell either way before a column comes or goes; held between one and
     /// what fits on the visible screen, so a width dragged past the screen or remembered from a wider one still fits.
     private func getCellsPerRow() -> Int {
-        let nearest = Int(iconCellMetrics.getCellCount(forPanelWidth: getPanelWidth()).rounded())
-        let fitting = Int(iconCellMetrics.getCellCount(forPanelWidth: NSScreen.main!.visibleFrame.width).rounded(.down))
+        let metrics = getCellMetrics(listingWindows: isListingWindows)
+        let nearest = Int(metrics.getCellCount(forPanelWidth: getPanelWidth()).rounded())
+        let fitting = Int(metrics.getCellCount(forPanelWidth: NSScreen.main!.visibleFrame.width).rounded(.down))
 
         return max(1, min(nearest, fitting))
     }
@@ -379,18 +427,26 @@ final class AppSwitcherFeature: Feature {
         panel.resize(state: buildState())
     }
 
+    private func getItemCount() -> Int {
+        if isListingWindows { return windows.count }
+        return candidates.count
+    }
+
     private func advanceSelection(backward: Bool) {
+        let itemCount = getItemCount()
         let step = backward ? -1 : 1
-        selectedIndex = (selectedIndex + step + candidates.count) % candidates.count
+
+        selectedIndex = (selectedIndex + step + itemCount) % itemCount
         panel.update(state: buildState())
     }
 
     /// The cell drawn nearest above or below, wrapping at the top and bottom; of two equally near, the left one, as `min` keeps the first.
     private func moveSelectionBetweenRows(up: Bool) {
-        let rowCount = (candidates.count + cellsPerRow - 1) / cellsPerRow
+        let itemCount = getItemCount()
+        let rowCount = (itemCount + cellsPerRow - 1) / cellsPerRow
         let step = up ? -1 : 1
         let targetRow = (selectedIndex / cellsPerRow + step + rowCount) % rowCount
-        let targetRowIndices = targetRow * cellsPerRow..<min((targetRow + 1) * cellsPerRow, candidates.count)
+        let targetRowIndices = targetRow * cellsPerRow..<min((targetRow + 1) * cellsPerRow, itemCount)
 
         selectedIndex = targetRowIndices.min { getColumnDistance(from: $0, to: selectedIndex) < getColumnDistance(from: $1, to: selectedIndex) }!
         panel.update(state: buildState())
@@ -398,8 +454,9 @@ final class AppSwitcherFeature: Feature {
 
     /// How far apart the two cells are drawn, in columns.
     private func getColumnDistance(from index: Int, to otherIndex: Int) -> CGFloat {
-        let column = getVisualColumn(index: index, cellCount: candidates.count, cellsPerRow: cellsPerRow)
-        let otherColumn = getVisualColumn(index: otherIndex, cellCount: candidates.count, cellsPerRow: cellsPerRow)
+        let itemCount = getItemCount()
+        let column = getVisualColumn(index: index, cellCount: itemCount, cellsPerRow: cellsPerRow)
+        let otherColumn = getVisualColumn(index: otherIndex, cellCount: itemCount, cellsPerRow: cellsPerRow)
 
         return abs(column - otherColumn)
     }
@@ -421,7 +478,7 @@ final class AppSwitcherFeature: Feature {
         let selectedIdentifier = candidates[selectedIndex].bundleIdentifier
 
         whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
-        loadCandidates()
+        loadCandidates(listingWindows: false)
         if candidates.isEmpty {
             panel.hide()
             return
@@ -431,9 +488,26 @@ final class AppSwitcherFeature: Feature {
         panel.show(state: buildState())
     }
 
+    /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in; those of windows no longer listed are dropped.
+    private func showPanel() {
+        panel.show(state: buildState())
+        if !isListingWindows { return }
+
+        thumbnails = thumbnails.filter { windowID, _ in windows.contains { $0.windowID == windowID } }
+        captureThumbnails(of: windows.map { $0.windowID }) { windowID, thumbnail in
+            self.thumbnails[windowID] = thumbnail
+            if !self.panel.isVisible { return }
+
+            self.panel.update(state: self.buildState())
+        }
+    }
+
     private func buildState() -> SwitcherState {
         return SwitcherState(
             apps: candidates,
+            windows: windows,
+            thumbnails: thumbnails,
+            isListingWindows: isListingWindows,
             cellsPerRow: cellsPerRow,
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,
@@ -441,8 +515,16 @@ final class AppSwitcherFeature: Feature {
         )
     }
 
-    private func activateSelectedApp() {
+    /// A window is raised on the next turn of the main queue: its accessibility round trips must stay out of the tap callback releasing Cmd.
+    private func activateSelection() {
         panel.hide()
+
+        if isListingWindows {
+            let window = windows[selectedIndex]
+            DispatchQueue.main.async { window.bringToFront() }
+            return
+        }
+
         candidates[selectedIndex].activate(options: [.activateAllWindows])
     }
 
@@ -453,7 +535,7 @@ final class AppSwitcherFeature: Feature {
     private func previewGlass() {
         if panel.isVisible { return }
 
-        loadCandidates()
+        loadCandidates(listingWindows: false)
         if candidates.isEmpty { return }
 
         selectedIndex = 0
