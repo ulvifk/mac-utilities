@@ -29,11 +29,14 @@ let highlightCornerRadius: CGFloat = 15.5
 let highlightIconInset: CGFloat = 3.5
 /// Concentric with the highlight: its radius plus its distance from the side edges.
 let panelCornerRadius: CGFloat = highlightCornerRadius + horizontalPadding + highlightIconInset
+/// Leaves the hint tray about as far below the name band as above the bottom edge.
+let iconHintBandHeight: CGFloat = 38
 let iconCellMetrics = SwitcherCellMetrics(
     cellSize: NSSize(width: iconSize, height: iconCellHeight),
     highlightFrameInCell: iconFrameInCell.insetBy(dx: highlightIconInset, dy: highlightIconInset),
     rowSpacing: iconRowSpacing,
-    verticalPadding: iconVerticalPadding
+    verticalPadding: iconVerticalPadding,
+    hintBandHeight: iconHintBandHeight
 )
 
 /// A window's thumbnail is fitted into this box keeping its aspect ratio, and never scaled up.
@@ -61,27 +64,65 @@ let windowCardBorderColor = NSColor.white.withAlphaComponent(0.18)
 let windowCardBorderWidth: CGFloat = 1
 /// The selected card's border is Mission Control's ring around a hovered window, in the accent colour, so it shows on bright glass too.
 let selectedWindowCardBorderWidth: CGFloat = 3
+/// Lower than below icons: the rows' wide bottom padding already holds part of the hint tray, which ends about as far below the cards as above
+/// the bottom edge.
+let windowHintBandHeight: CGFloat = 28
 /// Padded like the sides, so the highlight stays concentric with the panel at the top and bottom corners too; rows as far apart as columns.
 let windowCellMetrics = SwitcherCellMetrics(
     cellSize: windowCellSize,
     highlightFrameInCell: windowCardFrameInCell,
     rowSpacing: itemSpacing,
-    verticalPadding: horizontalPadding
+    verticalPadding: horizontalPadding,
+    hintBandHeight: windowHintBandHeight
 )
 
 /// The black tint's opacity until the darkness slider is moved; it pulls the glass down so the icons and the name stand out.
 let defaultGlassDarkness: CGFloat = 0.14
 let maxGlassDarkness: CGFloat = 0.6
-/// How long the preview stays after the last change in the settings tab.
+/// How long the preview stays after the last change in the settings pane.
 let glassPreviewDuration: TimeInterval = 1
 /// The capsule saying only the whitelist is listed, centered in the band above the top row where the dots would be.
 let badgeHeight: CGFloat = 16
 let badgeHorizontalPadding: CGFloat = 7
 let badgeSymbolSpacing: CGFloat = 3
 let badgeColor = NSColor.systemGreen.withAlphaComponent(0.85)
+/// On the Whitelist capsule and on the feedback about the filter.
+let whitelistSymbolName = "line.3.horizontal.decrease"
 /// Hidden apps stay listed, dimmed like in the native switcher, so they can be brought back.
 let hiddenIconAlpha: CGFloat = 0.4
 /// After Cmd+Q the icon fades and shrinks out while the rest slide into place, over this long.
 let removalDuration: TimeInterval = 0.15
 /// How far the leaving icon's edges pull in while it fades: to half its size.
 let leavingIconShrink: CGFloat = iconSize / 4
+
+/// How long the panel stays open before the shortcut hints come in, so a quick Cmd+Tab never shows them.
+let hintDelay: TimeInterval = 0.9
+/// The hint band growing in, and the hints and the feedback fading into each other.
+let hintFadeDuration: TimeInterval = 0.2
+/// How long the feedback stays in place of the hints.
+let feedbackDuration: TimeInterval = 1.2
+
+let hintKeycapHeight: CGFloat = 18
+let hintKeycapCornerRadius: CGFloat = 5
+let hintKeycapHorizontalPadding: CGFloat = 5
+let hintKeycapColor = NSColor.white.withAlphaComponent(0.16)
+let hintKeycapActionSpacing: CGFloat = 5
+/// From one hint's text to the next keycap.
+let hintSpacing: CGFloat = 14
+let hintActionColor = NSColor.white.withAlphaComponent(0.9)
+
+/// The hints sit in a dark tray, so they read on bright glass too, this far above the panel's bottom edge.
+let hintTrayBottomPadding: CGFloat = 10
+/// Around the keycaps; after the last hint's text the tray runs on a little further.
+let hintTrayPadding: CGFloat = 4
+let hintTrayTrailingPadding: CGFloat = 10
+let hintTrayHeight: CGFloat = hintKeycapHeight + 2 * hintTrayPadding
+/// Concentric with the keycaps.
+let hintTrayCornerRadius: CGFloat = hintKeycapCornerRadius + hintTrayPadding
+let hintTrayColor = NSColor.black.withAlphaComponent(0.26)
+/// The tray grows no nearer the side edges than this, which at its height keeps it clear of the panel's rounded corners, so even a panel one
+/// icon wide has room for the shortest hint.
+let hintTraySideInset: CGFloat = 16
+/// The feedback sits on a tray of the same height, sized to its symbol and text.
+let feedbackTrayPadding: CGFloat = 10
+let feedbackSymbolSpacing: CGFloat = 5

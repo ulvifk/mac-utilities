@@ -8,6 +8,8 @@ struct SwitcherCellMetrics {
     let rowSpacing: CGFloat
     /// Above the top row and below the bottom one.
     let verticalPadding: CGFloat
+    /// The band the panel grows below the bottom row's padding for the hints.
+    let hintBandHeight: CGFloat
 
     /// How many cells a row of this panel width holds, fractional.
     func getCellCount(forPanelWidth width: CGFloat) -> CGFloat {

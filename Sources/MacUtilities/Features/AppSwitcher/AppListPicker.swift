@@ -30,7 +30,7 @@ struct AppListPicker<Store: AppListStore>: View {
         state.isShown = true
     }
 
-    /// A count rather than names, which would stretch the button across the tab.
+    /// A count rather than names, which would stretch the button across the pane.
     private func getSummary() -> String {
         let listedCount = apps.filter { store.isListed($0.bundleIdentifier!) }.count
         if listedCount == 0 { return "None" }

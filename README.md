@@ -6,16 +6,42 @@ one login item. Swift Package, no Xcode project.
 
 ## Menu bar item and settings
 
-The menu bar item's menu has Paused, which lets every key press through untouched
-until it is unchecked; the entries of the enabled features, such as Keep awake;
-Settings..., which opens the settings window; and Quit.
+Clicking the menu bar item opens a popover in the style of Control Center, drawn as
+Liquid Glass. Its header, beside the app icon, says whether the shortcuts are live:
+"All shortcuts active" by a green dot, "Paused — keys pass through untouched" by an
+indigo one, or "Shortcuts off — see Settings" by an orange one while the event tap is
+not running. Below it sit rounded tiles, each with a round toggle filled with a colour
+while on: Pause Shortcuts, which lets every key press through untouched until it is
+toggled off again, then the tiles of the enabled features, such as Keep Awake.
+Settings… (Cmd+,) opens the settings window, on General while the shortcuts are off,
+and Quit (Cmd+Q) quits.
 
-The settings window has a General tab and one tab per feature. General holds a
-switch per feature (a feature switched off stops on the spot and stays off across
-launches), a "Launch at login" switch and an Accessibility row with a green or red
-dot and a button to the Privacy & Security > Accessibility pane; the dot is
-re-checked whenever the window comes back to the front. Every change applies
-immediately.
+Showing the popover activates the app, so it takes clicks and keys at once. A click
+elsewhere, another click on the item or Esc closes it; after Esc the app that was in
+front before gets the keyboard back.
+
+The settings window lists General, then one row per feature below a gap, in a
+sidebar, each with its icon tile, and shows the selected pane beside it; the window's
+title follows the pane. A row shows its pane the moment it is pressed, not when the
+mouse is released, and the arrow keys move between rows. The window and every pane
+are built at launch and kept, so opening it or switching panes never waits on
+building one. It opens at 720 by 540 points and can be made larger, or shorter down
+to 420.
+
+A feature's pane opens with its icon, its name, one line on what it does and the
+switch that turns it on or off. A feature switched off stops on the spot and stays
+off across launches; the rest of its pane is faded and disabled until it is back on.
+
+General opens with the app's card: how many features are on, and each feature's
+icon, faded while it is off, which opens its pane when clicked. Below it are a
+"Launch at login" switch and the Accessibility grant. The event tap every shortcut
+depends on needs the grant and is only created at launch, so until it runs a warning
+card sits above them and the General row in the sidebar carries a warning badge. While
+the grant is missing, the card says no shortcut works without it and has a button to
+the Privacy & Security > Accessibility pane; once granted, it offers Reopen
+MacUtilities, which quits the app and opens it again. With the tap running, a
+checkmark row says access is allowed. The grant is re-checked whenever the window
+comes back to the front. Every change applies immediately.
 
 ## Features
 
@@ -32,17 +58,18 @@ Screen Recording permission for the thumbnails). See
 
 ### keep-awake
 
-A "Keep awake" entry in the menu bar menu that holds a power assertion and, when
-wanted, disables sleep with the lid closed through `pmset`; optional auto-off timer.
-See [docs/keep-awake](docs/keep-awake/README.md) for the sudoers line it needs and
-what is restored on quit or crash.
+A Keep Awake tile in the menu bar popover that holds a power assertion and, when
+wanted, disables sleep with the lid closed through `pmset`; it counts down live when
+set to turn itself off. See [docs/keep-awake](docs/keep-awake/README.md) for the
+sudoers line it needs and what is restored on quit or crash.
 
 ### hotkeys
 
 Global shortcuts that open or toggle an app, run a shell command or toggle keep-awake,
-kept in `~/.config/mac-utilities/hotkeys.json` and edited in the Hotkeys tab, which
-records combos, picks apps with their icons and warns about taken keys. See
-[docs/hotkeys](docs/hotkeys/README.md) for the file format and the actions.
+kept in `~/.config/mac-utilities/hotkeys.json` and edited in the Hotkeys pane, which
+records combos, shows them as keycaps, picks apps with their icons and warns about
+taken keys. See [docs/hotkeys](docs/hotkeys/README.md) for the file format and the
+actions.
 
 ## Install
 
@@ -69,19 +96,48 @@ open MacUtilities.app
 ```
 
 `build.sh` runs `swift build -c release`, wraps the binary into `MacUtilities.app`
-and signs it with the "mac-utilities" certificate, so macOS keeps the granted
-Accessibility permission stable across rebuilds.
+with the icon from `Resources/AppIcon.icns` and signs it with the "mac-utilities"
+certificate, so macOS keeps the granted Accessibility permission stable across
+rebuilds.
 
 Always launch with `install.sh`, the login item or `open MacUtilities.app`. Running
 the binary directly from a terminal makes the terminal the responsible process for
 the Accessibility permission, and the event tap fails.
 
-To check the settings window without installing, open it once, capture every tab to
-`/tmp/settings-<tab>-smoke.png` and exit:
+To check the settings window without installing, open it once, capture every pane to
+`/tmp/settings-<pane>-smoke.png` and exit:
 
 ```sh
 SETTINGS_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
 ```
+
+Pointing `XDG_CONFIG_HOME` at a directory holding a sample
+`mac-utilities/hotkeys.json` captures the Hotkeys pane with those bindings, and at an
+empty one its empty state, without touching your own file.
+
+To check the menu bar popover the same way, open it under the instance's own menu
+bar item, capture it to `/tmp/menu-bar-smoke.png` and exit:
+
+```sh
+MENU_BAR_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
+```
+
+The app icon, three frosted glass tiles cascading on a midnight blue body with a ⌘
+key in front, is drawn in code by `scripts/render-app-icon.swift`; the menu bar
+glyph is the same three tiles. `Resources/AppIcon.icns` is the script's committed
+output, so a build needs no extra step. After changing the script, re-render the icon
+and rebuild:
+
+```sh
+swift scripts/render-app-icon.swift
+./build.sh
+```
+
+The script draws every size from the same 1024pt canvas into
+`.build/AppIcon.iconset` and runs `iconutil` on it. At 32 pixels, 16pt on a Retina
+screen, the tiles fan out further and drop the ⌘. There are no 16 and 32 pixel 1x
+sizes: `iconutil` stores those in a legacy format that macOS 26 draws shrunk inside a
+gray frame, while without them it scales the 64 pixel one down.
 
 ## Setup
 
@@ -92,21 +148,31 @@ Run `./create-signing-cert.sh` once. It creates a self-signed "mac-utilities" ce
 ```
 Sources/MacUtilities/
   main.swift          starts the app with the list of features
-  Core/               the host: Feature protocol, AppController (menu bar item, feature
-                      lifecycle, pause), EventTap, key matching, Preferences,
-                      Accessibility trust, window capture for the smoke tests
-  Settings/           the settings window, its General tab and the settings smoke test
+  Core/               the host: Feature protocol, AppController (menu bar item and its
+                      popover, feature lifecycle, pause), the menu bar glyph, EventTap,
+                      key matching, Preferences, Accessibility trust, window capture for
+                      the smoke tests
+  MenuBar/            the menu bar popover, the tile and round toggle its tiles are
+                      built from, and the menu bar smoke test
+  Settings/           the settings window: its sidebar, the header and switch opening
+                      every feature's pane, the General pane, the icon tiles and
+                      keycaps the panes share, and the settings smoke test
   Features/<Name>/    one folder per feature
+scripts/              render-app-icon.swift, which draws the app icon
+Resources/            AppIcon.icns, the rendered app icon that build.sh bundles
 docs/<name>/          the feature's README and screenshots
 ```
 
 A feature implements `Feature`: a stable `identifier` (the key its enabled state is
-stored under), a `displayName`, `menuItems` (its entries in the menu bar menu while
-enabled, empty for most), `start()`, `stop()`, `handle(type:event:) -> Bool` and
-`buildSettingsView() -> AnyView`, its tab in the settings window. The core tap hands
-every key press and modifier change to the enabled features in order; the first one
-returning `true` swallows the event. Enabled features are stopped when the app
-quits.
+stored under), a `displayName`, a one-sentence `summary`, an `iconSymbolName` and
+`iconGradient` for its icon tile in the settings window, `start()`, `stop()`,
+`handle(type:event:) -> Bool`, `buildSettingsSections() -> AnyView`, the sections of
+its settings pane below the header, and `buildPopoverTile() -> AnyView?`, its tile in
+the menu bar popover while it is enabled, nil for most; a tile observes its feature
+and keeps itself current. The popover lists the tiles in the features' order. The
+core tap hands every key press and modifier change to the enabled features in order;
+the first one returning `true` swallows the event. Enabled features are stopped when
+the app quits.
 Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
 feature runs until it is switched off, new ones included. New features are
 registered in `main.swift`.

@@ -1,43 +1,54 @@
 import AppKit
 
-/// Where the cells sit for a cell count: full rows from the top down, centered on each other, the last one possibly shorter.
+/// Where the cells sit for a cell count, in the content counted from the top down: full rows from the top, centered on each other, the last one
+/// possibly shorter; below them the hint band while it is shown.
 struct SwitcherLayout {
     let contentSize: NSSize
     /// [index] -> the cell's frame in the content
     let cellFrames: [NSRect]
+    /// Right below the rows' padding, where the panel grows to while the band is shown; outside the panel until then.
+    let hintBandFrame: NSRect
 
     private let highlightFrameInCell: NSRect
 
-    init(cellCount: Int, cellsPerRow: Int, metrics: SwitcherCellMetrics) {
+    init(cellCount: Int, cellsPerRow: Int, metrics: SwitcherCellMetrics, showsHintBand: Bool) {
         let cellSize = metrics.cellSize
         let rowCount = (cellCount + cellsPerRow - 1) / cellsPerRow
         let widestRowCellCount = min(cellCount, cellsPerRow)
         let width = CGFloat(widestRowCellCount) * cellSize.width + CGFloat(widestRowCellCount - 1) * itemSpacing + 2 * horizontalPadding
-        let height = CGFloat(rowCount) * cellSize.height + CGFloat(rowCount - 1) * metrics.rowSpacing + 2 * metrics.verticalPadding
+        let rowsHeight = CGFloat(rowCount) * cellSize.height + CGFloat(rowCount - 1) * metrics.rowSpacing + 2 * metrics.verticalPadding
 
         var frames: [NSRect] = []
         for index in 0..<cellCount {
             let row = index / cellsPerRow
             let x = horizontalPadding + getVisualColumn(index: index, cellCount: cellCount, cellsPerRow: cellsPerRow) * (cellSize.width + itemSpacing)
-            let y = height - metrics.verticalPadding - cellSize.height - CGFloat(row) * (cellSize.height + metrics.rowSpacing)
+            let y = metrics.verticalPadding + CGFloat(row) * (cellSize.height + metrics.rowSpacing)
 
             frames.append(alignToPixels(NSRect(x: x, y: y, width: cellSize.width, height: cellSize.height)))
         }
 
-        contentSize = NSSize(width: width, height: height)
+        contentSize = NSSize(width: width, height: showsHintBand ? rowsHeight + metrics.hintBandHeight : rowsHeight)
         cellFrames = frames
+        hintBandFrame = NSRect(x: 0, y: rowsHeight, width: width, height: metrics.hintBandHeight)
         highlightFrameInCell = metrics.highlightFrameInCell
     }
 
     /// Of an icon cell.
     func getIconFrame(index: Int) -> NSRect {
-        return iconFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY)
+        return convertFromCell(iconFrameInCell, index: index)
     }
 
     /// Hugs the selected icon's squircle rather than boxing the whole cell, the name sitting below it, outside; around a window's thumbnail and
     /// title together.
     func getHighlightFrame(index: Int) -> NSRect {
-        return alignToPixels(highlightFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY))
+        return alignToPixels(convertFromCell(highlightFrameInCell, index: index))
+    }
+
+    /// From a cell's own coordinates, which count up from its bottom edge.
+    private func convertFromCell(_ rect: NSRect, index: Int) -> NSRect {
+        let cellFrame = cellFrames[index]
+
+        return NSRect(x: cellFrame.minX + rect.minX, y: cellFrame.maxY - rect.maxY, width: rect.width, height: rect.height)
     }
 }
 

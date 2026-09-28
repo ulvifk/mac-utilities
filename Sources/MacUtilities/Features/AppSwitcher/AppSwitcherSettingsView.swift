@@ -1,21 +1,25 @@
 import SwiftUI
 
-/// [shortcut while the switcher is open] -> what it does
-private let switcherShortcuts: [(String, String)] = [
-    ("Cmd+Tab / Cmd+Shift+Tab", "Cycle forward / backward"),
-    ("Cmd+` / Cmd+Shift+`", "Cycle the current app's windows"),
-    ("Right / Left", "Cycle forward / backward"),
-    ("Up / Down", "Move one row up / down"),
-    ("Cmd+F", "Toggle the filter"),
-    ("Cmd+W", "Toggle the selected app's whitelist membership"),
-    ("Cmd+Q", "Quit the selected app"),
-    ("Cmd+Shift+Q", "Batch quit: the listed apps, or the unlisted ones"),
-    ("Cmd+H", "Hide the selected app"),
-    ("Esc", "Close without switching"),
+/// [what it does] -> the keys that do it while the switcher is open, one keycap group per alternative
+private let switchingShortcuts: [(String, [[String]])] = [
+    ("Next or previous app", [["⌘", "⇥"], ["⇧", "⌘", "⇥"]]),
+    ("Next or previous window of the app", [["⌘", "`"], ["⇧", "⌘", "`"]]),
+    ("Move the selection", [["←", "→", "↑", "↓"]]),
+    ("Close without switching", [["esc"]]),
 ]
 
-/// The filter switch and the whitelist, the panel's glass for apps and for windows, the window cards and their glass, Batch Quit (whether it
-/// quits the listed apps or the others, and its list) and the in-switcher shortcuts. Both lists are picked in a popover checklist.
+/// [what it does] -> the keys that do it while apps are listed
+private let appShortcuts: [(String, [[String]])] = [
+    ("Turn the filter on or off", [["⌘", "F"]]),
+    ("Whitelist the selected app, or take it off", [["⌘", "W"]]),
+    ("Hide the selected app", [["⌘", "H"]]),
+    ("Quit the selected app", [["⌘", "Q"]]),
+    ("Batch Quit", [["⇧", "⌘", "Q"]]),
+]
+
+/// The App Switcher pane's sections: the filter and the whitelist, the panel's glass for apps and for windows, the window cards and their glass,
+/// Batch Quit (whether it quits the listed apps or the others, and its list) and the in-switcher shortcuts as keycaps. Both lists are picked in
+/// a popover checklist.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
     @ObservedObject var batchQuitStore: BatchQuitStore
@@ -26,47 +30,81 @@ struct AppSwitcherSettingsView: View {
     @StateObject private var runningApps = RunningRegularApps()
 
     var body: some View {
-        Form {
-            Section("Whitelist") {
-                Toggle("Filter to the whitelist", isOn: buildFilterBinding())
-                LabeledContent("Whitelisted apps") {
-                    AppListPicker(store: whitelistStore, apps: runningApps.apps)
-                }
+        Section {
+            Toggle("Filter to the whitelist", isOn: buildFilterBinding())
+            LabeledContent("Whitelisted apps") {
+                AppListPicker(store: whitelistStore, apps: runningApps.apps)
             }
+        } header: {
+            Text("Whitelist")
+        } footer: {
+            Text("Filtered, the switcher lists only whitelisted apps, or every app while none of them is running.")
+        }
 
-            Section("Apps (Cmd+Tab)") {
-                GlassSettingsRows(glassStore: appGlassStore)
+        Section {
+            GlassSettingsRow(title: "Apps", glassStore: appGlassStore)
+            GlassSettingsRow(title: "Windows", glassStore: windowGlassStore)
+            Toggle("Cards around windows", isOn: buildWindowCardsBinding())
+            GlassSettingsRow(title: "Window cards", glassStore: windowCardGlassStore)
+                .disabled(!windowCardStore.showsCards)
+        } header: {
+            Text("Glass")
+        } footer: {
+            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Each change previews on screen.")
+        }
+
+        Section {
+            Picker("Quit", selection: buildQuitsUnlistedAppsBinding()) {
+                Text("Listed apps").tag(false)
+                Text("Unlisted apps").tag(true)
             }
-
-            Section("Windows (Cmd+`)") {
-                GlassSettingsRows(glassStore: windowGlassStore)
+            .pickerStyle(.segmented)
+            LabeledContent(batchQuitStore.quitsUnlistedApps ? "Apps to keep" : "Apps to quit") {
+                AppListPicker(store: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
             }
-
-            Section("Window cards") {
-                Toggle("Cards around windows", isOn: buildWindowCardsBinding())
-                GlassSettingsRows(glassStore: windowCardGlassStore)
-                    .disabled(!windowCardStore.showsCards)
+            LabeledContent("Quit them now") {
+                Button(batchQuitStore.quitsUnlistedApps ? "Quit Unlisted Apps" : "Quit Listed Apps") { runBatchQuit(batchQuitStore) }
             }
+        } header: {
+            Text("Batch Quit")
+        } footer: {
+            Text("Finder is never quit, and an app with unsaved changes asks first.")
+        }
 
-            Section("Batch Quit") {
-                Picker("Quit", selection: buildQuitsUnlistedAppsBinding()) {
-                    Text("Listed apps").tag(false)
-                    Text("Unlisted apps").tag(true)
-                }
-                .pickerStyle(.segmented)
-                LabeledContent(batchQuitStore.quitsUnlistedApps ? "Apps to keep" : "Apps to quit") {
-                    AppListPicker(store: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
-                }
-                Button(batchQuitStore.quitsUnlistedApps ? "Quit unlisted apps" : "Quit listed apps") { runBatchQuit(batchQuitStore) }
+        Section {
+            ForEach(switchingShortcuts, id: \.0) { meaning, keyGroups in
+                buildShortcutRow(meaning: meaning, keyGroups: keyGroups)
             }
+        } header: {
+            Text("Switching")
+        } footer: {
+            Text("Keep ⌘ held while switching; letting go switches to the selection.")
+        }
 
-            Section("While switching") {
-                ForEach(switcherShortcuts, id: \.0) { shortcut, meaning in
-                    LabeledContent(meaning, value: shortcut)
+        Section {
+            ForEach(appShortcuts, id: \.0) { meaning, keyGroups in
+                buildShortcutRow(meaning: meaning, keyGroups: keyGroups)
+            }
+        } header: {
+            Text("App Actions")
+        } footer: {
+            Text("Only while apps are listed; while windows are, these keys do nothing.")
+        }
+    }
+
+    /// Alternatives are split by a slash: ⌘⇥ / ⇧⌘⇥.
+    private func buildShortcutRow(meaning: String, keyGroups: [[String]]) -> some View {
+        return LabeledContent(meaning) {
+            HStack(spacing: 6) {
+                ForEach(keyGroups.indices, id: \.self) { index in
+                    if index > 0 {
+                        Text("/")
+                            .foregroundStyle(.tertiary)
+                    }
+                    KeycapsView(keys: keyGroups[index])
                 }
             }
         }
-        .formStyle(.grouped)
     }
 
     private func buildFilterBinding() -> Binding<Bool> {

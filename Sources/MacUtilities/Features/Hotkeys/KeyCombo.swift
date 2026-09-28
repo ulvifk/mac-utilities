@@ -22,9 +22,14 @@ struct KeyCombo: Equatable, Codable {
         modifiers = Set(ModifierKey.allCases.filter { event.modifierFlags.contains($0.windowFlag) })
     }
 
-    /// ⌘⌥T
+    /// ⌥⌘T
     var symbols: String {
-        return getOrderedModifiers().map { $0.symbol }.joined() + getKeyName(keyCode: keyCode)
+        return keyLabels.joined()
+    }
+
+    /// ["⌥", "⌘", "T"], one per keycap.
+    var keyLabels: [String] {
+        return getOrderedModifiers().map { $0.symbol } + [getKeyName(keyCode: keyCode)]
     }
 
     /// Modifiers in their display order, so the file reads the same way and never churns.

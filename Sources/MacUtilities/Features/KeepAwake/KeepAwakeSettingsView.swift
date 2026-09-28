@@ -1,23 +1,25 @@
 import SwiftUI
 
-/// The auto-off timer and whether a closed lid is kept awake too or only idle sleep is held off.
+/// The Keep Awake pane's section: the auto-off timer and whether a closed lid is kept awake too or only idle sleep is held off.
 struct KeepAwakeSettingsView: View {
     @ObservedObject var preferences: KeepAwakePreferences
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Turn off after", selection: buildAutoOffBinding()) {
-                    ForEach(KeepAwakeAutoOff.allCases, id: \.self) { autoOff in
-                        Text(autoOff.title)
-                    }
+        Section {
+            Picker("Turn off after", selection: buildAutoOffBinding()) {
+                ForEach(KeepAwakeAutoOff.allCases, id: \.self) { autoOff in
+                    Text(autoOff.title)
                 }
-                Toggle("Keep awake with the lid closed", isOn: buildLidClosedBinding())
-            } footer: {
-                Text("Both apply the next time Keep awake is turned on. Keeping a closed lid awake runs pmset as root through the sudoers line install.sh installs; with it off only idle sleep is held off and the display may still sleep.")
             }
+            .pickerStyle(.segmented)
+
+            Toggle(isOn: buildLidClosedBinding()) {
+                Text("Keep awake with the lid closed")
+                Text("Runs pmset as root through the sudoers line install.sh installs. Off, only idle sleep is held off and the display may still sleep.")
+            }
+        } footer: {
+            Text("Both apply the next time Keep Awake is turned on. The duration chips in the menu bar popover set Turn off after too.")
         }
-        .formStyle(.grouped)
     }
 
     private func buildAutoOffBinding() -> Binding<KeepAwakeAutoOff> {

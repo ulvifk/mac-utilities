@@ -30,7 +30,7 @@ func getConflictWarning(index: Int, bindings: [HotkeyBinding]) -> String? {
     for (otherIndex, other) in bindings.enumerated() {
         if otherIndex == index { continue }
         if other.key != key { continue }
-        return "Same key as binding \(otherIndex + 1)"
+        return "Same shortcut as another hotkey"
     }
 
     return nil

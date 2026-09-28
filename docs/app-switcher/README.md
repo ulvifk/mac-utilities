@@ -10,11 +10,13 @@ It also replaces Cmd+`, the native "next window of the same app", with the same 
 listing the frontmost app's windows as thumbnails; see [Windows](#windows). With the
 feature off, Cmd+` behaves as macOS has it.
 
-The App Switcher tab of the settings window toggles the filter, manages the
-whitelist, picks the panel's glass (Clear or Frosted, and a Darkness slider for its
-black tint) separately for apps and for windows, switches the cards around windows on
-or off and picks their own look and darkness, sets up Batch Quit and runs it, and
-lists the in-switcher shortcuts as a reminder. The whitelist and the Batch Quit list
+The App Switcher pane of the settings window toggles the filter, manages the
+whitelist, picks the panel's glass (Clear or Frosted, and a slider from light to
+dark for its black tint) in one row for the apps and one for the windows, switches the
+cards around windows on or off and picks their own look and darkness in a third row,
+sets up Batch Quit and runs it, and lists the in-switcher shortcuts as keycaps, the
+switching ones apart from the ones acting on apps. Each section has a line under it
+saying what its settings mean. The whitelist and the Batch Quit list
 are each picked with a button counting their listed apps that are running; it opens a
 checklist of the running regular apps (for Batch Quit all but Finder), the ones
 listed at that moment on top above a divider, which stays open while several are
@@ -50,10 +52,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
   window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
   windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
-  the settings tab previews it live until a second after the last change: the apps'
+  the settings pane previews it live until a second after the last change: the apps'
   glass with the running apps, the windows' glass and the card settings with the
   windows of the app used last, the one behind the settings window. Clicks pass
-  through to the tab.
+  through to the pane.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -82,12 +84,28 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Esc closes the switcher without activating anything.
 - Cmd+` while apps are listed does nothing, rather than cycling the windows of the app
   behind the panel.
+- Once the switcher has been open for 0.9 seconds, the panel grows a band along its
+  bottom edge, its top edge and the icons staying in place, and a dark tray fades in
+  there with the shortcuts, each key in a keycap and worded for the selection: ⌘W Add
+  to Whitelist or Remove from Whitelist, ⌘F Turn Filter On or Turn Filter Off by the
+  filter switch, ⌘H Hide (left out for a hidden app), ⌘Q Quit, ⇧⌘Q Batch Quit and esc
+  Cancel. A quick Cmd+Tab never shows it. The tray is centered and stays inside the
+  panel: a hint that does not fit is left out, the ones earlier in that list kept
+  longest, so a panel one icon wide still offers the shortest, ⌘Q Quit.
+- Each shortcut says what it did for 1.2 seconds in the hints' place, on a tray of its
+  own: Added to Whitelist or Removed from Whitelist; Showing Whitelist or Showing All
+  Apps, or No Whitelisted Apps Open when the filter was turned on with none of them to
+  list; Hidden, unless the app was hidden already; Quitting and the app's name; and
+  for Batch Quit, Quitting and the number of apps asked to quit, or No Apps to Quit.
+  Added to Whitelist and Showing Whitelist are green like the Whitelist capsule, the
+  others dark like the hints. A shortcut pressed before the hints came in grows the
+  band for its feedback, and the hints follow.
 - Dragging the panel's left or right edge with the mouse changes its width by whole
   icons, the rows re-wrapping live; the panel stays centered. The horizontal resize
   cursor shows over the edge. The width is clamped between one icon and the visible
   screen width and remembered across launches; until the edge has been dragged once,
-  the panel is about 70% of the screen wide. It is wider than that when its rows would
-  otherwise run past the screen's height.
+  the panel is about 70% of the screen wide. It is wider than that when its rows and
+  the hint band would otherwise run past the screen's height.
 
 ## Windows
 
@@ -106,34 +124,41 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   if it was never captured.
 - Each window sits in a dark card, the selected one ringed in the accent colour as
   Mission Control rings a hovered window, so the selection stands out on bright glass
-  too. The cards have their own Look and Darkness under "Window cards" in the settings
-  tab: Clear lets what is behind the panel show through the card's black fill, Frosted
-  blurs it away first; the fill starts at 30%. With "Cards around windows" off, the
-  thumbnails and titles sit on the glass and only the highlight marks the selection.
+  too. The cards have their own look and darkness in the "Window cards" row of the
+  settings pane: Clear lets what is behind the panel show through the card's black
+  fill, Frosted blurs it away first; the fill starts at 30%. With "Cards around
+  windows" off, the thumbnails and titles sit on the glass and only the highlight
+  marks the selection.
 - Thumbnails need Screen Recording permission (System Settings > Privacy & Security >
   Screen & System Audio Recording); macOS asks the first time one is captured, when
-  Cmd+` opens the panel or the settings tab previews the windows' glass or the cards.
+  Cmd+` opens the panel or the settings pane previews the windows' glass or the cards.
   Without it every window shows its app's icon.
 - Arrows, the highlight, clicking a window, Esc and dragging an edge work as with
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
   app shortcuts (Cmd+W, Cmd+F, Cmd+Q, Cmd+Shift+Q, Cmd+H) do nothing while windows are
   listed.
+- The hints come in as with apps but offer only ← → Select, with ↑ ↓ once there is a
+  second row, and esc Cancel.
 
 ## Code
 
 `Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
 keys and keeps the candidates, the listed windows and the selection;
-`AppSwitcherSettingsView` is the settings tab, listing the apps `RunningRegularApps`
-keeps current; `SwitcherPanel` draws the glass panel from a `SwitcherState` using
-`SwitcherLayout`, `IconCellView` or `WindowCellView` (both `SwitcherCellView`s) and
-`WhitelistBadgeView`, with the sizes and colours in `SwitcherMetrics` and the ones
-that differ between icon and window cells in `SwitcherCellMetrics`;
+`AppSwitcherSettingsView` holds the sections of the settings pane, listing the apps
+`RunningRegularApps` keeps current and drawing the shortcuts with the shared
+`KeycapsView`; `SwitcherPanel` draws the glass panel from a `SwitcherState` using
+`SwitcherLayout`, which places the content of a `SwitcherContentView` from the top down
+so it stays in place while the hint band grows in, `IconCellView` or `WindowCellView`
+(both `SwitcherCellView`s), `WhitelistBadgeView` and `HintBandView`, which shows the
+`ShortcutHint`s and, for a moment after a shortcut, its `SwitcherFeedback`, with the
+sizes and colours in `SwitcherMetrics` and the ones that differ between icon and window
+cells in `SwitcherCellMetrics`;
 `AppWindows.swift` lists an app's windows as `AppWindow`s through the accessibility
 API, which also raises them, and `WindowThumbnails.swift` captures their thumbnails
 with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the window
-cards keeps a look and darkness in UserDefaults, set in `GlassSettingsRows`, and
-`WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
-and the whitelist in UserDefaults and publishes changes to the tab; `BatchQuitStore`
+cards keeps a look and darkness in UserDefaults, each set in a `GlassSettingsRow`,
+and `WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
+and the whitelist in UserDefaults and publishes changes to the pane; `BatchQuitStore`
 keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
 either list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is
 the strip along each side edge that takes the drag and `BackgroundCursor.swift` lets
@@ -143,7 +168,7 @@ the panel show the resize cursor while the app is inactive; `RecentAppsTracker` 
 ## Dev
 
 Open the panel once without a keyboard, print its geometry, capture it to
-`/tmp/app-switcher-smoke.png` and exit:
+`/tmp/app-switcher-smoke.png` once the hints have come in and exit:
 
 ```sh
 APP_SWITCHER_SMOKE_TEST=1 APP_SWITCHER_SMOKE_INDEX=3 APP_SWITCHER_SMOKE_FILTER=1 \

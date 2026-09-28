@@ -5,9 +5,7 @@ struct KeyRecorderField: NSViewRepresentable {
     let onRecord: (KeyCombo) -> Void
 
     func makeNSView(context: Context) -> KeyRecorderButton {
-        let button = KeyRecorderButton(frame: .zero)
-        button.bezelStyle = .rounded
-        return button
+        return KeyRecorderButton()
     }
 
     func updateNSView(_ button: KeyRecorderButton, context: Context) {

@@ -2,7 +2,7 @@
 
 Feature of `MacUtilities.app` that binds global key combos to actions: jump to the
 terminal or launch it, hide it again, run a shell line, toggle keep-awake. The
-bindings live in a JSON file you can edit by hand and version; the Hotkeys tab of
+bindings live in a JSON file you can edit by hand and version; the Hotkeys pane of
 the settings window is the friendly front to the same file.
 
 A bound combo is swallowed by the event tap, so the focused app never sees it. The
@@ -32,7 +32,7 @@ bindings, each with a `key` and an `action`:
 ```
 
 - `keyCode` is the virtual key code of the key (17 is T, 49 is Space on every
-  layout; letters follow the current layout). The settings tab records it for you;
+  layout; letters follow the current layout). The settings pane records it for you;
   for hand edits the common ones are: A 0, S 1, D 2, F 3, H 4, G 5, Z 6, X 7, C 8,
   V 9, B 11, Q 12, W 13, E 14, R 15, Y 16, T 17, 1 18, 2 19, 3 20, 4 21, 6 22, 5 23,
   9 25, 7 26, 8 28, 0 29, O 31, U 32, I 34, P 35, L 37, J 38, K 40, N 45, M 46,
@@ -40,14 +40,14 @@ bindings, each with a `key` and an `action`:
   F1 122, F2 120, F3 99, F4 118, F5 96, F6 97, F7 98, F8 100, F9 101, F10 109,
   F11 103, F12 111.
 - `modifiers` holds any of `control`, `option`, `shift`, `command`, in any order.
-- A binding without a `key` is kept but never fires; that is what "Add binding"
+- A binding without a `key` is kept but never fires; that is what "Add Hotkey"
   writes until a shortcut is recorded.
 - `type` is one of the actions below; `target` is what it acts on.
 
-The file is written on every change made in the tab (pretty-printed, keys sorted)
+The file is written on every change made in the pane (pretty-printed, keys sorted)
 and the directory is watched, so a hand edit applies on the spot while the app runs.
 A file that does not parse is reported on stdout, the bindings in use stay as they
-were, and the tab shows the parse error in place of the rows and writes nothing
+were, and the pane shows the parse error in place of the rows and writes nothing
 until it parses again, so hand edits are never overwritten.
 
 ## Actions
@@ -60,32 +60,41 @@ until it parses again, so hand edits are never overwritten.
   for; it outlives the app. It runs with the app's environment, which at login is
   launchd's (`PATH` is `/usr/bin:/bin:/usr/sbin:/sbin`), and its output is
   discarded, so use absolute paths.
-- `toggleKeepAwake`: `target` is empty. Toggles the Keep awake menu entry, the same
-  as clicking it. Does nothing while the keep-awake feature is switched off in
-  Settings > General.
+- `toggleKeepAwake`: `target` is empty. Toggles Keep Awake, the same as the round
+  toggle on its tile in the menu bar popover, so it turns on for the "Turn off after"
+  time. Does nothing while the keep-awake feature is switched off in its settings
+  pane.
 
-## Settings tab
+## Settings pane
 
-One row per binding: the recorder button, the action, its target and a warning when
-the key is taken. Click the recorder and press the combo; it shows as symbols
-(⌥⌘T). Esc or a click elsewhere stops recording. Only combos with at least one
-modifier are recorded; a bare function key can still be set in the file. While
-recording, no binding fires, so a combo that is already bound can be recorded again;
-the duplicate then shows through the warning.
+One row per binding: the action, each with its own symbol; the app it acts on, for
+the app actions; the shortcut as keycaps; and a button removing the binding. A
+command gets the full width of a line under its row, and a warning comes last when
+the key is taken. Add Hotkey under the rows adds a binding; with none at all, the
+pane says "No Hotkeys" instead and offers Add Hotkey there.
+
+Click the shortcut, a dashed "Record Shortcut" capsule until one is recorded, and
+press the combo; the capsule reads "Press keys…" meanwhile, and the combo then shows
+as keycaps (⌥ ⌘ T). Esc or a click elsewhere stops recording. Only combos with at
+least one modifier are recorded; a bare function key can still be set in the file.
+While recording, no binding fires, so a combo that is already bound can be recorded
+again; the duplicate then shows through the warning.
 
 The target is an app picker (every `.app` in `/Applications`, `/System/Applications`,
 `~/Applications` and their `Utilities` folders, with icons) for the app actions, a
 text field for the command, nothing for keep-awake. Changing the action clears the
 target.
 
-The warning names the other binding with the same key, or the macOS use of a
-reserved combo: Cmd+Space (Spotlight), Cmd+Tab and Cmd+Shift+Tab (app switching,
-claimed by macOS or the app-switcher feature either way), Cmd+Option+Esc, Ctrl+Cmd+Q,
-Cmd+Shift+3/4/5 and Ctrl+arrows. A warned binding is still saved and still fires
-where the tap sees the key first.
+The warning says another binding has the same key ("Same shortcut as another
+hotkey", on both rows), or names the macOS use of a reserved combo: Cmd+Space
+(Spotlight), Cmd+Tab and Cmd+Shift+Tab (app switching, claimed by macOS or the
+app-switcher feature either way), Cmd+Option+Esc, Ctrl+Cmd+Q, Cmd+Shift+3/4/5 and
+Ctrl+arrows. A warned binding is still saved and still fires where the tap sees the
+key first.
 
-Every change is written to the file at once; there is no save button. The tab shows
-the path of the file it edits in its footer.
+Every change is written to the file at once; there is no save button. The pane's
+footer names the file it edits, with a Reveal in Finder button selecting it once the
+file exists.
 
 ## Code
 
@@ -94,6 +103,8 @@ presses against the bindings and runs the action off the tap through
 `PerformHotkeyAction`; `HotkeyBindingsStore` reads and writes the file and watches the
 directory; `HotkeyBinding`, `KeyCombo`, `ModifierKey`, `HotkeyAction` and
 `HotkeyActionType` are the file's shape, with `KeyNames` turning key codes into
-labels; `HotkeysSettingsView` lists a `HotkeyBindingRow` per binding, built from
-`KeyRecorderField` (wrapping `KeyRecorderButton`), `AppPicker` over `InstalledApps`
-and the warnings from `HotkeyConflicts`.
+labels; `HotkeysSettingsView` holds the sections of the settings pane, listing a
+`HotkeyBindingRow` per binding, built from `KeyRecorderField` (wrapping
+`KeyRecorderButton`, which draws a `KeyRecorderLabel`: the capsule, or the combo in
+the shared `KeycapsView`), `AppPicker` over `InstalledApps` and the warnings from
+`HotkeyConflicts`.

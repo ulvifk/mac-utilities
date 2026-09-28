@@ -13,6 +13,12 @@ final class SwitcherPanel: NSPanel {
     private var cells: [SwitcherCellView] = []
     private var highlight = NSView()
     private var nameLabel = NSTextField(labelWithString: "")
+    private let hintBand = HintBandView()
+
+    /// From the moment the hints come in or a shortcut says what it did, until the panel hides.
+    private var isShowingHintBand = false
+    private var hintShowing: DispatchWorkItem?
+    private var feedbackHiding: DispatchWorkItem?
 
     init() {
         super.init(
@@ -68,6 +74,7 @@ final class SwitcherPanel: NSPanel {
         } else {
             showAppStatus(layout: layout)
         }
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.12
@@ -85,6 +92,7 @@ final class SwitcherPanel: NSPanel {
         cell.onClick = { _ in }
         for later in cells[index...] { later.index -= 1 }
         nameLabel.stringValue = getSelectedName()
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = removalDuration
@@ -94,6 +102,7 @@ final class SwitcherPanel: NSPanel {
             animator().setFrame(getFrame(centeredOnX: frame.midX, contentSize: layout.contentSize), display: true)
             highlight.animator().frame = layout.getHighlightFrame(index: state.selectedIndex)
             nameLabel.animator().frame = getNameFrame(layout: layout)
+            hintBand.animator().frame = layout.hintBandFrame
 
             for (index, cell) in cells.enumerated() {
                 cell.animator().frame = layout.cellFrames[index]
@@ -115,16 +124,45 @@ final class SwitcherPanel: NSPanel {
         if !state.isListingWindows {
             nameLabel.frame = getNameFrame(layout: layout)
         }
+        hintBand.frame = layout.hintBandFrame
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
         setFrame(getFrame(centeredOnX: screen!.visibleFrame.midX, contentSize: layout.contentSize), display: true)
     }
 
+    /// Once the panel has stayed open a moment, so a quick Cmd+Tab never shows them.
+    func showHintsAfterDelay() {
+        hintShowing = DispatchWorkItem {
+            self.showHintBand()
+            self.hintBand.showHints()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + hintDelay, execute: hintShowing!)
+    }
+
+    /// For a moment in place of the hints, growing the band first when it is not shown yet; the hints come in after it either way.
+    func showFeedback(_ feedback: SwitcherFeedback) {
+        hintShowing?.cancel()
+        feedbackHiding?.cancel()
+        if !isShowingHintBand {
+            showHintBand()
+        }
+
+        hintBand.showFeedback(feedback, width: buildLayout().contentSize.width)
+        feedbackHiding = DispatchWorkItem { self.hintBand.showHints() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + feedbackDuration, execute: feedbackHiding!)
+    }
+
+    /// Drops the hints and feedback still to come and takes the band away, so the next opening starts without it.
     func hide() {
+        hintShowing?.cancel()
+        feedbackHiding?.cancel()
+        isShowingHintBand = false
+        hintBand.clear()
         orderOut(nil)
     }
 
     private func buildContent(glassDarkness: CGFloat) {
         let layout = buildLayout()
-        let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
+        let container = SwitcherContentView(frame: NSRect(origin: .zero, size: layout.contentSize))
 
         // Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
         container.appearance = NSAppearance(named: .aqua)
@@ -143,6 +181,9 @@ final class SwitcherPanel: NSPanel {
             nameLabel.frame = getNameFrame(layout: layout)
             container.addSubview(nameLabel)
         }
+        hintBand.frame = layout.hintBandFrame
+        hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
+        container.addSubview(hintBand)
         for handle in buildResizeHandles(size: layout.contentSize) {
             container.addSubview(handle)
         }
@@ -233,7 +274,59 @@ final class SwitcherPanel: NSPanel {
     private func buildLayout() -> SwitcherLayout {
         let cellCount = state.isListingWindows ? state.windows.count : state.apps.count
 
-        return SwitcherLayout(cellCount: cellCount, cellsPerRow: state.cellsPerRow, metrics: getCellMetrics(listingWindows: state.isListingWindows))
+        return SwitcherLayout(
+            cellCount: cellCount,
+            cellsPerRow: state.cellsPerRow,
+            metrics: getCellMetrics(listingWindows: state.isListingWindows),
+            showsHintBand: isShowingHintBand
+        )
+    }
+
+    /// Grows the panel down by the band, its top edge staying put: the content counts from the top, so the rows keep their place and the band,
+    /// waiting under them, comes into view.
+    private func showHintBand() {
+        isShowingHintBand = true
+        let height = buildLayout().contentSize.height
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = hintFadeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            animator().setFrame(alignToPixels(NSRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)), display: true)
+        }
+    }
+
+    /// What can be done now: for apps worded for the selected app and the filter, for windows only moving the selection and cancelling.
+    private func buildShortcutHints() -> [ShortcutHint] {
+        if state.isListingWindows { return buildWindowShortcutHints() }
+        return buildAppShortcutHints()
+    }
+
+    /// The band drops them from the end as the panel narrows. Hide is left out for a hidden app, where it does nothing.
+    private func buildAppShortcutHints() -> [ShortcutHint] {
+        let app = state.apps[state.selectedIndex]
+        var hints = [
+            ShortcutHint(keys: "⌘W", action: isWhitelisted(app) ? "Remove from Whitelist" : "Add to Whitelist"),
+            ShortcutHint(keys: "⌘F", action: state.isFilterEnabled ? "Turn Filter Off" : "Turn Filter On"),
+        ]
+
+        if !app.isHidden {
+            hints.append(ShortcutHint(keys: "⌘H", action: "Hide"))
+        }
+        hints.append(ShortcutHint(keys: "⌘Q", action: "Quit"))
+        hints.append(ShortcutHint(keys: "⇧⌘Q", action: "Batch Quit"))
+        hints.append(ShortcutHint(keys: "esc", action: "Cancel"))
+
+        return hints
+    }
+
+    /// Up and down only with a second row to move to.
+    private func buildWindowShortcutHints() -> [ShortcutHint] {
+        let arrowKeys = state.windows.count > state.cellsPerRow ? "← → ↑ ↓" : "← →"
+
+        return [
+            ShortcutHint(keys: arrowKeys, action: "Select"),
+            ShortcutHint(keys: "esc", action: "Cancel"),
+        ]
     }
 
     private func isWhitelisted(_ app: NSRunningApplication) -> Bool {
@@ -262,7 +355,7 @@ final class SwitcherPanel: NSPanel {
         let nameSize = nameLabel.fittingSize
         let width = min(nameSize.width, maxWidth)
 
-        return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.minY - nameTopSpacing - nameSize.height, width: width, height: nameSize.height))
+        return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.maxY + nameTopSpacing, width: width, height: nameSize.height))
     }
 
     private func buildNameLabel(text: String) -> NSTextField {
@@ -304,11 +397,11 @@ final class SwitcherPanel: NSPanel {
 
         badge.frame = alignToPixels(NSRect(
             x: (size.width - badgeSize.width) / 2,
-            y: size.height - iconVerticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
+            y: iconVerticalPadding + nameBandHeight / 2 - badgeSize.height / 2,
             width: badgeSize.width,
             height: badgeSize.height
         ))
-        badge.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin]
+        badge.autoresizingMask = [.minXMargin, .maxXMargin]
 
         return badge
     }

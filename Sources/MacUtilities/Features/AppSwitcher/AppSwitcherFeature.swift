@@ -7,10 +7,12 @@ import SwiftUI
 final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
-    let menuItems: [NSMenuItem] = []
+    let summary = "Replaces ⌘Tab and ⌘` with a glass switcher for apps and their windows."
+    let iconSymbolName = "rectangle.stack.fill"
+    let iconGradient = Gradient(colors: [.blue, .indigo])
 
     private let panel: SwitcherPanel
-    /// Shows the glass live while it is set in the settings tab; clicks pass through it to the tab.
+    /// Shows the glass live while it is set in the settings pane; clicks pass through it to the pane.
     private let previewPanel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
@@ -82,7 +84,7 @@ final class AppSwitcherFeature: Feature {
         return false
     }
 
-    func buildSettingsView() -> AnyView {
+    func buildSettingsSections() -> AnyView {
         return AnyView(AppSwitcherSettingsView(
             whitelistStore: whitelistStore,
             batchQuitStore: batchQuitStore,
@@ -91,6 +93,10 @@ final class AppSwitcherFeature: Feature {
             windowCardStore: windowCardStore,
             windowCardGlassStore: windowCardGlassStore
         ))
+    }
+
+    func buildPopoverTile() -> AnyView? {
+        return nil
     }
 
     private func runSmokeTestIfRequested() {
@@ -106,7 +112,7 @@ final class AppSwitcherFeature: Feature {
             showCaptureBackdrop(behind: self.panel)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + hintDelay) {
             print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) windows=\(self.windows.count) selected=\(self.selectedIndex)")
             print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName }) windows=\(self.windows.map { $0.title }) thumbnails=\(self.thumbnails.count)")
             writeCapture(around: self.panel, path: smokeCapturePath)
@@ -259,8 +265,10 @@ final class AppSwitcherFeature: Feature {
 
         if isWhitelistToggleShortcut(event) {
             let bundleIdentifier = candidates[selectedIndex].bundleIdentifier!
-            whitelistStore.setListed(bundleIdentifier, !whitelistStore.isListed(bundleIdentifier))
+            let listed = !whitelistStore.isListed(bundleIdentifier)
+            whitelistStore.setListed(bundleIdentifier, listed)
             panel.update(state: buildState())
+            showFeedback(listed ? .addedToWhitelist : .removedFromWhitelist)
             return true
         }
 
@@ -270,21 +278,37 @@ final class AppSwitcherFeature: Feature {
         }
 
         if isBatchQuitShortcut(event) {
-            DispatchQueue.main.async { runBatchQuit(self.batchQuitStore) }
+            DispatchQueue.main.async { self.runBatchQuitShowingCount() }
             return true
         }
 
         if isQuitShortcut(event) {
-            candidates[selectedIndex].terminate()
+            let app = candidates[selectedIndex]
+            app.terminate()
+            showFeedback(.quittingApp(name: getAppName(app)))
             return true
         }
 
         if isHideShortcut(event) {
-            candidates[selectedIndex].hide()
+            hideSelectedApp()
             return true
         }
 
         return false
+    }
+
+    /// A second press on a hidden app does nothing.
+    private func hideSelectedApp() {
+        let app = candidates[selectedIndex]
+        if app.isHidden { return }
+
+        app.hide()
+        showFeedback(.hidden)
+    }
+
+    /// On the next turn of the main queue: showing it can grow the panel, an animation the tap callback must not wait on.
+    private func showFeedback(_ feedback: SwitcherFeedback) {
+        DispatchQueue.main.async { self.panel.showFeedback(feedback) }
     }
 
     /// Releasing Cmd activates the selection; the release itself always reaches the focused app.
@@ -409,13 +433,13 @@ final class AppSwitcherFeature: Feature {
     }
 
     /// The count nearest the panel width, so a drag has to travel half a cell either way before a column comes or goes; raised when that many
-    /// rows would run past the visible screen's height, then held between one and what fits on its width, so a width dragged past the screen
-    /// or remembered from a wider one still fits.
+    /// rows and the hint band would run past the visible screen's height, then held between one and what fits on its width, so a width dragged
+    /// past the screen or remembered from a wider one still fits.
     private func getCellsPerRow() -> Int {
         let metrics = getCellMetrics(listingWindows: isListingWindows)
         let screenSize = NSScreen.main!.visibleFrame.size
         let nearest = Int(metrics.getCellCount(forPanelWidth: getPanelWidth()).rounded())
-        let fittingRows = max(1, Int(metrics.getRowCount(forPanelHeight: screenSize.height).rounded(.down)))
+        let fittingRows = max(1, Int(metrics.getRowCount(forPanelHeight: screenSize.height - metrics.hintBandHeight).rounded(.down)))
         let fewestForHeight = (getItemCount() + fittingRows - 1) / fittingRows
         let fitting = Int(metrics.getCellCount(forPanelWidth: screenSize.width).rounded(.down))
 
@@ -537,11 +561,25 @@ final class AppSwitcherFeature: Feature {
 
         selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
         panel.show(state: buildState(), glassStore: getGlassStore())
+        panel.showFeedback(getFilterFeedback())
+    }
+
+    /// What is listed now: with the filter on, every app still is while no whitelisted app has a window.
+    private func getFilterFeedback() -> SwitcherFeedback {
+        if isFiltered { return .showingWhitelist }
+        if whitelistStore.isFilterEnabled { return .noWhitelistedApps }
+        return .showingAllApps
+    }
+
+    private func runBatchQuitShowingCount() {
+        let quitCount = runBatchQuit(batchQuitStore)
+        panel.showFeedback(.quittingApps(count: quitCount))
     }
 
     /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.
     private func showPanel() {
         panel.show(state: buildState(), glassStore: getGlassStore())
+        panel.showHintsAfterDelay()
         refreshThumbnails(of: windows.map { $0.windowID }, in: panel)
     }
 
@@ -571,6 +609,7 @@ final class AppSwitcherFeature: Feature {
             cellsPerRow: cellsPerRow,
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,
+            isFilterEnabled: whitelistStore.isFilterEnabled,
             whitelisted: whitelistStore.getWhitelist()
         )
     }

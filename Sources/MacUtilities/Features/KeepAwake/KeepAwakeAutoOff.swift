@@ -9,10 +9,10 @@ enum KeepAwakeAutoOff: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .thirtyMinutes: return "30 minutes"
-        case .oneHour: return "1 hour"
-        case .twoHours: return "2 hours"
-        case .untilTurnedOff: return "Until turned off"
+        case .thirtyMinutes: return "30 min"
+        case .oneHour: return "1 hr"
+        case .twoHours: return "2 hr"
+        case .untilTurnedOff: return "Never"
         }
     }
 

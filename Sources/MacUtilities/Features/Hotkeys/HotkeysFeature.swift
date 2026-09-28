@@ -5,7 +5,9 @@ import SwiftUI
 final class HotkeysFeature: Feature {
     let identifier = "hotkeys"
     let displayName = "Hotkeys"
-    let menuItems: [NSMenuItem] = []
+    let summary = "Opens apps, runs commands and toggles Keep Awake with global keyboard shortcuts."
+    let iconSymbolName = "command"
+    let iconGradient = Gradient(colors: [.purple, .pink])
 
     private let store = HotkeyBindingsStore()
     private let toggleKeepAwake: () -> Void
@@ -18,7 +20,7 @@ final class HotkeysFeature: Feature {
 
     func stop() {}
 
-    /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again. While the settings tab records a shortcut every combo passes, so a bound one can be recorded again.
+    /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again. While the settings pane records a shortcut every combo passes, so a bound one can be recorded again.
     func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type != .keyDown { return false }
         if isRecordingShortcut() { return false }
@@ -32,8 +34,12 @@ final class HotkeysFeature: Feature {
         return true
     }
 
-    func buildSettingsView() -> AnyView {
+    func buildSettingsSections() -> AnyView {
         return AnyView(HotkeysSettingsView(store: store))
+    }
+
+    func buildPopoverTile() -> AnyView? {
+        return nil
     }
 
     private func isRecordingShortcut() -> Bool {

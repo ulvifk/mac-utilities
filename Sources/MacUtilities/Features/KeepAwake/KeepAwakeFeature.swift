@@ -1,28 +1,30 @@
 import AppKit
+import Combine
 import SwiftUI
 
-private let menuItemTitle = "Keep awake"
-private let activeSymbolName = "cup.and.saucer.fill"
-private let pmsetRefusedTitle = "\(menuItemTitle) (pmset not allowed, see README)"
+let keepAwakeSymbolName = "cup.and.saucer.fill"
 
-/// Keeps the Mac awake from the menu bar: a power assertion and, when wanted, lid-closed sleep disabled through pmset; turns itself off after the set time.
-final class KeepAwakeFeature: Feature {
+/// Keeps the Mac awake from the menu bar popover: a power assertion and, when wanted, lid-closed sleep disabled through pmset; turns itself off
+/// after the set time. Publishes its state to its tile.
+final class KeepAwakeFeature: Feature, ObservableObject {
     let identifier = "keep-awake"
     let displayName = "Keep Awake"
-    let menuItems: [NSMenuItem]
+    let summary = "Keeps the Mac awake from the menu bar, even with the lid closed."
+    let iconSymbolName = keepAwakeSymbolName
+    let iconGradient = Gradient(colors: [.orange, .brown])
 
     private let preferences = KeepAwakePreferences()
-    private let menuItem = NSMenuItem(title: menuItemTitle, action: #selector(KeepAwakeFeature.toggle), keyEquivalent: "")
     private let setMenuBarSymbol: (String?) -> Void
 
-    private var session: KeepAwakeSession?
-    /// Refreshes the remaining time in the menu item and ends the session once its time is up.
-    private var minuteTimer: Timer?
+    /// nil while off.
+    @Published private(set) var session: KeepAwakeSession?
+    /// Sudo refused pmset at the last turn-on, so nothing is held; until the next turn-on.
+    @Published private(set) var isPmsetRefused = false
+    /// Ends the session at its deactivation date; nil while off or on until turned off.
+    private var deactivation: DispatchWorkItem?
 
     init(setMenuBarSymbol: @escaping (String?) -> Void) {
         self.setMenuBarSymbol = setMenuBarSymbol
-        menuItems = [menuItem]
-        menuItem.target = self
     }
 
     func start() {}
@@ -37,11 +39,16 @@ final class KeepAwakeFeature: Feature {
         return false
     }
 
-    func buildSettingsView() -> AnyView {
+    func buildSettingsSections() -> AnyView {
         return AnyView(KeepAwakeSettingsView(preferences: preferences))
     }
 
-    @objc func toggle() {
+    func buildPopoverTile() -> AnyView? {
+        return AnyView(KeepAwakeTile(feature: self))
+    }
+
+    /// On for the remembered time, or off.
+    func toggle() {
         if session == nil {
             activate()
         } else {
@@ -49,64 +56,44 @@ final class KeepAwakeFeature: Feature {
         }
     }
 
+    /// On for that long from now, starting over when it is on already; the time becomes the remembered one the toggle uses.
+    func turnOn(for autoOff: KeepAwakeAutoOff) {
+        preferences.setAutoOff(autoOff)
+
+        if session != nil {
+            deactivate()
+        }
+        activate()
+    }
+
     private func activate() {
         guard let session = KeepAwakeSession(preferences: preferences) else {
-            menuItem.title = pmsetRefusedTitle
+            isPmsetRefused = true
             return
         }
 
         self.session = session
-        minuteTimer = buildMinuteTimer()
+        isPmsetRefused = false
+        if let deactivationDate = session.deactivationDate {
+            deactivation = scheduleDeactivation(at: deactivationDate)
+        }
 
-        menuItem.state = .on
-        updateMenuItemTitle()
-        setMenuBarSymbol(activeSymbolName)
+        setMenuBarSymbol(keepAwakeSymbolName)
     }
 
     private func deactivate() {
         session!.end()
         session = nil
-        minuteTimer!.invalidate()
-        minuteTimer = nil
+        deactivation?.cancel()
+        deactivation = nil
 
-        menuItem.state = .off
-        menuItem.title = menuItemTitle
         setMenuBarSymbol(nil)
     }
 
-    /// In the common run loop modes, so it also fires while the menu is open.
-    private func buildMinuteTimer() -> Timer {
-        let timer = Timer(timeInterval: 60, repeats: true) { [unowned self] _ in self.handleMinutePassed() }
-        RunLoop.main.add(timer, forMode: .common)
-        return timer
-    }
-
-    private func handleMinutePassed() {
-        if isTimeUp() {
-            deactivate()
-            return
-        }
-
-        updateMenuItemTitle()
-    }
-
-    private func isTimeUp() -> Bool {
-        guard let deactivationDate = session!.deactivationDate else { return false }
-        return Date() >= deactivationDate
-    }
-
-    private func updateMenuItemTitle() {
-        guard let deactivationDate = session!.deactivationDate else {
-            menuItem.title = menuItemTitle
-            return
-        }
-
-        menuItem.title = "\(menuItemTitle) (\(formatRemainingTime(until: deactivationDate)) left)"
-    }
-
-    private func formatRemainingTime(until date: Date) -> String {
-        let minutes = Int((date.timeIntervalSinceNow / 60).rounded(.up))
-        if minutes < 60 { return "\(minutes) min" }
-        return "\(minutes / 60) h \(minutes % 60) min"
+    /// On the wall clock, so a Mac that slept past the date turns it off on waking.
+    private func scheduleDeactivation(at date: Date) -> DispatchWorkItem {
+        let deactivation = DispatchWorkItem { [unowned self] in self.deactivate() }
+        DispatchQueue.main.asyncAfter(wallDeadline: .now() + date.timeIntervalSinceNow, execute: deactivation)
+        return deactivation
     }
 }

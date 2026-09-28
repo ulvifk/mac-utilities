@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Pop-up of the installed apps with their icons; the selection is the bundle identifier. Nothing is selected while the identifier is not among the installed apps.
+/// It shrinks below its longest app name, truncating the selected one, so it fits on a binding's row.
 struct AppPicker: NSViewRepresentable {
     let apps: [InstalledApp]
     let selectedBundleIdentifier: String
@@ -23,6 +24,7 @@ struct AppPicker: NSViewRepresentable {
 
         popUp.target = context.coordinator
         popUp.action = #selector(AppPickerCoordinator.handleSelection)
+        popUp.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return popUp
     }
 

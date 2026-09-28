@@ -1,6 +1,12 @@
 import SwiftUI
 
-/// One binding: the recorder, the action, its target and the conflict warning when its key is taken.
+/// Room for either app action, so the app pickers line up in a column; the other actions, which have no app picker, take their own width.
+private let actionPickerMinWidth: CGFloat = 140
+private let appPickerWidthRange: ClosedRange<CGFloat> = 110...190
+private let keyRecorderSize = CGSize(width: 124, height: 22)
+
+/// One binding: the action, the app it acts on, the recorder showing the combo as keycaps and a remove button on one line; a command gets
+/// the full width of the line below, and the conflict warning comes last when the key is taken.
 struct HotkeyBindingRow: View {
     let binding: HotkeyBinding
     let conflictWarning: String?
@@ -9,35 +15,48 @@ struct HotkeyBindingRow: View {
     let onRemove: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                KeyRecorderField(combo: binding.key) { onChange(withKey($0)) }
-                    .frame(width: 150)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
                 Picker("Action", selection: buildTypeBinding()) {
                     ForEach(HotkeyActionType.allCases, id: \.self) { type in
-                        Text(type.title)
+                        Label(type.title, systemImage: type.symbolName)
                     }
                 }
                 .labelsHidden()
-                Spacer()
-                Button(action: onRemove) { Image(systemName: "minus.circle") }
-                    .buttonStyle(.borderless)
+                .fixedSize()
+                .frame(minWidth: actionPickerMinWidth, alignment: .leading)
+
+                if binding.action.type.takesApp {
+                    AppPicker(apps: installedApps, selectedBundleIdentifier: binding.action.target) { onChange(withTarget($0)) }
+                        .frame(minWidth: appPickerWidthRange.lowerBound, maxWidth: appPickerWidthRange.upperBound)
+                }
+
+                Spacer(minLength: 8)
+
+                KeyRecorderField(combo: binding.key) { onChange(withKey($0)) }
+                    .frame(width: keyRecorderSize.width, height: keyRecorderSize.height)
+                Button(action: onRemove) {
+                    Image(systemName: "minus.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Remove this hotkey")
             }
 
-            if binding.action.type.takesApp {
-                AppPicker(apps: installedApps, selectedBundleIdentifier: binding.action.target) { onChange(withTarget($0)) }
-            }
             if binding.action.type == .runCommand {
                 TextField("Command for /bin/sh -c", text: buildTargetBinding())
+                    .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
+                    .labelsHidden()
             }
 
             if let conflictWarning {
-                Label(conflictWarning, systemImage: "exclamationmark.triangle")
+                Label(conflictWarning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
                     .foregroundStyle(.orange)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 
     private func buildTypeBinding() -> Binding<HotkeyActionType> {
