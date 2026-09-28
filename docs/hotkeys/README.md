@@ -40,7 +40,7 @@ bindings, each with a `key` and an `action`:
   F1 122, F2 120, F3 99, F4 118, F5 96, F6 97, F7 98, F8 100, F9 101, F10 109,
   F11 103, F12 111.
 - `modifiers` holds any of `control`, `option`, `shift`, `command`, in any order.
-- A binding without a `key` is kept but never fires; that is what "Add binding"
+- A binding without a `key` is kept but never fires; that is what "Add Hotkey"
   writes until a shortcut is recorded.
 - `type` is one of the actions below; `target` is what it acts on.
 
@@ -70,7 +70,8 @@ until it parses again, so hand edits are never overwritten.
 One row per binding: the action, each with its own symbol; the app it acts on, for
 the app actions; the shortcut as keycaps; and a button removing the binding. A
 command gets the full width of a line under its row, and a warning comes last when
-the key is taken.
+the key is taken. Add Hotkey under the rows adds a binding; with none at all, the
+pane says "No Hotkeys" instead and offers Add Hotkey there.
 
 Click the shortcut, a dashed "Record Shortcut" capsule until one is recorded, and
 press the combo; the capsule reads "Press keys…" meanwhile, and the combo then shows
@@ -91,8 +92,9 @@ app-switcher feature either way), Cmd+Option+Esc, Ctrl+Cmd+Q, Cmd+Shift+3/4/5 an
 Ctrl+arrows. A warned binding is still saved and still fires where the tap sees the
 key first.
 
-Every change is written to the file at once; there is no save button. The pane shows
-the path of the file it edits in its footer.
+Every change is written to the file at once; there is no save button. The pane's
+footer names the file it edits, with a Reveal in Finder button selecting it once the
+file exists.
 
 ## Code
 

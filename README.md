@@ -111,6 +111,10 @@ To check the settings window without installing, open it once, capture every pan
 SETTINGS_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
 ```
 
+Pointing `XDG_CONFIG_HOME` at a directory holding a sample
+`mac-utilities/hotkeys.json` captures the Hotkeys pane with those bindings, and at an
+empty one its empty state, without touching your own file.
+
 To check the menu bar popover the same way, open it under the instance's own menu
 bar item, capture it to `/tmp/menu-bar-smoke.png` and exit:
 
