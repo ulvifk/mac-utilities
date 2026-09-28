@@ -1,6 +1,7 @@
 import CoreGraphics
 
 let tabKeyCode: Int64 = 48
+let graveKeyCode: Int64 = 50
 let wKeyCode: Int64 = 13
 let fKeyCode: Int64 = 3
 let qKeyCode: Int64 = 12

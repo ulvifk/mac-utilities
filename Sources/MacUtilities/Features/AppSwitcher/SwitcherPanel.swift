@@ -6,16 +6,15 @@ final class SwitcherPanel: NSPanel {
     /// The width the edge drag asks for, before clamping.
     var onWidthDragged: (CGFloat) -> Void = { _ in }
 
-    private let glassStore: GlassStore
-
     /// The last state shown.
     private var state: SwitcherState!
-    private var cells: [IconCellView] = []
+    /// The last glass shown.
+    private var isFrosted = false
+    private var cells: [SwitcherCellView] = []
     private var highlight = NSView()
     private var nameLabel = NSTextField(labelWithString: "")
 
-    init(glassStore: GlassStore) {
-        self.glassStore = glassStore
+    init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -35,14 +34,16 @@ final class SwitcherPanel: NSPanel {
     /// Glass in a window without the active appearance draws a frosted, near-opaque stand-in, and this panel is never key. AppKit asks this
     /// private method, so answering yes gets the real see-through glass without taking keyboard focus from the frontmost app; Frosted keeps the stand-in.
     @objc func _hasActiveAppearance() -> Bool {
-        return !glassStore.isFrosted
+        return !isFrosted
     }
 
-    func show(state: SwitcherState) {
+    /// On the glass as set in the store now; later changes to it show from the next call.
+    func show(state: SwitcherState, glassStore: GlassStore) {
         self.state = state
+        isFrosted = glassStore.isFrosted
         let wasVisible = isVisible
 
-        buildContent()
+        buildContent(glassDarkness: glassStore.darkness)
         center()
 
         if wasVisible {
@@ -62,12 +63,11 @@ final class SwitcherPanel: NSPanel {
         self.state = state
         let layout = buildLayout()
 
-        for (cell, app) in zip(cells, state.apps) {
-            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+        if state.isListingWindows {
+            showWindowStatus()
+        } else {
+            showAppStatus(layout: layout)
         }
-
-        nameLabel.stringValue = getSelectedName()
-        nameLabel.frame = getNameFrame(layout: layout)
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.12
@@ -80,7 +80,7 @@ final class SwitcherPanel: NSPanel {
     func removeApp(at index: Int, state: SwitcherState) {
         self.state = state
         let layout = buildLayout()
-        let cell = cells.remove(at: index)
+        let cell = cells.remove(at: index) as! IconCellView
 
         cell.onClick = { _ in }
         for later in cells[index...] { later.index -= 1 }
@@ -103,7 +103,7 @@ final class SwitcherPanel: NSPanel {
         })
     }
 
-    /// Re-wraps the icons to the state's row width without animation, so they follow the edge drag live; the panel stays centered.
+    /// Re-wraps the cells to the state's row width without animation, so they follow the edge drag live; the panel stays centered.
     func resize(state: SwitcherState) {
         self.state = state
         let layout = buildLayout()
@@ -112,7 +112,9 @@ final class SwitcherPanel: NSPanel {
             cell.frame = frame
         }
         highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
-        nameLabel.frame = getNameFrame(layout: layout)
+        if !state.isListingWindows {
+            nameLabel.frame = getNameFrame(layout: layout)
+        }
         setFrame(getFrame(centeredOnX: screen!.visibleFrame.midX, contentSize: layout.contentSize), display: true)
     }
 
@@ -120,14 +122,13 @@ final class SwitcherPanel: NSPanel {
         orderOut(nil)
     }
 
-    private func buildContent() {
+    private func buildContent(glassDarkness: CGFloat) {
         let layout = buildLayout()
         let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
 
         // Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
         container.appearance = NSAppearance(named: .aqua)
         highlight = buildHighlight()
-        nameLabel = buildNameLabel(text: getSelectedName())
         cells = buildCells(layout: layout)
 
         container.addSubview(highlight)
@@ -137,28 +138,30 @@ final class SwitcherPanel: NSPanel {
         for cell in cells {
             container.addSubview(cell)
         }
-        container.addSubview(nameLabel)
+        if !state.isListingWindows {
+            nameLabel = buildNameLabel(text: getSelectedName())
+            nameLabel.frame = getNameFrame(layout: layout)
+            container.addSubview(nameLabel)
+        }
         for handle in buildResizeHandles(size: layout.contentSize) {
             container.addSubview(handle)
         }
 
         highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
-        nameLabel.frame = getNameFrame(layout: layout)
 
-        let glass = buildGlassView(size: layout.contentSize)
+        let glass = buildGlassView(size: layout.contentSize, darkness: glassDarkness)
         glass.contentView = container
 
         contentView = glass
         setContentSize(layout.contentSize)
     }
 
-    private func buildCells(layout: SwitcherLayout) -> [IconCellView] {
-        var cells: [IconCellView] = []
+    private func buildCells(layout: SwitcherLayout) -> [SwitcherCellView] {
+        var cells: [SwitcherCellView] = []
 
-        for (index, app) in state.apps.enumerated() {
-            let cell = IconCellView(app: app)
+        for index in layout.cellFrames.indices {
+            let cell = state.isListingWindows ? buildWindowCell(index: index) : buildIconCell(index: index)
 
-            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
             cell.index = index
             cell.frame = layout.cellFrames[index]
             cell.onClick = { [unowned self] index in self.onCellClicked(index) }
@@ -166,6 +169,49 @@ final class SwitcherPanel: NSPanel {
         }
 
         return cells
+    }
+
+    private func buildIconCell(index: Int) -> SwitcherCellView {
+        let app = state.apps[index]
+        let cell = IconCellView(app: app)
+
+        cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+
+        return cell
+    }
+
+    private func buildWindowCell(index: Int) -> SwitcherCellView {
+        let window = state.windows[index]
+        let cell = WindowCellView(window: window, cardGlass: state.windowCardGlass)
+
+        cell.showSelected(index == state.selectedIndex)
+        if let thumbnail = state.thumbnails[window.windowID] {
+            cell.showThumbnail(thumbnail)
+        }
+
+        return cell
+    }
+
+    /// Dims the hidden apps, marks the whitelisted ones and names the selected one.
+    private func showAppStatus(layout: SwitcherLayout) {
+        for (cell, app) in zip(cells, state.apps) {
+            (cell as! IconCellView).showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+        }
+
+        nameLabel.stringValue = getSelectedName()
+        nameLabel.frame = getNameFrame(layout: layout)
+    }
+
+    /// Rings the selected window's card and swaps in the thumbnails captured since the cells were built.
+    private func showWindowStatus() {
+        for (index, window) in state.windows.enumerated() {
+            let cell = cells[index] as! WindowCellView
+
+            cell.showSelected(index == state.selectedIndex)
+            if let thumbnail = state.thumbnails[window.windowID] {
+                cell.showThumbnail(thumbnail)
+            }
+        }
     }
 
     /// A drag asks for the width that keeps the panel centered with the dragged edge under the mouse: twice the mouse's distance from the middle, negative once it crosses over.
@@ -185,7 +231,9 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func buildLayout() -> SwitcherLayout {
-        return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
+        let cellCount = state.isListingWindows ? state.windows.count : state.apps.count
+
+        return SwitcherLayout(cellCount: cellCount, cellsPerRow: state.cellsPerRow, metrics: getCellMetrics(listingWindows: state.isListingWindows))
     }
 
     private func isWhitelisted(_ app: NSRunningApplication) -> Bool {
@@ -239,12 +287,12 @@ final class SwitcherPanel: NSPanel {
         return highlight
     }
 
-    private func buildGlassView(size: NSSize) -> NSGlassEffectView {
+    private func buildGlassView(size: NSSize, darkness: CGFloat) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
         glass.style = .clear
         glass.cornerRadius = panelCornerRadius
-        glass.tintColor = NSColor.black.withAlphaComponent(glassStore.darkness)
+        glass.tintColor = NSColor.black.withAlphaComponent(darkness)
 
         return glass
     }
@@ -256,7 +304,7 @@ final class SwitcherPanel: NSPanel {
 
         badge.frame = alignToPixels(NSRect(
             x: (size.width - badgeSize.width) / 2,
-            y: size.height - verticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
+            y: size.height - iconVerticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
             width: badgeSize.width,
             height: badgeSize.height
         ))

@@ -2,11 +2,9 @@ import AppKit
 import CoreImage
 
 /// A clickable icon cell: the whitelist dot above the icon, room for the selected app name below it, the icon centered between them.
-final class IconCellView: NSView {
+final class IconCellView: SwitcherCellView {
     let icon = NSImageView()
     let dot = NSView()
-    var index = 0
-    var onClick: (Int) -> Void = { _ in }
 
     convenience init(app: NSRunningApplication) {
         self.init(frame: .zero)
@@ -39,22 +37,6 @@ final class IconCellView: NSView {
 
         dot.isHidden = !whitelisted
         icon.contentFilters = []
-    }
-
-    /// Keeps the icon image view from swallowing the click.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        let localPoint = convert(point, from: superview)
-        if !bounds.contains(localPoint) { return nil }
-
-        return self
-    }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
-        return true
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        onClick(index)
     }
 
     private func buildGrayscaleFilter() -> CIFilter {
