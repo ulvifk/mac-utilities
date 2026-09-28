@@ -82,12 +82,28 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Esc closes the switcher without activating anything.
 - Cmd+` while apps are listed does nothing, rather than cycling the windows of the app
   behind the panel.
+- Once the switcher has been open for 0.9 seconds, the panel grows a band along its
+  bottom edge, its top edge and the icons staying in place, and a dark tray fades in
+  there with the shortcuts, each key in a keycap and worded for the selection: ⌘W Add
+  to Whitelist or Remove from Whitelist, ⌘F Turn Filter On or Turn Filter Off by the
+  filter switch, ⌘H Hide (left out for a hidden app), ⌘Q Quit, ⇧⌘Q Batch Quit and esc
+  Cancel. A quick Cmd+Tab never shows it. The tray is centered and stays inside the
+  panel: a hint that does not fit is left out, the ones earlier in that list kept
+  longest, so a panel one icon wide still offers the shortest, ⌘Q Quit.
+- Each shortcut says what it did for 1.2 seconds in the hints' place, on a tray of its
+  own: Added to Whitelist or Removed from Whitelist; Showing Whitelist or Showing All
+  Apps, or No Whitelisted Apps Open when the filter was turned on with none of them to
+  list; Hidden, unless the app was hidden already; Quitting and the app's name; and
+  for Batch Quit, Quitting and the number of apps asked to quit, or No Apps to Quit.
+  Added to Whitelist and Showing Whitelist are green like the Whitelist capsule, the
+  others dark like the hints. A shortcut pressed before the hints came in grows the
+  band for its feedback, and the hints follow.
 - Dragging the panel's left or right edge with the mouse changes its width by whole
   icons, the rows re-wrapping live; the panel stays centered. The horizontal resize
   cursor shows over the edge. The width is clamped between one icon and the visible
   screen width and remembered across launches; until the edge has been dragged once,
-  the panel is about 70% of the screen wide. It is wider than that when its rows would
-  otherwise run past the screen's height.
+  the panel is about 70% of the screen wide. It is wider than that when its rows and
+  the hint band would otherwise run past the screen's height.
 
 ## Windows
 
@@ -118,6 +134,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
   app shortcuts (Cmd+W, Cmd+F, Cmd+Q, Cmd+Shift+Q, Cmd+H) do nothing while windows are
   listed.
+- The hints come in as with apps but offer only ← → Select, with ↑ ↓ once there is a
+  second row, and esc Cancel.
 
 ## Code
 
@@ -125,9 +143,12 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 keys and keeps the candidates, the listed windows and the selection;
 `AppSwitcherSettingsView` is the settings tab, listing the apps `RunningRegularApps`
 keeps current; `SwitcherPanel` draws the glass panel from a `SwitcherState` using
-`SwitcherLayout`, `IconCellView` or `WindowCellView` (both `SwitcherCellView`s) and
-`WhitelistBadgeView`, with the sizes and colours in `SwitcherMetrics` and the ones
-that differ between icon and window cells in `SwitcherCellMetrics`;
+`SwitcherLayout`, which places the content of a `SwitcherContentView` from the top down
+so it stays in place while the hint band grows in, `IconCellView` or `WindowCellView`
+(both `SwitcherCellView`s), `WhitelistBadgeView` and `HintBandView`, which shows the
+`ShortcutHint`s and, for a moment after a shortcut, its `SwitcherFeedback`, with the
+sizes and colours in `SwitcherMetrics` and the ones that differ between icon and window
+cells in `SwitcherCellMetrics`;
 `AppWindows.swift` lists an app's windows as `AppWindow`s through the accessibility
 API, which also raises them, and `WindowThumbnails.swift` captures their thumbnails
 with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the window
@@ -143,7 +164,7 @@ the panel show the resize cursor while the app is inactive; `RecentAppsTracker` 
 ## Dev
 
 Open the panel once without a keyboard, print its geometry, capture it to
-`/tmp/app-switcher-smoke.png` and exit:
+`/tmp/app-switcher-smoke.png` once the hints have come in and exit:
 
 ```sh
 APP_SWITCHER_SMOKE_TEST=1 APP_SWITCHER_SMOKE_INDEX=3 APP_SWITCHER_SMOKE_FILTER=1 \
