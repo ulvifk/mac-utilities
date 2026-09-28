@@ -29,6 +29,12 @@ final class SwitcherPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
     }
 
+    /// Glass in a window without the active appearance draws a frosted, near-opaque stand-in, and this panel is never key. AppKit asks this
+    /// private method, so answering yes gets the real see-through glass without taking keyboard focus from the frontmost app.
+    @objc func _hasActiveAppearance() -> Bool {
+        return true
+    }
+
     func show(state: SwitcherState) {
         self.state = state
         let wasVisible = isVisible
