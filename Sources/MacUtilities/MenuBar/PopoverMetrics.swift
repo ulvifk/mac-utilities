@@ -6,6 +6,10 @@ let popoverPadding: CGFloat = 12
 /// Between the header, the tiles and the footer.
 let popoverSectionSpacing: CGFloat = 12
 let popoverTitleFont = Font.system(size: 15, weight: .bold)
+/// The app icon's body fills about 80% of its canvas, so at this size it is as large as the round toggles.
+let popoverAppIconSize: CGFloat = 42
+/// Between the icon's canvas and its body, on each side.
+let popoverAppIconMargin = (popoverAppIconSize - roundToggleDiameter) / 2
 /// Tile subtitles and the header's status line.
 let secondaryLineFont = Font.system(size: 11)
 /// A toggle filling or a chip being picked.

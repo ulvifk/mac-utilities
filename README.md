@@ -7,13 +7,13 @@ one login item. Swift Package, no Xcode project.
 ## Menu bar item and settings
 
 Clicking the menu bar item opens a popover in the style of Control Center, drawn as
-Liquid Glass. Its header says whether the shortcuts are live: "All shortcuts active"
-by a green dot, "Paused — keys pass through untouched" by an indigo one, or
-"Shortcuts off — see Settings" by an orange one while the event tap is not running.
-Below it sit rounded tiles, each with a round toggle filled with a colour while on:
-Pause Shortcuts, which lets every key press through untouched until it is toggled off
-again, then the tiles of the enabled features, such as Keep Awake. Settings… (Cmd+,)
-opens the settings window and Quit (Cmd+Q) quits.
+Liquid Glass. Its header, beside the app icon, says whether the shortcuts are live:
+"All shortcuts active" by a green dot, "Paused — keys pass through untouched" by an
+indigo one, or "Shortcuts off — see Settings" by an orange one while the event tap is
+not running. Below it sit rounded tiles, each with a round toggle filled with a colour
+while on: Pause Shortcuts, which lets every key press through untouched until it is
+toggled off again, then the tiles of the enabled features, such as Keep Awake.
+Settings… (Cmd+,) opens the settings window and Quit (Cmd+Q) quits.
 
 Showing the popover activates the app, so it takes clicks and keys at once. A click
 elsewhere, another click on the item or Esc closes it; after Esc the app that was in

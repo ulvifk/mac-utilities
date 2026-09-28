@@ -27,21 +27,26 @@ struct MenuBarPopoverView: View {
         .frame(width: popoverWidth)
     }
 
-    /// Inset like the tiles' content, so the title lines up with the round toggles.
+    /// The app icon's body lines up with the round toggles below it, and the title with theirs.
     private func buildHeader() -> some View {
-        return VStack(alignment: .leading, spacing: 2) {
-            Text("MacUtilities")
-                .font(popoverTitleFont)
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(getStatusColor())
-                    .frame(width: statusDotSize, height: statusDotSize)
-                Text(getStatusText())
-                    .font(secondaryLineFont)
-                    .foregroundStyle(.secondary)
+        return HStack(spacing: roundToggleSpacing - popoverAppIconMargin) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: popoverAppIconSize, height: popoverAppIconSize)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("MacUtilities")
+                    .font(popoverTitleFont)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(getStatusColor())
+                        .frame(width: statusDotSize, height: statusDotSize)
+                    Text(getStatusText())
+                        .font(secondaryLineFont)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .padding(.horizontal, tilePadding)
+        .padding(.horizontal, tilePadding - popoverAppIconMargin)
     }
 
     private func buildPauseTile() -> some View {
