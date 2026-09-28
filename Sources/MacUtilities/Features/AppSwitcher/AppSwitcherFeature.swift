@@ -405,14 +405,19 @@ final class AppSwitcherFeature: Feature {
         cellsPerRow = getCellsPerRow()
     }
 
-    /// The count nearest the panel width, so a drag has to travel half a cell either way before a column comes or goes; held between one and
-    /// what fits on the visible screen, so a width dragged past the screen or remembered from a wider one still fits.
+    /// The count nearest the panel width, so a drag has to travel half a cell either way before a column comes or goes; raised when that many
+    /// rows would run past the visible screen's height, then held between one and what fits on its width, so a width dragged past the screen
+    /// or remembered from a wider one still fits.
     private func getCellsPerRow() -> Int {
         let metrics = getCellMetrics(listingWindows: isListingWindows)
+        let screenSize = NSScreen.main!.visibleFrame.size
         let nearest = Int(metrics.getCellCount(forPanelWidth: getPanelWidth()).rounded())
-        let fitting = Int(metrics.getCellCount(forPanelWidth: NSScreen.main!.visibleFrame.width).rounded(.down))
+        let fittingRows = max(1, Int(metrics.getRowCount(forPanelHeight: screenSize.height).rounded(.down)))
+        let fewestForHeight = (getItemCount() + fittingRows - 1) / fittingRows
+        let fitting = Int(metrics.getCellCount(forPanelWidth: screenSize.width).rounded(.down))
 
-        return max(1, min(nearest, fitting))
+        let wanted = max(nearest, fewestForHeight)
+        return max(1, min(wanted, fitting))
     }
 
     /// The remembered width, or the default share of the screen until the edge has been dragged once.

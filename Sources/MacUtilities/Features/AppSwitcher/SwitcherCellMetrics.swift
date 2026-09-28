@@ -13,6 +13,11 @@ struct SwitcherCellMetrics {
     func getCellCount(forPanelWidth width: CGFloat) -> CGFloat {
         return (width - 2 * horizontalPadding + itemSpacing) / (cellSize.width + itemSpacing)
     }
+
+    /// How many rows a panel of this height holds, fractional.
+    func getRowCount(forPanelHeight height: CGFloat) -> CGFloat {
+        return (height - 2 * verticalPadding + rowSpacing) / (cellSize.height + rowSpacing)
+    }
 }
 
 func getCellMetrics(listingWindows: Bool) -> SwitcherCellMetrics {

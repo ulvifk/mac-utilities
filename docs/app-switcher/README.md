@@ -76,7 +76,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   icons, the rows re-wrapping live; the panel stays centered. The horizontal resize
   cursor shows over the edge. The width is clamped between one icon and the visible
   screen width and remembered across launches; until the edge has been dragged once,
-  the panel is about 70% of the screen wide.
+  the panel is about 70% of the screen wide. It is wider than that when its rows would
+  otherwise run past the screen's height.
 
 ## Windows
 
