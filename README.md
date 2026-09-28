@@ -150,8 +150,8 @@ Sources/MacUtilities/
   MenuBar/            the menu bar popover, the tile and round toggle its tiles are
                       built from, and the menu bar smoke test
   Settings/           the settings window: its sidebar, the header and switch opening
-                      every feature's pane, the General pane, the icon tiles, and the
-                      settings smoke test
+                      every feature's pane, the General pane, the icon tiles and
+                      keycaps the panes share, and the settings smoke test
   Features/<Name>/    one folder per feature
 scripts/              render-app-icon.swift, which draws the app icon
 Resources/            AppIcon.icns, the rendered app icon that build.sh bundles
