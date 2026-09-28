@@ -31,10 +31,11 @@ A feature's pane opens with its icon, its name, one line on what it does and the
 switch that turns it on or off. A feature switched off stops on the spot and stays
 off across launches; the rest of its pane is faded and disabled until it is back on.
 
-General holds a "Launch at login" switch and an Accessibility row with a green or red
-dot and a button to the Privacy & Security > Accessibility pane; the dot is
-re-checked whenever the window comes back to the front. Every change applies
-immediately.
+General opens with the app's card: how many features are on, and each feature's
+icon, faded while it is off, which opens its pane when clicked. Below it are a
+"Launch at login" switch and an Accessibility row with a green or red dot and a
+button to the Privacy & Security > Accessibility pane; the dot is re-checked whenever
+the window comes back to the front. Every change applies immediately.
 
 ## Features
 

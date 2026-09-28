@@ -10,7 +10,7 @@ final class SettingsSidebarCellView: NSTableCellView {
         paneIdentifier = pane.identifier
         super.init(frame: .zero)
 
-        let icon = NSHostingView(rootView: SettingsIconTile(symbolName: pane.symbolName, gradient: pane.gradient, size: sidebarIconSize))
+        let icon = NSHostingView(rootView: SettingsIconTile(symbolName: pane.symbolName, gradient: pane.gradient, size: smallIconTileSize))
         let title = NSTextField(labelWithString: pane.title)
 
         title.lineBreakMode = .byTruncatingTail
@@ -23,8 +23,8 @@ final class SettingsSidebarCellView: NSTableCellView {
         NSLayoutConstraint.activate([
             icon.leadingAnchor.constraint(equalTo: leadingAnchor),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: sidebarIconSize),
-            icon.heightAnchor.constraint(equalToConstant: sidebarIconSize),
+            icon.widthAnchor.constraint(equalToConstant: smallIconTileSize),
+            icon.heightAnchor.constraint(equalToConstant: smallIconTileSize),
             title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: sidebarIconTitleSpacing),
             title.centerYAnchor.constraint(equalTo: centerYAnchor),
             title.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
