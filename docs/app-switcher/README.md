@@ -10,19 +10,19 @@ It also replaces Cmd+`, the native "next window of the same app", with the same 
 listing the frontmost app's windows as thumbnails; see [Windows](#windows). With the
 feature off, Cmd+` behaves as macOS has it.
 
-The App Switcher tab of the settings window toggles the filter, picks the panel's
-glass (Clear or Frosted, and a Darkness slider for its black tint) separately for
-apps and for windows, switches the cards around windows on or off and picks their own
-look and darkness, manages the whitelist (every running regular app is listed by name
-with its icon, switch on = whitelisted), sets up Batch Quit and runs it, and lists
-the in-switcher shortcuts as a reminder. Batch Quit quits either the listed apps or
-the unlisted ones, set with Quit: Listed apps / Unlisted apps. The list is picked
-with a button counting the listed apps that are running, in a row named "Apps to
-quit" or "Apps to keep" by the mode; it opens a checklist of the running regular
-apps, the ones listed at that moment on top above a divider, which stays open while
-several are checked and keeps its rows in place meanwhile. A listed app that is not
-running stays on the list but only shows in the checklist while it runs. Changes made
-there and with the shortcuts below show up in each other on the spot.
+The App Switcher tab of the settings window toggles the filter, manages the
+whitelist, picks the panel's glass (Clear or Frosted, and a Darkness slider for its
+black tint) separately for apps and for windows, switches the cards around windows on
+or off and picks their own look and darkness, sets up Batch Quit and runs it, and
+lists the in-switcher shortcuts as a reminder. The whitelist and the Batch Quit list
+are each picked with a button counting their listed apps that are running; it opens a
+checklist of the running regular apps (for Batch Quit all but Finder), the ones
+listed at that moment on top above a divider, which stays open while several are
+checked and keeps its rows in place meanwhile. A listed app that is not running stays
+on its list but only shows in the checklist while it runs. Batch Quit quits either
+the listed apps or the unlisted ones, set with Quit: Listed apps / Unlisted apps, its
+list's row named "Apps to quit" or "Apps to keep" by the mode. Changes made there and
+with the shortcuts below show up in each other on the spot.
 
 Filter off, every running app listed:
 
@@ -134,10 +134,10 @@ with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the w
 cards keeps a look and darkness in UserDefaults, set in `GlassSettingsRows`, and
 `WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
 and the whitelist in UserDefaults and publishes changes to the tab; `BatchQuitStore`
-keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits the
-list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is the
-strip along each side edge that takes the drag and `BackgroundCursor.swift` lets the
-panel show the resize cursor while the app is inactive; `RecentAppsTracker` and
+keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
+either list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is
+the strip along each side edge that takes the drag and `BackgroundCursor.swift` lets
+the panel show the resize cursor while the app is inactive; `RecentAppsTracker` and
 `RunningApps` provide the most-recently-used order and the windowed apps.
 
 ## Dev

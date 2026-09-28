@@ -14,9 +14,8 @@ private let switcherShortcuts: [(String, String)] = [
     ("Esc", "Close without switching"),
 ]
 
-/// The filter switch, the panel's glass for apps and for windows, the window cards and their glass, the whitelist (every running regular app,
-/// switch = whitelisted), Batch Quit (whether it quits the listed apps or the others, and the list, picked in a popover) and the in-switcher
-/// shortcuts.
+/// The filter switch and the whitelist, the panel's glass for apps and for windows, the window cards and their glass, Batch Quit (whether it
+/// quits the listed apps or the others, and its list) and the in-switcher shortcuts. Both lists are picked in a popover checklist.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
     @ObservedObject var batchQuitStore: BatchQuitStore
@@ -28,8 +27,11 @@ struct AppSwitcherSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
+            Section("Whitelist") {
                 Toggle("Filter to the whitelist", isOn: buildFilterBinding())
+                LabeledContent("Whitelisted apps") {
+                    AppListPicker(store: whitelistStore, apps: runningApps.apps)
+                }
             }
 
             Section("Apps (Cmd+Tab)") {
@@ -44,19 +46,6 @@ struct AppSwitcherSettingsView: View {
                 Toggle("Cards around windows", isOn: buildWindowCardsBinding())
                 GlassSettingsRows(glassStore: windowCardGlassStore)
                     .disabled(!windowCardStore.showsCards)
-            }
-
-            Section("Whitelist") {
-                ForEach(runningApps.apps, id: \.processIdentifier) { app in
-                    Toggle(isOn: buildWhitelistedBinding(bundleIdentifier: app.bundleIdentifier!)) {
-                        HStack(spacing: 8) {
-                            Image(nsImage: app.icon!)
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                            Text(getAppName(app))
-                        }
-                    }
-                }
             }
 
             Section("Batch Quit") {
@@ -98,13 +87,6 @@ struct AppSwitcherSettingsView: View {
         return Binding(
             get: { batchQuitStore.quitsUnlistedApps },
             set: { batchQuitStore.setQuitsUnlistedApps($0) }
-        )
-    }
-
-    private func buildWhitelistedBinding(bundleIdentifier: String) -> Binding<Bool> {
-        return Binding(
-            get: { whitelistStore.isWhitelisted(bundleIdentifier) },
-            set: { whitelistStore.setWhitelisted(bundleIdentifier, $0) }
         )
     }
 }
