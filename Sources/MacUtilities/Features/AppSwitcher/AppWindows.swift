@@ -6,8 +6,8 @@ private typealias GetWindowID = @convention(c) (AXUIElement, UnsafeMutablePointe
 /// Dialogs count, so a settings window can be switched to; palettes, the desktop and other special windows do not.
 private let switchableSubroles: Set<String> = [kAXStandardWindowSubrole, kAXDialogSubrole]
 
-/// The app's windows on the current Space, minimized ones included, frontmost first as the accessibility API lists them. The short messaging
-/// timeout keeps a hung app from stalling the switcher.
+/// The app's windows on the current Space, minimized ones included, frontmost first as the accessibility API lists them. A timeout only
+/// holds for the element it is set on, so the app and each window get the short one: a hung app then stalls neither the listing nor the raise.
 func getWindows(of app: NSRunningApplication) -> [AppWindow] {
     let element = AXUIElementCreateApplication(app.processIdentifier)
     AXUIElementSetMessagingTimeout(element, 0.1)
@@ -16,6 +16,7 @@ func getWindows(of app: NSRunningApplication) -> [AppWindow] {
 
     var windows: [AppWindow] = []
     for windowElement in windowElements {
+        AXUIElementSetMessagingTimeout(windowElement, 0.1)
         if !isSwitchable(windowElement) { continue }
 
         windows.append(AppWindow(app: app, element: windowElement, windowID: getWindowID(windowElement), title: getTitle(windowElement, app: app)))
