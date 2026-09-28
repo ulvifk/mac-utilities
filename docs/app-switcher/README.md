@@ -1,10 +1,10 @@
 # app-switcher
 
 Feature of `MacUtilities.app` that replaces Cmd+Tab with its own switcher. With
-"Filter enabled" on the switcher only lists whitelisted apps; with it off it lists
-every running app. While the feature is on, the native Cmd+Tab switcher is never
-shown: if the filter is on but no whitelisted app is running, the switcher lists
-every running app instead, so the shortcuts below always stay reachable.
+"Filter to the whitelist" on the switcher only lists whitelisted apps; with it off it
+lists every running app. While the feature is on, the native Cmd+Tab switcher is
+never shown: if the filter is on but no whitelisted app is running, the switcher
+lists every running app instead, so the shortcuts below always stay reachable.
 
 It also replaces Cmd+`, the native "next window of the same app", with the same panel
 listing the frontmost app's windows as thumbnails; see [Windows](#windows). With the
