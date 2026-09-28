@@ -15,30 +15,31 @@ sleep is held off and the display may still sleep.
 ## The tile
 
 - The round toggle turns Keep Awake on for the "Turn off after" time, or off again.
-  Its subtitle reads "Off", "On until turned off", or counts down the time left
+  Its subtitle reads "Off", "On, never turns off", or counts down the time left
   second by second, "1:29:05 left".
-- Under it, the chips 30 min, 1 hr, 2 hr and ∞ turn Keep Awake on for that long from
-  now; the one in use is filled orange. A chip clicked while it is on starts it over
-  for the new time, re-reading both settings. The chip clicked also becomes "Turn off
-  after" in the settings pane, so the round toggle and the `toggleKeepAwake` hotkey use
-  that time from then on.
+- Under it, the chips 30 min, 1 hr, 2 hr and ∞ (Never) turn Keep Awake on for that
+  long from now; the one in use is filled orange. A chip clicked while it is on starts
+  it over for the new time, re-reading both settings. The chip clicked also becomes
+  "Turn off after" in the settings pane, so the round toggle and the `toggleKeepAwake`
+  hotkey use that time from then on.
 
 A set time ends on a one-shot timer at the deactivation date, on the wall clock, so a
 Mac that slept past it turns Keep Awake off on waking.
 
 ## Settings pane
 
-- Turn off after: 30 minutes, 1 hour, 2 hours or until turned off; the chips set it
-  too.
-- Keep awake with the lid closed: on by default.
+- Turn off after: 30 min, 1 hr, 2 hr or Never, side by side in one segmented
+  control; the chips set it too.
+- Keep awake with the lid closed: on by default. The line under it says it runs
+  `pmset` as root and what is held off without it.
 
-Both apply the next time Keep awake is turned on.
+Both apply the next time Keep Awake is turned on.
 
 ## What is restored, and when
 
 `pmset -a disablesleep 1` outlives the process that set it, so it is put back to `0`:
 
-- when Keep awake is toggled off, its time is up, the feature is switched off in its
+- when Keep Awake is toggled off, its time is up, the feature is switched off in its
   settings pane or the app quits (`applicationWillTerminate` stops every enabled
   feature);
 - when the app dies any other way: activating spawns a child watchdog shell that
@@ -47,7 +48,7 @@ Both apply the next time Keep awake is turned on.
   back to normal within five seconds.
 
 After a power loss or kernel panic while active no process survives to restore it,
-so `disablesleep` stays `1` until Keep awake is toggled again or `uninstall.sh` runs.
+so `disablesleep` stays `1` until Keep Awake is toggled again or `uninstall.sh` runs.
 
 `uninstall.sh` runs `pmset -a disablesleep 0` once more before removing the sudoers
 line, in case the app was killed while active.
@@ -63,7 +64,7 @@ line, in case the app was killed while active.
 
 for the installing user, after checking it with `visudo -c`; nothing else can be run
 through it. `uninstall.sh` removes the file. Without it sudo refuses the `pmset`
-call, Keep awake stays off with nothing held, and the tile's subtitle turns orange,
+call, Keep Awake stays off with nothing held, and the tile's subtitle turns orange,
 "Couldn't keep a closed lid awake: run install.sh, or turn the lid option off in
 Settings", until the next time it is turned on.
 
@@ -74,4 +75,4 @@ Settings", until the next time it is turned on.
 on the one-shot timer; the session holds the `PowerAssertion` and, with the lid switch
 on, the watchdog from `LidClosedSleep`; `KeepAwakePreferences` keeps the
 `KeepAwakeAutoOff` choice and the lid switch in UserDefaults for
-`KeepAwakeSettingsView`, the settings pane, and the tile's chips.
+`KeepAwakeSettingsView`, the settings pane's section, and the tile's chips.

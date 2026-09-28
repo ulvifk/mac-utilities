@@ -38,7 +38,7 @@ struct KeepAwakeTile: View {
         }
 
         guard let session = feature.session else { return Text("Off") }
-        guard let deactivationDate = session.deactivationDate else { return Text("On until turned off") }
+        guard let deactivationDate = session.deactivationDate else { return Text("On, never turns off") }
 
         return Text("\(Text(deactivationDate, style: .timer)) left")
     }
@@ -47,7 +47,7 @@ struct KeepAwakeTile: View {
         let isInUse = isAutoOffInUse(autoOff)
 
         return Button { feature.turnOn(for: autoOff) } label: {
-            Text(autoOff.shortTitle)
+            Text(getChipTitle(autoOff))
                 .font(chipFont)
                 .monospacedDigit()
                 .foregroundStyle(isInUse ? Color.white : Color.primary)
@@ -58,6 +58,11 @@ struct KeepAwakeTile: View {
         .buttonStyle(.plain)
         .accessibilityLabel(autoOff.title)
         .accessibilityAddTraits(isInUse ? .isSelected : [])
+    }
+
+    private func getChipTitle(_ autoOff: KeepAwakeAutoOff) -> String {
+        if autoOff == .untilTurnedOff { return "∞" }
+        return autoOff.title
     }
 
     private func isAutoOffInUse(_ autoOff: KeepAwakeAutoOff) -> Bool {
