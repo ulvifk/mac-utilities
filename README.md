@@ -93,6 +93,13 @@ To check the settings window without installing, open it once, capture every tab
 SETTINGS_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
 ```
 
+To check the menu bar popover the same way, open it under the instance's own menu
+bar item, capture it to `/tmp/menu-bar-smoke.png` and exit:
+
+```sh
+MENU_BAR_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
+```
+
 The app icon, three frosted glass tiles cascading on a midnight blue body with a ⌘
 key in front, is drawn in code by `scripts/render-app-icon.swift`; the menu bar
 glyph is the same three tiles. `Resources/AppIcon.icns` is the script's committed
@@ -123,8 +130,8 @@ Sources/MacUtilities/
                       popover, feature lifecycle, pause), the menu bar glyph, EventTap,
                       key matching, Preferences, Accessibility trust, window capture for
                       the smoke tests
-  MenuBar/            the menu bar popover and the tile and round toggle its tiles
-                      are built from
+  MenuBar/            the menu bar popover, the tile and round toggle its tiles are
+                      built from, and the menu bar smoke test
   Settings/           the settings window, its General tab and the settings smoke test
   Features/<Name>/    one folder per feature
 scripts/              render-app-icon.swift, which draws the app icon

@@ -8,7 +8,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menuBarGlyph = buildMenuBarGlyph()
     private let preferences = Preferences()
-    private lazy var menuBarPopover = MenuBarPopover(rootView: MenuBarPopoverView(controller: self), statusItemButton: statusItem.button!)
+    private(set) lazy var menuBarPopover = MenuBarPopover(rootView: MenuBarPopoverView(controller: self), statusItemButton: statusItem.button!)
     private(set) lazy var settingsWindow = SettingsWindow(rootView: SettingsView(controller: self))
 
     private var eventTap: EventTap!
@@ -33,6 +33,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         requestAccessibilityTrust()
         eventTap.start()
         runSettingsSmokeTestIfRequested(controller: self)
+        runMenuBarSmokeTestIfRequested(controller: self)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
