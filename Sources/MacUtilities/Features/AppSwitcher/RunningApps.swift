@@ -1,7 +1,6 @@
 import AppKit
 import ApplicationServices
 
-/// Finder is a regular app too, but quitting it closes every Finder window and the desktop icons.
 private let finderBundleIdentifier = "com.apple.finder"
 
 func getRegularRunningApps() -> [NSRunningApplication] {
@@ -12,12 +11,17 @@ func getAppName(_ app: NSRunningApplication) -> String {
     return app.localizedName ?? app.bundleIdentifier!
 }
 
+/// Finder is a regular app too, but quitting it closes every Finder window and the desktop icons, so Batch Quit neither lists nor quits it.
+func isBatchQuittable(_ app: NSRunningApplication) -> Bool {
+    return app.bundleIdentifier != finderBundleIdentifier
+}
+
 /// A normal quit, so an app with unsaved changes shows its dialog and stays running. The switcher itself is an accessory app, never a regular one.
-func quitRegularAppsNotIn(whitelist: Set<String>) {
+func runBatchQuit(_ batchQuitStore: BatchQuitStore) {
     for app in getRegularRunningApps() {
         guard let bundleIdentifier = app.bundleIdentifier else { continue }
-        if bundleIdentifier == finderBundleIdentifier { continue }
-        if whitelist.contains(bundleIdentifier) { continue }
+        if !isBatchQuittable(app) { continue }
+        if !batchQuitStore.isBatchQuitTarget(bundleIdentifier) { continue }
         app.terminate()
     }
 }

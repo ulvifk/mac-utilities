@@ -9,15 +9,17 @@ private let switcherShortcuts: [(String, String)] = [
     ("Cmd+F", "Toggle the filter"),
     ("Cmd+W", "Toggle the selected app's whitelist membership"),
     ("Cmd+Q", "Quit the selected app"),
-    ("Cmd+X", "Quit every app not in the whitelist"),
+    ("Cmd+Shift+Q", "Batch quit: the listed apps, or the unlisted ones"),
     ("Cmd+H", "Hide the selected app"),
     ("Esc", "Close without switching"),
 ]
 
 /// The filter switch, the panel's glass for apps and for windows, the window cards and their glass, the whitelist (every running regular app,
-/// switch = whitelisted) and the in-switcher shortcuts.
+/// switch = whitelisted), Batch Quit (whether it quits the listed apps or the others, and the list, picked in a popover) and the in-switcher
+/// shortcuts.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
+    @ObservedObject var batchQuitStore: BatchQuitStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
     @ObservedObject var windowCardStore: WindowCardStore
@@ -28,7 +30,6 @@ struct AppSwitcherSettingsView: View {
         Form {
             Section {
                 Toggle("Filter to the whitelist", isOn: buildFilterBinding())
-                Button("Quit apps not in the whitelist") { quitRegularAppsNotIn(whitelist: whitelistStore.getWhitelist()) }
             }
 
             Section("Apps (Cmd+Tab)") {
@@ -58,6 +59,18 @@ struct AppSwitcherSettingsView: View {
                 }
             }
 
+            Section("Batch Quit") {
+                Picker("Quit", selection: buildQuitsUnlistedAppsBinding()) {
+                    Text("Listed apps").tag(false)
+                    Text("Unlisted apps").tag(true)
+                }
+                .pickerStyle(.segmented)
+                LabeledContent(batchQuitStore.quitsUnlistedApps ? "Apps to keep" : "Apps to quit") {
+                    BatchQuitAppPicker(batchQuitStore: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
+                }
+                Button(batchQuitStore.quitsUnlistedApps ? "Quit unlisted apps" : "Quit listed apps") { runBatchQuit(batchQuitStore) }
+            }
+
             Section("While switching") {
                 ForEach(switcherShortcuts, id: \.0) { shortcut, meaning in
                     LabeledContent(meaning, value: shortcut)
@@ -78,6 +91,13 @@ struct AppSwitcherSettingsView: View {
         return Binding(
             get: { windowCardStore.showsCards },
             set: { windowCardStore.setShowsCards($0) }
+        )
+    }
+
+    private func buildQuitsUnlistedAppsBinding() -> Binding<Bool> {
+        return Binding(
+            get: { batchQuitStore.quitsUnlistedApps },
+            set: { batchQuitStore.setQuitsUnlistedApps($0) }
         )
     }
 

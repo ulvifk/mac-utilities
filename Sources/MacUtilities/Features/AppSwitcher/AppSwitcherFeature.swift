@@ -14,6 +14,7 @@ final class AppSwitcherFeature: Feature {
     private let previewPanel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
+    private let batchQuitStore = BatchQuitStore()
     private let appGlassStore = GlassStore(keyPrefix: "appGlass", defaultDarkness: defaultGlassDarkness)
     private let windowGlassStore = GlassStore(keyPrefix: "windowGlass", defaultDarkness: defaultGlassDarkness)
     private let windowCardStore = WindowCardStore()
@@ -84,6 +85,7 @@ final class AppSwitcherFeature: Feature {
     func buildSettingsView() -> AnyView {
         return AnyView(AppSwitcherSettingsView(
             whitelistStore: whitelistStore,
+            batchQuitStore: batchQuitStore,
             appGlassStore: appGlassStore,
             windowGlassStore: windowGlassStore,
             windowCardStore: windowCardStore,
@@ -267,13 +269,13 @@ final class AppSwitcherFeature: Feature {
             return true
         }
 
-        if isQuitShortcut(event) {
-            candidates[selectedIndex].terminate()
+        if isBatchQuitShortcut(event) {
+            DispatchQueue.main.async { runBatchQuit(self.batchQuitStore) }
             return true
         }
 
-        if isQuitAppsNotInWhitelistShortcut(event) {
-            DispatchQueue.main.async { quitRegularAppsNotIn(whitelist: self.whitelistStore.getWhitelist()) }
+        if isQuitShortcut(event) {
+            candidates[selectedIndex].terminate()
             return true
         }
 
@@ -324,8 +326,8 @@ final class AppSwitcherFeature: Feature {
     private func isAppShortcut(_ event: CGEvent) -> Bool {
         if isWhitelistToggleShortcut(event) { return true }
         if isFilterToggleShortcut(event) { return true }
+        if isBatchQuitShortcut(event) { return true }
         if isQuitShortcut(event) { return true }
-        if isQuitAppsNotInWhitelistShortcut(event) { return true }
         if isHideShortcut(event) { return true }
         return false
     }
@@ -354,12 +356,13 @@ final class AppSwitcherFeature: Feature {
         return isCommandShortcut(event, keyCode: fKeyCode)
     }
 
-    private func isQuitShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: qKeyCode)
+    /// Cmd+Shift+Q is also a Cmd+Q, so it is asked first.
+    private func isBatchQuitShortcut(_ event: CGEvent) -> Bool {
+        return isShortcut(event, keyCode: qKeyCode, modifiers: [.maskCommand, .maskShift])
     }
 
-    private func isQuitAppsNotInWhitelistShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: xKeyCode)
+    private func isQuitShortcut(_ event: CGEvent) -> Bool {
+        return isCommandShortcut(event, keyCode: qKeyCode)
     }
 
     private func isHideShortcut(_ event: CGEvent) -> Bool {

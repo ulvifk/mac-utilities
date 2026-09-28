@@ -10,13 +10,19 @@ It also replaces Cmd+`, the native "next window of the same app", with the same 
 listing the frontmost app's windows as thumbnails; see [Windows](#windows). With the
 feature off, Cmd+` behaves as macOS has it.
 
-The App Switcher tab of the settings window toggles the filter, quits every running
-regular app not in the whitelist, picks the panel's glass (Clear or Frosted, and a
-Darkness slider for its black tint) separately for apps and for windows, switches the
-cards around windows on or off and picks their own look and darkness, manages the
-whitelist (every running regular app is listed by name with its icon, switch on =
-whitelisted) and lists the in-switcher shortcuts as a reminder. Changes made there
-and with the shortcuts below show up in each other on the spot.
+The App Switcher tab of the settings window toggles the filter, picks the panel's
+glass (Clear or Frosted, and a Darkness slider for its black tint) separately for
+apps and for windows, switches the cards around windows on or off and picks their own
+look and darkness, manages the whitelist (every running regular app is listed by name
+with its icon, switch on = whitelisted), sets up Batch Quit and runs it, and lists
+the in-switcher shortcuts as a reminder. Batch Quit quits either the listed apps or
+the unlisted ones, set with Quit: Listed apps / Unlisted apps. The list is picked
+with a button counting the listed apps that are running, in a row named "Apps to
+quit" or "Apps to keep" by the mode; it opens a checklist of the running regular
+apps, the ones listed at that moment on top above a divider, which stays open while
+several are checked and keeps its rows in place meanwhile. A listed app that is not
+running stays on the list but only shows in the checklist while it runs. Changes made
+there and with the shortcuts below show up in each other on the spot.
 
 Filter off, every running app listed:
 
@@ -63,10 +69,14 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   has actually quit, so an app asking for confirmation stays listed. Its icon fades and
   shrinks out while the others slide together and the panel shrinks around them; the
   highlight stays on the same app, or moves to a neighbour when that was the one quit.
-- Cmd+X while the switcher is open quits every running regular app not in the
-  whitelist, the same as the settings button; Finder is always kept. Each app gets a
-  normal quit, so one with unsaved changes shows its dialog and stays running; the
-  others leave the list as they quit.
+- Cmd+Shift+Q while the switcher is open runs Batch Quit, the same as the settings
+  button: it quits the running apps on the Batch Quit list, or with Quit set to
+  Unlisted apps every running regular app not on it. Shift held to cycle backward
+  makes a Q press a Batch Quit too, not a Cmd+Q. The list is saved apart from the
+  whitelist, which plays no part: an app can be on both or neither. An empty list
+  quits nothing, or everything in the second mode. Finder is never offered for the
+  list nor quit. Each app gets a normal quit, so one with unsaved changes shows its
+  dialog and stays listed until it has quit; the others leave the list as they quit.
 - Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything.
@@ -106,7 +116,7 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   Without it every window shows its app's icon.
 - Arrows, the highlight, clicking a window, Esc and dragging an edge work as with
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
-  app shortcuts (Cmd+W, Cmd+F, Cmd+Q, Cmd+X, Cmd+H) do nothing while windows are
+  app shortcuts (Cmd+W, Cmd+F, Cmd+Q, Cmd+Shift+Q, Cmd+H) do nothing while windows are
   listed.
 
 ## Code
@@ -123,11 +133,12 @@ API, which also raises them, and `WindowThumbnails.swift` captures their thumbna
 with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the window
 cards keeps a look and darkness in UserDefaults, set in `GlassSettingsRows`, and
 `WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
-and the whitelist in UserDefaults and publishes changes to the tab; `PanelWidthStore`
-keeps the dragged panel width, `ResizeHandleView` is the strip along each side edge
-that takes the drag and `BackgroundCursor.swift` lets the panel show the resize
-cursor while the app is inactive; `RecentAppsTracker` and `RunningApps` provide the
-most-recently-used order and the windowed apps.
+and the whitelist in UserDefaults and publishes changes to the tab; `BatchQuitStore`
+keeps the Batch Quit list and its mode the same way and `BatchQuitAppPicker` edits
+it; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is the strip
+along each side edge that takes the drag and `BackgroundCursor.swift` lets the panel
+show the resize cursor while the app is inactive; `RecentAppsTracker` and
+`RunningApps` provide the most-recently-used order and the windowed apps.
 
 ## Dev
 

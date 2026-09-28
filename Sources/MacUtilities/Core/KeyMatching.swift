@@ -6,7 +6,6 @@ let wKeyCode: Int64 = 13
 let fKeyCode: Int64 = 3
 let qKeyCode: Int64 = 12
 let hKeyCode: Int64 = 4
-let xKeyCode: Int64 = 7
 let escapeKeyCode: Int64 = 53
 let leftArrowKeyCode: Int64 = 123
 let rightArrowKeyCode: Int64 = 124
