@@ -13,7 +13,8 @@ indigo one, or "Shortcuts off — see Settings" by an orange one while the event
 not running. Below it sit rounded tiles, each with a round toggle filled with a colour
 while on: Pause Shortcuts, which lets every key press through untouched until it is
 toggled off again, then the tiles of the enabled features, such as Keep Awake.
-Settings… (Cmd+,) opens the settings window and Quit (Cmd+Q) quits.
+Settings… (Cmd+,) opens the settings window, on General while the shortcuts are off,
+and Quit (Cmd+Q) quits.
 
 Showing the popover activates the app, so it takes clicks and keys at once. A click
 elsewhere, another click on the item or Esc closes it; after Esc the app that was in
@@ -33,9 +34,14 @@ off across launches; the rest of its pane is faded and disabled until it is back
 
 General opens with the app's card: how many features are on, and each feature's
 icon, faded while it is off, which opens its pane when clicked. Below it are a
-"Launch at login" switch and an Accessibility row with a green or red dot and a
-button to the Privacy & Security > Accessibility pane; the dot is re-checked whenever
-the window comes back to the front. Every change applies immediately.
+"Launch at login" switch and the Accessibility grant. The event tap every shortcut
+depends on needs the grant and is only created at launch, so until it runs a warning
+card sits above them and the General row in the sidebar carries a warning badge. While
+the grant is missing, the card says no shortcut works without it and has a button to
+the Privacy & Security > Accessibility pane; once granted, it offers Reopen
+MacUtilities, which quits the app and opens it again. With the tap running, a
+checkmark row says access is allowed. The grant is re-checked whenever the window
+comes back to the front. Every change applies immediately.
 
 ## Features
 

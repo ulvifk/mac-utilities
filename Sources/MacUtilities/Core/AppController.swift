@@ -9,7 +9,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     private let menuBarGlyph = buildMenuBarGlyph()
     private let preferences = Preferences()
     private(set) lazy var menuBarPopover = MenuBarPopover(rootView: MenuBarPopoverView(controller: self), statusItemButton: statusItem.button!)
-    /// Built at launch rather than when first opened, since building every pane takes a moment.
+    /// Built at launch rather than when first opened, since building every pane takes a moment; after the event tap, whose state it shows.
     private(set) var settingsWindow: SettingsWindow!
 
     private var eventTap: EventTap!
@@ -30,9 +30,9 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         statusItem.button!.target = self
         statusItem.button!.action = #selector(AppController.toggleMenuBarPopover)
         startEnabledFeatures()
-        settingsWindow = SettingsWindow(controller: self)
         requestAccessibilityTrust()
         eventTap.start()
+        settingsWindow = SettingsWindow(controller: self)
         runSettingsSmokeTestIfRequested(controller: self)
         runMenuBarSmokeTestIfRequested(controller: self)
     }
@@ -77,9 +77,13 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         statusItem.button!.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Mac Utilities")
     }
 
-    /// The popover would stay open over the window otherwise: it closes by itself only on a click elsewhere. The window goes first, so the
-    /// popover closing finds it key and leaves the app active.
+    /// While no shortcut works it opens on General, whose card says why. The popover would stay open over the window otherwise: it closes by
+    /// itself only on a click elsewhere. The window goes first, so the popover closing finds it key and leaves the app active.
     func openSettings() {
+        if !isEventTapRunning {
+            settingsWindow.showPane(generalPaneIdentifier)
+        }
+
         settingsWindow.open()
         menuBarPopover.close()
     }

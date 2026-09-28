@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The app's card with how many features are on, launch at login and the Accessibility grant; the last two are re-read whenever the window
-/// comes back to the front.
+/// The app's card with how many features are on, a warning card while the shortcuts are off for want of Accessibility, launch at login and,
+/// once they run, a calm row saying so. The grant and the login item are re-read whenever the window comes back to the front.
 struct GeneralSettingsView: View {
     @ObservedObject var controller: AppController
     let showPane: (String) -> Void
@@ -19,9 +19,22 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            if !controller.isEventTapRunning {
+                Section {
+                    AccessibilityWarningCard(isAccessibilityAllowed: state.isAccessibilityTrusted)
+                }
+            }
+
             Section {
                 LaunchAtLoginToggle(state: state)
-                AccessibilityStatusRow(state: state)
+                if controller.isEventTapRunning {
+                    Label {
+                        Text("Accessibility access allowed")
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
+                }
             }
         }
         .formStyle(.grouped)

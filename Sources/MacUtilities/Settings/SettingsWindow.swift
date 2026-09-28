@@ -53,7 +53,14 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
     /// General, then one pane per feature.
     private func buildPanes(controller: AppController) -> [SettingsPane] {
         let generalView = GeneralSettingsView(controller: controller) { [unowned self] paneIdentifier in self.showPane(paneIdentifier) }
-        let general = SettingsPane(identifier: generalPaneIdentifier, title: "General", symbolName: generalIconSymbolName, gradient: generalIconGradient, view: AnyView(generalView))
+        let general = SettingsPane(
+            identifier: generalPaneIdentifier,
+            title: "General",
+            symbolName: generalIconSymbolName,
+            gradient: generalIconGradient,
+            warning: getGeneralWarning(controller: controller),
+            view: AnyView(generalView)
+        )
 
         return [general] + controller.features.map { feature in
             SettingsPane(
@@ -61,8 +68,15 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
                 title: feature.displayName,
                 symbolName: feature.iconSymbolName,
                 gradient: feature.iconGradient,
+                warning: nil,
                 view: AnyView(FeatureSettingsPane(controller: controller, feature: feature))
             )
         }
+    }
+
+    /// The event tap is created only at launch, so this holds for the window's life.
+    private func getGeneralWarning(controller: AppController) -> String? {
+        if controller.isEventTapRunning { return nil }
+        return "Shortcuts are off until Accessibility is allowed and MacUtilities reopened"
     }
 }

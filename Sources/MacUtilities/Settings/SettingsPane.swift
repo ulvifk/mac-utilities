@@ -8,5 +8,7 @@ struct SettingsPane {
     let title: String
     let symbolName: String
     let gradient: Gradient
+    /// Shown as a badge on the pane's row; nil for none.
+    let warning: String?
     let view: AnyView
 }

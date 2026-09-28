@@ -9,6 +9,7 @@ let sidebarRowHeight: CGFloat = 28
 /// Sets General apart from the features.
 let sidebarGapHeight: CGFloat = 12
 let sidebarIconTitleSpacing: CGFloat = 8
+let sidebarBadgeTrailingInset: CGFloat = 4
 
 /// Icon tiles in the sidebar and on the app's card, the size System Settings draws its sidebar's.
 let smallIconTileSize: CGFloat = 20
