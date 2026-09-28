@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The settings window, kept around across closes. The app is an accessory, so opening it activates the app to bring the window to the front.
+/// The settings window, kept around across closes. The app is an accessory, so opening it activates the app; the system may turn that down and
+/// leave the window behind the frontmost app's, so it is also ordered front regardless.
 final class SettingsWindow: NSWindow {
     init(rootView: SettingsView) {
         super.init(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -15,5 +16,6 @@ final class SettingsWindow: NSWindow {
     func open() {
         NSApp.activate()
         makeKeyAndOrderFront(nil)
+        orderFrontRegardless()
     }
 }

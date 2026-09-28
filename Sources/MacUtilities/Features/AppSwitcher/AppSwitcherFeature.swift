@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Replaces Cmd+Tab with the switcher panel, filtered to the whitelist when the filter is on.
@@ -7,11 +8,16 @@ final class AppSwitcherFeature: Feature {
     let displayName = "App Switcher"
     let menuItems: [NSMenuItem] = []
 
-    private let panel = SwitcherPanel()
+    private let panel: SwitcherPanel
+    /// Shows the glass live while it is set in the settings tab; clicks pass through it to the tab.
+    private let previewPanel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
+    private let glassStore = GlassStore()
     private let panelWidthStore = PanelWidthStore()
     private var observers: [NSObjectProtocol] = []
+    private var glassChanges: AnyCancellable?
+    private var previewHiding: DispatchWorkItem?
 
     private var candidates: [NSRunningApplication] = []
     private var isFiltered = false
@@ -23,6 +29,10 @@ final class AppSwitcherFeature: Feature {
     private var pendingAdvance = 0
 
     init() {
+        panel = SwitcherPanel(glassStore: glassStore)
+        previewPanel = SwitcherPanel(glassStore: glassStore)
+
+        previewPanel.ignoresMouseEvents = true
         wirePanel()
     }
 
@@ -31,6 +41,7 @@ final class AppSwitcherFeature: Feature {
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
+        glassChanges = observeGlassChanges()
         runSmokeTestIfRequested()
     }
 
@@ -39,8 +50,10 @@ final class AppSwitcherFeature: Feature {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         observers = []
+        glassChanges = nil
         tracker.stop()
         panel.hide()
+        previewPanel.hide()
     }
 
     func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -56,7 +69,7 @@ final class AppSwitcherFeature: Feature {
     }
 
     func buildSettingsView() -> AnyView {
-        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore))
+        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore, glassStore: glassStore))
     }
 
     private func runSmokeTestIfRequested() {
@@ -120,6 +133,13 @@ final class AppSwitcherFeature: Feature {
         }
 
         return observers
+    }
+
+    /// The store announces a change before making it; the main queue runs the preview after, and also while a slider is being dragged.
+    private func observeGlassChanges() -> AnyCancellable {
+        return glassStore.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { self.previewGlass() }
     }
 
     // MARK: events
@@ -429,5 +449,23 @@ final class AppSwitcherFeature: Feature {
     private func activateSelectedApp() {
         panel.hide()
         candidates[selectedIndex].activate(options: [.activateAllWindows])
+    }
+
+    // MARK: preview
+
+    /// Shows the running apps on the glass as just set and hides them a moment after the last change. Left out while the switcher is open,
+    /// since it shares the candidates.
+    private func previewGlass() {
+        if panel.isVisible { return }
+
+        loadCandidates()
+        if candidates.isEmpty { return }
+
+        selectedIndex = 0
+        previewPanel.show(state: buildState())
+
+        previewHiding?.cancel()
+        previewHiding = DispatchWorkItem { self.previewPanel.hide() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + glassPreviewDuration, execute: previewHiding!)
     }
 }
