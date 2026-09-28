@@ -6,16 +6,15 @@ final class SwitcherPanel: NSPanel {
     /// The width the edge drag asks for, before clamping.
     var onWidthDragged: (CGFloat) -> Void = { _ in }
 
-    private let glassStore: GlassStore
-
     /// The last state shown.
     private var state: SwitcherState!
+    /// The last glass shown.
+    private var isFrosted = false
     private var cells: [SwitcherCellView] = []
     private var highlight = NSView()
     private var nameLabel = NSTextField(labelWithString: "")
 
-    init(glassStore: GlassStore) {
-        self.glassStore = glassStore
+    init() {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -35,14 +34,16 @@ final class SwitcherPanel: NSPanel {
     /// Glass in a window without the active appearance draws a frosted, near-opaque stand-in, and this panel is never key. AppKit asks this
     /// private method, so answering yes gets the real see-through glass without taking keyboard focus from the frontmost app; Frosted keeps the stand-in.
     @objc func _hasActiveAppearance() -> Bool {
-        return !glassStore.isFrosted
+        return !isFrosted
     }
 
-    func show(state: SwitcherState) {
+    /// On the glass as set in the store now; later changes to it show from the next call.
+    func show(state: SwitcherState, glassStore: GlassStore) {
         self.state = state
+        isFrosted = glassStore.isFrosted
         let wasVisible = isVisible
 
-        buildContent()
+        buildContent(glassDarkness: glassStore.darkness)
         center()
 
         if wasVisible {
@@ -121,7 +122,7 @@ final class SwitcherPanel: NSPanel {
         orderOut(nil)
     }
 
-    private func buildContent() {
+    private func buildContent(glassDarkness: CGFloat) {
         let layout = buildLayout()
         let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
 
@@ -148,7 +149,7 @@ final class SwitcherPanel: NSPanel {
 
         highlight.frame = layout.getHighlightFrame(index: state.selectedIndex)
 
-        let glass = buildGlassView(size: layout.contentSize)
+        let glass = buildGlassView(size: layout.contentSize, darkness: glassDarkness)
         glass.contentView = container
 
         contentView = glass
@@ -282,12 +283,12 @@ final class SwitcherPanel: NSPanel {
         return highlight
     }
 
-    private func buildGlassView(size: NSSize) -> NSGlassEffectView {
+    private func buildGlassView(size: NSSize, darkness: CGFloat) -> NSGlassEffectView {
         let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: size))
 
         glass.style = .clear
         glass.cornerRadius = panelCornerRadius
-        glass.tintColor = NSColor.black.withAlphaComponent(glassStore.darkness)
+        glass.tintColor = NSColor.black.withAlphaComponent(darkness)
 
         return glass
     }

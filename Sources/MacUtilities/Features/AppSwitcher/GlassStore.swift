@@ -1,11 +1,17 @@
 import Combine
 import Foundation
 
-/// How the panel's glass looks, in UserDefaults: see-through or frosted, and how dark its tint is. The panel reads it each time it opens.
+/// How one list's glass looks, in UserDefaults under keys starting with the prefix: see-through or frosted, and how dark its tint is. The panel
+/// reads it each time it opens.
 final class GlassStore: ObservableObject {
-    private let frostedKey = "glassFrosted"
-    private let darknessKey = "glassDarkness"
+    private let frostedKey: String
+    private let darknessKey: String
     private let defaults = UserDefaults.standard
+
+    init(keyPrefix: String) {
+        frostedKey = keyPrefix + "Frosted"
+        darknessKey = keyPrefix + "Darkness"
+    }
 
     var isFrosted: Bool {
         return defaults.bool(forKey: frostedKey)

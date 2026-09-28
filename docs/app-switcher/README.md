@@ -12,10 +12,10 @@ feature off, Cmd+` behaves as macOS has it.
 
 The App Switcher tab of the settings window toggles the filter, quits every running
 regular app not in the whitelist, picks the panel's glass (Clear or Frosted, and a
-Darkness slider for its black tint), manages the whitelist (every running regular app
-is listed by name with its icon, switch on = whitelisted) and lists the in-switcher
-shortcuts as a reminder. Changes made there and with the shortcuts below show up in
-each other on the spot.
+Darkness slider for its black tint) separately for apps and for windows, manages the
+whitelist (every running regular app is listed by name with its icon, switch on =
+whitelisted) and lists the in-switcher shortcuts as a reminder. Changes made there
+and with the shortcuts below show up in each other on the spot.
 
 Filter off, every running app listed:
 
@@ -41,9 +41,11 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   panel.
 - The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
   Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
-  window. Both, and the tint's darkness, apply from the next time the switcher opens.
-  Changing either in the settings tab previews it live: the running apps show on the
-  new glass until a second after the last change, and clicks pass through to the tab.
+  window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
+  windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
+  the settings tab previews it live until a second after the last change: the apps'
+  glass with the running apps, the windows' glass with the windows of the app used
+  last, the one behind the settings window. Clicks pass through to the tab.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -106,11 +108,12 @@ keeps current; `SwitcherPanel` draws the glass panel from a `SwitcherState` usin
 that differ between icon and window cells in `SwitcherCellMetrics`;
 `AppWindows.swift` lists an app's windows as `AppWindow`s through the accessibility
 API, which also raises them, and `WindowThumbnails.swift` captures their thumbnails
-with ScreenCaptureKit; `GlassStore` keeps the glass look and darkness in
-UserDefaults; `WhitelistStore` keeps the filter switch and the whitelist in
-UserDefaults and publishes changes to the tab; `PanelWidthStore` keeps the dragged
-panel width, `ResizeHandleView` is the strip along each side edge that takes the drag
-and `BackgroundCursor.swift` lets the panel show the resize cursor while the app is
+with ScreenCaptureKit; one `GlassStore` for the apps and one for the windows keep the
+glass look and darkness in UserDefaults, each set in `GlassSettingsRows`;
+`WhitelistStore` keeps the filter switch and the whitelist in UserDefaults and
+publishes changes to the tab; `PanelWidthStore` keeps the dragged panel width,
+`ResizeHandleView` is the strip along each side edge that takes the drag and
+`BackgroundCursor.swift` lets the panel show the resize cursor while the app is
 inactive; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order
 and the windowed apps.
 

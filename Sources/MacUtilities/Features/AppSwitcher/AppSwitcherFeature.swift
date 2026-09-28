@@ -14,10 +14,11 @@ final class AppSwitcherFeature: Feature {
     private let previewPanel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
-    private let glassStore = GlassStore()
+    private let appGlassStore = GlassStore(keyPrefix: "appGlass")
+    private let windowGlassStore = GlassStore(keyPrefix: "windowGlass")
     private let panelWidthStore = PanelWidthStore()
     private var observers: [NSObjectProtocol] = []
-    private var glassChanges: AnyCancellable?
+    private var glassChanges: [AnyCancellable] = []
     private var previewHiding: DispatchWorkItem?
 
     private var isListingWindows = false
@@ -36,8 +37,8 @@ final class AppSwitcherFeature: Feature {
     private var pendingAdvance = 0
 
     init() {
-        panel = SwitcherPanel(glassStore: glassStore)
-        previewPanel = SwitcherPanel(glassStore: glassStore)
+        panel = SwitcherPanel()
+        previewPanel = SwitcherPanel()
 
         previewPanel.ignoresMouseEvents = true
         wirePanel()
@@ -48,7 +49,8 @@ final class AppSwitcherFeature: Feature {
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
-        glassChanges = observeGlassChanges()
+        glassChanges.append(observeGlassChanges(appGlassStore))
+        glassChanges.append(observeGlassChanges(windowGlassStore))
         runSmokeTestIfRequested()
     }
 
@@ -57,7 +59,7 @@ final class AppSwitcherFeature: Feature {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         observers = []
-        glassChanges = nil
+        glassChanges = []
         tracker.stop()
         panel.hide()
         previewPanel.hide()
@@ -76,7 +78,7 @@ final class AppSwitcherFeature: Feature {
     }
 
     func buildSettingsView() -> AnyView {
-        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore, glassStore: glassStore))
+        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore, appGlassStore: appGlassStore, windowGlassStore: windowGlassStore))
     }
 
     private func runSmokeTestIfRequested() {
@@ -143,10 +145,10 @@ final class AppSwitcherFeature: Feature {
     }
 
     /// The store announces a change before making it; the main queue runs the preview after, and also while a slider is being dragged.
-    private func observeGlassChanges() -> AnyCancellable {
+    private func observeGlassChanges(_ glassStore: GlassStore) -> AnyCancellable {
         return glassStore.objectWillChange
             .receive(on: DispatchQueue.main)
-            .sink { self.previewGlass() }
+            .sink { self.previewGlass(glassStore) }
     }
 
     // MARK: events
@@ -183,7 +185,9 @@ final class AppSwitcherFeature: Feature {
         DispatchQueue.main.async { self.openSwitcher(listingWindows: listingWindows) }
     }
 
+    /// The glass preview goes first: it shares the candidates, and a thumbnail arriving for it would redraw it from the ones loaded here.
     private func openSwitcher(listingWindows: Bool) {
+        previewPanel.hide()
         loadCandidates(listingWindows: listingWindows)
         isOpening = false
 
@@ -352,13 +356,32 @@ final class AppSwitcherFeature: Feature {
 
     // MARK: switching
 
-    /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later. The windows are
-    /// the frontmost app's, whatever the whitelist and the filter say.
+    /// The windows are the frontmost app's.
     private func loadCandidates(listingWindows: Bool) {
-        isListingWindows = listingWindows
-        candidates = listingWindows ? [] : getCandidates()
-        windows = listingWindows ? getWindows(of: NSWorkspace.shared.frontmostApplication!) : []
+        if listingWindows {
+            loadWindows(of: NSWorkspace.shared.frontmostApplication!)
+            return
+        }
+
+        loadApps()
+    }
+
+    /// The row width is fixed here, so the panel's layout and the row navigation agree even if the main screen changes later.
+    private func loadApps() {
+        isListingWindows = false
+        candidates = getCandidates()
+        windows = []
         isFiltered = isListingWhitelistOnly()
+        cellsPerRow = getCellsPerRow()
+    }
+
+    /// Whatever the whitelist and the filter say. Drops the thumbnails of windows no longer listed; the row width is fixed as for the apps.
+    private func loadWindows(of app: NSRunningApplication) {
+        isListingWindows = true
+        candidates = []
+        windows = getWindows(of: app)
+        thumbnails = thumbnails.filter { windowID, _ in windows.contains { $0.windowID == windowID } }
+        isFiltered = false
         cellsPerRow = getCellsPerRow()
     }
 
@@ -478,27 +501,29 @@ final class AppSwitcherFeature: Feature {
         let selectedIdentifier = candidates[selectedIndex].bundleIdentifier
 
         whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
-        loadCandidates(listingWindows: false)
+        loadApps()
         if candidates.isEmpty {
             panel.hide()
             return
         }
 
         selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
-        panel.show(state: buildState())
+        panel.show(state: buildState(), glassStore: appGlassStore)
     }
 
-    /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in; those of windows no longer listed are dropped.
+    /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.
     private func showPanel() {
-        panel.show(state: buildState())
-        if !isListingWindows { return }
+        panel.show(state: buildState(), glassStore: isListingWindows ? windowGlassStore : appGlassStore)
+        refreshThumbnails(of: windows.map { $0.windowID }, in: panel)
+    }
 
-        thumbnails = thumbnails.filter { windowID, _ in windows.contains { $0.windowID == windowID } }
-        captureThumbnails(of: windows.map { $0.windowID }) { windowID, thumbnail in
+    /// Each thumbnail shows in the panel as it arrives, while the panel is up.
+    private func refreshThumbnails(of windowIDs: [CGWindowID], in switcherPanel: SwitcherPanel) {
+        captureThumbnails(of: windowIDs) { windowID, thumbnail in
             self.thumbnails[windowID] = thumbnail
-            if !self.panel.isVisible { return }
+            if !switcherPanel.isVisible { return }
 
-            self.panel.update(state: self.buildState())
+            switcherPanel.update(state: self.buildState())
         }
     }
 
@@ -530,16 +555,23 @@ final class AppSwitcherFeature: Feature {
 
     // MARK: preview
 
-    /// Shows the running apps on the glass as just set and hides them a moment after the last change. Left out while the switcher is open,
-    /// since it shares the candidates.
-    private func previewGlass() {
+    /// Shows what the glass is for on the glass just set and hides it a moment after the last change: the running apps, or the windows of the
+    /// app used last, the one behind the settings window. Only windows without a thumbnail yet are captured, so dragging the slider does not
+    /// capture on every step. Left out while the switcher is open, since it shares the candidates.
+    private func previewGlass(_ glassStore: GlassStore) {
         if panel.isVisible { return }
 
-        loadCandidates(listingWindows: false)
-        if candidates.isEmpty { return }
+        if glassStore === windowGlassStore {
+            guard let app = getRecentRunningApps().first else { return }
+            loadWindows(of: app)
+        } else {
+            loadApps()
+        }
+        if getItemCount() == 0 { return }
 
         selectedIndex = 0
-        previewPanel.show(state: buildState())
+        previewPanel.show(state: buildState(), glassStore: glassStore)
+        refreshThumbnails(of: windows.map { $0.windowID }.filter { thumbnails[$0] == nil }, in: previewPanel)
 
         previewHiding?.cancel()
         previewHiding = DispatchWorkItem { self.previewPanel.hide() }

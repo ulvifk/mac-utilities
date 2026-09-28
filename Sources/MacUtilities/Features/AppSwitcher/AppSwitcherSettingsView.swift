@@ -14,10 +14,12 @@ private let switcherShortcuts: [(String, String)] = [
     ("Esc", "Close without switching"),
 ]
 
-/// The filter switch, the panel's glass, the whitelist (every running regular app, switch = whitelisted) and the in-switcher shortcuts.
+/// The filter switch, the panel's glass for apps and for windows, the whitelist (every running regular app, switch = whitelisted) and the
+/// in-switcher shortcuts.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
-    @ObservedObject var glassStore: GlassStore
+    let appGlassStore: GlassStore
+    let windowGlassStore: GlassStore
     @StateObject private var runningApps = RunningRegularApps()
 
     var body: some View {
@@ -27,15 +29,12 @@ struct AppSwitcherSettingsView: View {
                 Button("Quit apps not in the whitelist") { quitRegularAppsNotIn(whitelist: whitelistStore.getWhitelist()) }
             }
 
-            Section("Glass") {
-                Picker("Look", selection: buildFrostedBinding()) {
-                    Text("Clear").tag(false)
-                    Text("Frosted").tag(true)
-                }
-                .pickerStyle(.segmented)
-                Slider(value: buildDarknessBinding(), in: 0...maxGlassDarkness) {
-                    Text("Darkness")
-                }
+            Section("Apps (Cmd+Tab)") {
+                GlassSettingsRows(glassStore: appGlassStore)
+            }
+
+            Section("Windows (Cmd+`)") {
+                GlassSettingsRows(glassStore: windowGlassStore)
             }
 
             Section("Whitelist") {
@@ -64,20 +63,6 @@ struct AppSwitcherSettingsView: View {
         return Binding(
             get: { whitelistStore.isFilterEnabled },
             set: { whitelistStore.setFilterEnabled($0) }
-        )
-    }
-
-    private func buildFrostedBinding() -> Binding<Bool> {
-        return Binding(
-            get: { glassStore.isFrosted },
-            set: { glassStore.setFrosted($0) }
-        )
-    }
-
-    private func buildDarknessBinding() -> Binding<CGFloat> {
-        return Binding(
-            get: { glassStore.darkness },
-            set: { glassStore.setDarkness($0) }
         )
     }
 

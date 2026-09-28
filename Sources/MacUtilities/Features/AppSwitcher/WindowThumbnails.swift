@@ -5,6 +5,8 @@ import ScreenCaptureKit
 /// windows and those on another Space draw nothing and are left out. Needs Screen Recording: without it the listing fails, as does the capture of a
 /// window closed meanwhile, and the task ends there, leaving the app's icon in place.
 func captureThumbnails(of windowIDs: [CGWindowID], onCaptured: @escaping (CGWindowID, NSImage) -> Void) {
+    if windowIDs.isEmpty { return }
+
     _ = Task { @MainActor in
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
 
