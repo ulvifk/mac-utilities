@@ -588,12 +588,13 @@ final class AppSwitcherFeature: Feature {
     // MARK: preview
 
     /// Shows what the glass is for on the glass just set and hides it a moment after the last change: the running apps, or the windows of the
-    /// app used last, the one behind the settings window. Only windows without a thumbnail yet are captured, so dragging the slider does not
-    /// capture on every step. Left out while the switcher is open, since it shares the candidates, and hidden with nothing to list, since a
+    /// app used last, the one behind the settings window. Their thumbnails are captured when the preview comes up on them, not again on every
+    /// step of a slider drag. Left out while the switcher is open, since it shares the candidates, and hidden with nothing to list, since a
     /// thumbnail still arriving would redraw it from the empty list.
     private func previewGlass(listingWindows: Bool) {
         if panel.isVisible { return }
 
+        let wasPreviewingWindows = isPreviewingWindows()
         if listingWindows {
             guard let app = getRecentRunningApps().first else { return }
             loadWindows(of: app)
@@ -607,10 +608,18 @@ final class AppSwitcherFeature: Feature {
 
         selectedIndex = 0
         previewPanel.show(state: buildState(), glassStore: getGlassStore())
-        refreshThumbnails(of: windows.map { $0.windowID }.filter { thumbnails[$0] == nil }, in: previewPanel)
+        if !wasPreviewingWindows {
+            refreshThumbnails(of: windows.map { $0.windowID }, in: previewPanel)
+        }
 
         previewHiding?.cancel()
         previewHiding = DispatchWorkItem { self.previewPanel.hide() }
         DispatchQueue.main.asyncAfter(deadline: .now() + glassPreviewDuration, execute: previewHiding!)
+    }
+
+    /// While the preview is up, the candidates are its own: the switcher hides it before loading.
+    private func isPreviewingWindows() -> Bool {
+        if !previewPanel.isVisible { return false }
+        return isListingWindows
     }
 }
