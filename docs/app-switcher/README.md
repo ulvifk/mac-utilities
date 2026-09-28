@@ -12,7 +12,8 @@ feature off, Cmd+` behaves as macOS has it.
 
 The App Switcher tab of the settings window toggles the filter, quits every running
 regular app not in the whitelist, picks the panel's glass (Clear or Frosted, and a
-Darkness slider for its black tint) separately for apps and for windows, manages the
+Darkness slider for its black tint) separately for apps and for windows, switches the
+cards around windows on or off and picks their own look and darkness, manages the
 whitelist (every running regular app is listed by name with its icon, switch on =
 whitelisted) and lists the in-switcher shortcuts as a reminder. Changes made there
 and with the shortcuts below show up in each other on the spot.
@@ -44,8 +45,9 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
   windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
   the settings tab previews it live until a second after the last change: the apps'
-  glass with the running apps, the windows' glass with the windows of the app used
-  last, the one behind the settings window. Clicks pass through to the tab.
+  glass with the running apps, the windows' glass and the card settings with the
+  windows of the app used last, the one behind the settings window. Clicks pass
+  through to the tab.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -89,6 +91,12 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   the same app shows the last thumbnails at once and refreshes them, until another
   app's windows are listed. A minimized window keeps the thumbnail it had, or the icon
   if it was never captured.
+- Each window sits in a dark card, the selected one ringed in the accent colour as
+  Mission Control rings a hovered window, so the selection stands out on bright glass
+  too. The cards have their own Look and Darkness under "Window cards" in the settings
+  tab: Clear lets what is behind the panel show through the card's black fill, Frosted
+  blurs it away first; the fill starts at 30%. With "Cards around windows" off, the
+  thumbnails and titles sit on the glass and only the highlight marks the selection.
 - Thumbnails need Screen Recording permission (System Settings > Privacy & Security >
   Screen & System Audio Recording); macOS asks the first time Cmd+` opens the panel.
   Without it every window shows its app's icon.
@@ -108,14 +116,14 @@ keeps current; `SwitcherPanel` draws the glass panel from a `SwitcherState` usin
 that differ between icon and window cells in `SwitcherCellMetrics`;
 `AppWindows.swift` lists an app's windows as `AppWindow`s through the accessibility
 API, which also raises them, and `WindowThumbnails.swift` captures their thumbnails
-with ScreenCaptureKit; one `GlassStore` for the apps and one for the windows keep the
-glass look and darkness in UserDefaults, each set in `GlassSettingsRows`;
-`WhitelistStore` keeps the filter switch and the whitelist in UserDefaults and
-publishes changes to the tab; `PanelWidthStore` keeps the dragged panel width,
-`ResizeHandleView` is the strip along each side edge that takes the drag and
-`BackgroundCursor.swift` lets the panel show the resize cursor while the app is
-inactive; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order
-and the windowed apps.
+with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the window
+cards keeps a look and darkness in UserDefaults, set in `GlassSettingsRows`, and
+`WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
+and the whitelist in UserDefaults and publishes changes to the tab; `PanelWidthStore`
+keeps the dragged panel width, `ResizeHandleView` is the strip along each side edge
+that takes the drag and `BackgroundCursor.swift` lets the panel show the resize
+cursor while the app is inactive; `RecentAppsTracker` and `RunningApps` provide the
+most-recently-used order and the windowed apps.
 
 ## Dev
 

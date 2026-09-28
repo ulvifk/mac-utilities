@@ -64,7 +64,7 @@ final class SwitcherPanel: NSPanel {
         let layout = buildLayout()
 
         if state.isListingWindows {
-            showThumbnails()
+            showWindowStatus()
         } else {
             showAppStatus(layout: layout)
         }
@@ -182,8 +182,9 @@ final class SwitcherPanel: NSPanel {
 
     private func buildWindowCell(index: Int) -> SwitcherCellView {
         let window = state.windows[index]
-        let cell = WindowCellView(window: window)
+        let cell = WindowCellView(window: window, cardGlass: state.windowCardGlass)
 
+        cell.showSelected(index == state.selectedIndex)
         if let thumbnail = state.thumbnails[window.windowID] {
             cell.showThumbnail(thumbnail)
         }
@@ -201,12 +202,15 @@ final class SwitcherPanel: NSPanel {
         nameLabel.frame = getNameFrame(layout: layout)
     }
 
-    /// Swaps in the thumbnails captured since the cells were built.
-    private func showThumbnails() {
-        for (cell, window) in zip(cells, state.windows) {
-            guard let thumbnail = state.thumbnails[window.windowID] else { continue }
+    /// Rings the selected window's card and swaps in the thumbnails captured since the cells were built.
+    private func showWindowStatus() {
+        for (index, window) in state.windows.enumerated() {
+            let cell = cells[index] as! WindowCellView
 
-            (cell as! WindowCellView).showThumbnail(thumbnail)
+            cell.showSelected(index == state.selectedIndex)
+            if let thumbnail = state.thumbnails[window.windowID] {
+                cell.showThumbnail(thumbnail)
+            }
         }
     }
 

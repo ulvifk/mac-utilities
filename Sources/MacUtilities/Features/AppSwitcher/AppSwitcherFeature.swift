@@ -14,11 +14,13 @@ final class AppSwitcherFeature: Feature {
     private let previewPanel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
-    private let appGlassStore = GlassStore(keyPrefix: "appGlass")
-    private let windowGlassStore = GlassStore(keyPrefix: "windowGlass")
+    private let appGlassStore = GlassStore(keyPrefix: "appGlass", defaultDarkness: defaultGlassDarkness)
+    private let windowGlassStore = GlassStore(keyPrefix: "windowGlass", defaultDarkness: defaultGlassDarkness)
+    private let windowCardStore = WindowCardStore()
+    private let windowCardGlassStore = GlassStore(keyPrefix: "windowCardGlass", defaultDarkness: defaultWindowCardDarkness)
     private let panelWidthStore = PanelWidthStore()
     private var observers: [NSObjectProtocol] = []
-    private var glassChanges: [AnyCancellable] = []
+    private var lookChanges: [AnyCancellable] = []
     private var previewHiding: DispatchWorkItem?
 
     private var isListingWindows = false
@@ -49,8 +51,10 @@ final class AppSwitcherFeature: Feature {
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
-        glassChanges.append(observeGlassChanges(appGlassStore))
-        glassChanges.append(observeGlassChanges(windowGlassStore))
+        lookChanges.append(observeLookChanges(of: appGlassStore, previewing: appGlassStore))
+        lookChanges.append(observeLookChanges(of: windowGlassStore, previewing: windowGlassStore))
+        lookChanges.append(observeLookChanges(of: windowCardStore, previewing: windowGlassStore))
+        lookChanges.append(observeLookChanges(of: windowCardGlassStore, previewing: windowGlassStore))
         runSmokeTestIfRequested()
     }
 
@@ -59,7 +63,7 @@ final class AppSwitcherFeature: Feature {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         observers = []
-        glassChanges = []
+        lookChanges = []
         tracker.stop()
         panel.hide()
         previewPanel.hide()
@@ -78,7 +82,13 @@ final class AppSwitcherFeature: Feature {
     }
 
     func buildSettingsView() -> AnyView {
-        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore, appGlassStore: appGlassStore, windowGlassStore: windowGlassStore))
+        return AnyView(AppSwitcherSettingsView(
+            whitelistStore: whitelistStore,
+            appGlassStore: appGlassStore,
+            windowGlassStore: windowGlassStore,
+            windowCardStore: windowCardStore,
+            windowCardGlassStore: windowCardGlassStore
+        ))
     }
 
     private func runSmokeTestIfRequested() {
@@ -144,11 +154,12 @@ final class AppSwitcherFeature: Feature {
         return observers
     }
 
-    /// The store announces a change before making it; the main queue runs the preview after, and also while a slider is being dragged.
-    private func observeGlassChanges(_ glassStore: GlassStore) -> AnyCancellable {
-        return glassStore.objectWillChange
+    /// The store announces a change before making it; the main queue runs the preview on the list's glass after, and also while a slider is
+    /// being dragged.
+    private func observeLookChanges(of store: some ObservableObject, previewing glassStore: GlassStore) -> AnyCancellable {
+        return store.objectWillChange
             .receive(on: DispatchQueue.main)
-            .sink { self.previewGlass(glassStore) }
+            .sink { _ in self.previewGlass(glassStore) }
     }
 
     // MARK: events
@@ -533,6 +544,7 @@ final class AppSwitcherFeature: Feature {
             windows: windows,
             thumbnails: thumbnails,
             isListingWindows: isListingWindows,
+            windowCardGlass: windowCardStore.showsCards ? windowCardGlassStore : nil,
             cellsPerRow: cellsPerRow,
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,

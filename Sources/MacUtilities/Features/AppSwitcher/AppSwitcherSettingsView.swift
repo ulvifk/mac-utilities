@@ -14,12 +14,14 @@ private let switcherShortcuts: [(String, String)] = [
     ("Esc", "Close without switching"),
 ]
 
-/// The filter switch, the panel's glass for apps and for windows, the whitelist (every running regular app, switch = whitelisted) and the
-/// in-switcher shortcuts.
+/// The filter switch, the panel's glass for apps and for windows, the window cards and their glass, the whitelist (every running regular app,
+/// switch = whitelisted) and the in-switcher shortcuts.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
+    @ObservedObject var windowCardStore: WindowCardStore
+    let windowCardGlassStore: GlassStore
     @StateObject private var runningApps = RunningRegularApps()
 
     var body: some View {
@@ -35,6 +37,12 @@ struct AppSwitcherSettingsView: View {
 
             Section("Windows (Cmd+`)") {
                 GlassSettingsRows(glassStore: windowGlassStore)
+            }
+
+            Section("Window cards") {
+                Toggle("Cards around windows", isOn: buildWindowCardsBinding())
+                GlassSettingsRows(glassStore: windowCardGlassStore)
+                    .disabled(!windowCardStore.showsCards)
             }
 
             Section("Whitelist") {
@@ -63,6 +71,13 @@ struct AppSwitcherSettingsView: View {
         return Binding(
             get: { whitelistStore.isFilterEnabled },
             set: { whitelistStore.setFilterEnabled($0) }
+        )
+    }
+
+    private func buildWindowCardsBinding() -> Binding<Bool> {
+        return Binding(
+            get: { windowCardStore.showsCards },
+            set: { windowCardStore.setShowsCards($0) }
         )
     }
 

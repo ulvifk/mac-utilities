@@ -53,10 +53,18 @@ let windowThumbnailFrameInCell = NSRect(
     width: windowThumbnailSize.width,
     height: windowThumbnailSize.height
 )
+/// The card framing each window's thumbnail and title, where the highlight also sits.
+let windowCardFrameInCell = NSRect(origin: .zero, size: windowCellSize).insetBy(dx: highlightIconInset, dy: highlightIconInset)
+/// The card's black fill until its darkness slider is moved: enough to keep the title readable on clear glass.
+let defaultWindowCardDarkness: CGFloat = 0.3
+let windowCardBorderColor = NSColor.white.withAlphaComponent(0.18)
+let windowCardBorderWidth: CGFloat = 1
+/// The selected card's border is Mission Control's ring around a hovered window, in the accent colour, so it shows on bright glass too.
+let selectedWindowCardBorderWidth: CGFloat = 3
 /// Padded like the sides, so the highlight stays concentric with the panel at the top and bottom corners too; rows as far apart as columns.
 let windowCellMetrics = SwitcherCellMetrics(
     cellSize: windowCellSize,
-    highlightFrameInCell: NSRect(origin: .zero, size: windowCellSize).insetBy(dx: highlightIconInset, dy: highlightIconInset),
+    highlightFrameInCell: windowCardFrameInCell,
     rowSpacing: itemSpacing,
     verticalPadding: horizontalPadding
 )
