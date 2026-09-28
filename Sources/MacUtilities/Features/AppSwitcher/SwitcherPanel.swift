@@ -15,9 +15,10 @@ final class SwitcherPanel: NSPanel {
     private var nameLabel = NSTextField(labelWithString: "")
     private let hintBand = HintBandView()
 
-    /// From the moment the hints come in until the panel hides.
+    /// From the moment the hints come in or a shortcut says what it did, until the panel hides.
     private var isShowingHintBand = false
     private var hintShowing: DispatchWorkItem?
+    private var feedbackHiding: DispatchWorkItem?
 
     init() {
         super.init(
@@ -137,9 +138,23 @@ final class SwitcherPanel: NSPanel {
         DispatchQueue.main.asyncAfter(deadline: .now() + hintDelay, execute: hintShowing!)
     }
 
-    /// Drops the hints still to come and takes the band away, so the next opening starts without it.
+    /// For a moment in place of the hints, growing the band first when it is not shown yet; the hints come in after it either way.
+    func showFeedback(_ feedback: SwitcherFeedback) {
+        hintShowing?.cancel()
+        feedbackHiding?.cancel()
+        if !isShowingHintBand {
+            showHintBand()
+        }
+
+        hintBand.showFeedback(feedback, width: buildLayout().contentSize.width)
+        feedbackHiding = DispatchWorkItem { self.hintBand.showHints() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + feedbackDuration, execute: feedbackHiding!)
+    }
+
+    /// Drops the hints and feedback still to come and takes the band away, so the next opening starts without it.
     func hide() {
         hintShowing?.cancel()
+        feedbackHiding?.cancel()
         isShowingHintBand = false
         hintBand.clear()
         orderOut(nil)

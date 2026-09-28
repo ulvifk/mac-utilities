@@ -86,6 +86,8 @@ let badgeHeight: CGFloat = 16
 let badgeHorizontalPadding: CGFloat = 7
 let badgeSymbolSpacing: CGFloat = 3
 let badgeColor = NSColor.systemGreen.withAlphaComponent(0.85)
+/// On the Whitelist capsule and on the feedback about the filter.
+let whitelistSymbolName = "line.3.horizontal.decrease"
 /// Hidden apps stay listed, dimmed like in the native switcher, so they can be brought back.
 let hiddenIconAlpha: CGFloat = 0.4
 /// After Cmd+Q the icon fades and shrinks out while the rest slide into place, over this long.
@@ -95,8 +97,10 @@ let leavingIconShrink: CGFloat = iconSize / 4
 
 /// How long the panel stays open before the shortcut hints come in, so a quick Cmd+Tab never shows them.
 let hintDelay: TimeInterval = 0.9
-/// The hint band growing in and the hints fading in.
+/// The hint band growing in, and the hints and the feedback fading into each other.
 let hintFadeDuration: TimeInterval = 0.2
+/// How long the feedback stays in place of the hints.
+let feedbackDuration: TimeInterval = 1.2
 
 let hintKeycapHeight: CGFloat = 18
 let hintKeycapCornerRadius: CGFloat = 5
@@ -119,3 +123,6 @@ let hintTrayColor = NSColor.black.withAlphaComponent(0.26)
 /// The tray grows no nearer the side edges than this, which at its height keeps it clear of the panel's rounded corners, so even a panel one
 /// icon wide has room for the shortest hint.
 let hintTraySideInset: CGFloat = 16
+/// The feedback sits on a tray of the same height, sized to its symbol and text.
+let feedbackTrayPadding: CGFloat = 10
+let feedbackSymbolSpacing: CGFloat = 5

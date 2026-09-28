@@ -262,8 +262,10 @@ final class AppSwitcherFeature: Feature {
 
         if isWhitelistToggleShortcut(event) {
             let bundleIdentifier = candidates[selectedIndex].bundleIdentifier!
-            whitelistStore.setListed(bundleIdentifier, !whitelistStore.isListed(bundleIdentifier))
+            let listed = !whitelistStore.isListed(bundleIdentifier)
+            whitelistStore.setListed(bundleIdentifier, listed)
             panel.update(state: buildState())
+            showFeedback(listed ? .addedToWhitelist : .removedFromWhitelist)
             return true
         }
 
@@ -273,21 +275,37 @@ final class AppSwitcherFeature: Feature {
         }
 
         if isBatchQuitShortcut(event) {
-            DispatchQueue.main.async { runBatchQuit(self.batchQuitStore) }
+            DispatchQueue.main.async { self.runBatchQuitShowingCount() }
             return true
         }
 
         if isQuitShortcut(event) {
-            candidates[selectedIndex].terminate()
+            let app = candidates[selectedIndex]
+            app.terminate()
+            showFeedback(.quittingApp(name: getAppName(app)))
             return true
         }
 
         if isHideShortcut(event) {
-            candidates[selectedIndex].hide()
+            hideSelectedApp()
             return true
         }
 
         return false
+    }
+
+    /// A second press on a hidden app does nothing.
+    private func hideSelectedApp() {
+        let app = candidates[selectedIndex]
+        if app.isHidden { return }
+
+        app.hide()
+        showFeedback(.hidden)
+    }
+
+    /// On the next turn of the main queue: showing it can grow the panel, an animation the tap callback must not wait on.
+    private func showFeedback(_ feedback: SwitcherFeedback) {
+        DispatchQueue.main.async { self.panel.showFeedback(feedback) }
     }
 
     /// Releasing Cmd activates the selection; the release itself always reaches the focused app.
@@ -540,6 +558,19 @@ final class AppSwitcherFeature: Feature {
 
         selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
         panel.show(state: buildState(), glassStore: getGlassStore())
+        panel.showFeedback(getFilterFeedback())
+    }
+
+    /// What is listed now: with the filter on, every app still is while no whitelisted app has a window.
+    private func getFilterFeedback() -> SwitcherFeedback {
+        if isFiltered { return .showingWhitelist }
+        if whitelistStore.isFilterEnabled { return .noWhitelistedApps }
+        return .showingAllApps
+    }
+
+    private func runBatchQuitShowingCount() {
+        let quitCount = runBatchQuit(batchQuitStore)
+        panel.showFeedback(.quittingApps(count: quitCount))
     }
 
     /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.

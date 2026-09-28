@@ -5,7 +5,7 @@ final class WhitelistBadgeView: NSView {
     convenience init() {
         self.init(frame: .zero)
 
-        let symbol = NSImageView(image: NSImage(systemSymbolName: "line.3.horizontal.decrease", accessibilityDescription: nil)!)
+        let symbol = NSImageView(image: NSImage(systemSymbolName: whitelistSymbolName, accessibilityDescription: nil)!)
         let label = NSTextField(labelWithString: "Whitelist")
 
         symbol.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 9, weight: .bold)

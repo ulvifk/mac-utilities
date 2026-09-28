@@ -1,8 +1,10 @@
 import AppKit
 
-/// The band the panel grows along its bottom edge: a tray of the shortcut hints that fit its width, centered. Shows them only when told to.
+/// The band the panel grows along its bottom edge: a tray of the shortcut hints that fit its width, or for a moment in its place a tray saying
+/// what a shortcut just did, both centered. Shows neither until told to.
 final class HintBandView: NSView {
     private var hintTray = NSView()
+    private var feedbackTray = NSView()
 
     /// What the hint tray was built for.
     private var trayHints: [ShortcutHint] = []
@@ -33,12 +35,33 @@ final class HintBandView: NSView {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = hintFadeDuration
             hintTray.animator().alphaValue = 1
+            feedbackTray.animator().alphaValue = 0
         }
     }
 
-    /// Hides the hints again, for the next time the panel opens.
+    /// In place of the hints, or of the feedback before it.
+    func showFeedback(_ feedback: SwitcherFeedback, width: CGFloat) {
+        let previousTray = feedbackTray
+        let tray = buildFeedbackTray(feedback, width: width)
+
+        tray.alphaValue = 0
+        addSubview(tray)
+        feedbackTray = tray
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = hintFadeDuration
+            hintTray.animator().alphaValue = 0
+            previousTray.animator().alphaValue = 0
+            tray.animator().alphaValue = 1
+        }, completionHandler: {
+            previousTray.removeFromSuperview()
+        })
+    }
+
+    /// Shows neither again, for the next time the panel opens.
     func clear() {
         hintTray.alphaValue = 0
+        feedbackTray.removeFromSuperview()
     }
 
     private func isTrayBuilt(for hints: [ShortcutHint], width: CGFloat) -> Bool {
@@ -63,7 +86,7 @@ final class HintBandView: NSView {
             hintsWidth = x + hintView.frame.width
         }
 
-        let tray = buildTray(width: hintTrayPadding + hintsWidth + hintTrayTrailingPadding)
+        let tray = buildTray(width: hintTrayPadding + hintsWidth + hintTrayTrailingPadding, color: hintTrayColor)
         for hintView in hintViews {
             tray.addSubview(hintView)
         }
@@ -114,14 +137,44 @@ final class HintBandView: NSView {
         return keycap
     }
 
+    /// The feedback's symbol and text on a tray of its colour, no wider than the hint tray may be, truncating a longer text.
+    private func buildFeedbackTray(_ feedback: SwitcherFeedback, width: CGFloat) -> NSView {
+        let symbol = NSImageView(image: NSImage(systemSymbolName: feedback.symbolName, accessibilityDescription: nil)!)
+        let label = NSTextField(labelWithString: feedback.text)
+
+        symbol.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .heavy)
+        symbol.contentTintColor = .white
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = .white
+        label.lineBreakMode = .byTruncatingTail
+
+        let symbolSize = symbol.fittingSize
+        let labelSize = label.fittingSize
+        let fittingWidth = feedbackTrayPadding + symbolSize.width + feedbackSymbolSpacing + labelSize.width + feedbackTrayPadding
+        let tray = buildTray(width: min(fittingWidth, width - 2 * hintTraySideInset), color: feedback.color)
+
+        symbol.frame = alignToPixels(NSRect(x: feedbackTrayPadding, y: (hintTrayHeight - symbolSize.height) / 2, width: symbolSize.width, height: symbolSize.height))
+        let labelX = symbol.frame.maxX + feedbackSymbolSpacing
+        label.frame = alignToPixels(NSRect(
+            x: labelX,
+            y: (hintTrayHeight - labelSize.height) / 2,
+            width: tray.frame.width - labelX - feedbackTrayPadding,
+            height: labelSize.height
+        ))
+        tray.addSubview(symbol)
+        tray.addSubview(label)
+
+        return tray
+    }
+
     /// Centered on the band's current width, so it stays centered while the band's width animates.
-    private func buildTray(width: CGFloat) -> NSView {
+    private func buildTray(width: CGFloat, color: NSColor) -> NSView {
         let tray = NSView(frame: alignToPixels(NSRect(x: (bounds.width - width) / 2, y: hintTrayBottomPadding, width: width, height: hintTrayHeight)))
 
         tray.autoresizingMask = [.minXMargin, .maxXMargin]
         tray.wantsLayer = true
         tray.layer?.cornerRadius = hintTrayCornerRadius
-        tray.layer?.backgroundColor = hintTrayColor.cgColor
+        tray.layer?.backgroundColor = color.cgColor
 
         return tray
     }
