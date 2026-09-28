@@ -21,7 +21,7 @@ func runBatchQuit(_ batchQuitStore: BatchQuitStore) {
     for app in getRegularRunningApps() {
         guard let bundleIdentifier = app.bundleIdentifier else { continue }
         if !isBatchQuittable(app) { continue }
-        if !batchQuitStore.isListed(bundleIdentifier) { continue }
+        if !batchQuitStore.isQuitting(bundleIdentifier) { continue }
         app.terminate()
     }
 }
