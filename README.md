@@ -67,8 +67,9 @@ sudoers line it needs and what is restored on quit or crash.
 
 Global shortcuts that open or toggle an app, run a shell command or toggle keep-awake,
 kept in `~/.config/mac-utilities/hotkeys.json` and edited in the Hotkeys pane, which
-records combos, picks apps with their icons and warns about taken keys. See
-[docs/hotkeys](docs/hotkeys/README.md) for the file format and the actions.
+records combos, shows them as keycaps, picks apps with their icons and warns about
+taken keys. See [docs/hotkeys](docs/hotkeys/README.md) for the file format and the
+actions.
 
 ## Install
 

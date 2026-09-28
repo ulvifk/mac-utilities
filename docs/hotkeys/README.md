@@ -67,23 +67,29 @@ until it parses again, so hand edits are never overwritten.
 
 ## Settings pane
 
-One row per binding: the recorder button, the action, its target and a warning when
-the key is taken. Click the recorder and press the combo; it shows as symbols
-(⌥⌘T). Esc or a click elsewhere stops recording. Only combos with at least one
-modifier are recorded; a bare function key can still be set in the file. While
-recording, no binding fires, so a combo that is already bound can be recorded again;
-the duplicate then shows through the warning.
+One row per binding: the action, each with its own symbol; the app it acts on, for
+the app actions; the shortcut as keycaps; and a button removing the binding. A
+command gets the full width of a line under its row, and a warning comes last when
+the key is taken.
+
+Click the shortcut, a dashed "Record Shortcut" capsule until one is recorded, and
+press the combo; the capsule reads "Press keys…" meanwhile, and the combo then shows
+as keycaps (⌥ ⌘ T). Esc or a click elsewhere stops recording. Only combos with at
+least one modifier are recorded; a bare function key can still be set in the file.
+While recording, no binding fires, so a combo that is already bound can be recorded
+again; the duplicate then shows through the warning.
 
 The target is an app picker (every `.app` in `/Applications`, `/System/Applications`,
 `~/Applications` and their `Utilities` folders, with icons) for the app actions, a
 text field for the command, nothing for keep-awake. Changing the action clears the
 target.
 
-The warning names the other binding with the same key, or the macOS use of a
-reserved combo: Cmd+Space (Spotlight), Cmd+Tab and Cmd+Shift+Tab (app switching,
-claimed by macOS or the app-switcher feature either way), Cmd+Option+Esc, Ctrl+Cmd+Q,
-Cmd+Shift+3/4/5 and Ctrl+arrows. A warned binding is still saved and still fires
-where the tap sees the key first.
+The warning says another binding has the same key ("Same shortcut as another
+hotkey", on both rows), or names the macOS use of a reserved combo: Cmd+Space
+(Spotlight), Cmd+Tab and Cmd+Shift+Tab (app switching, claimed by macOS or the
+app-switcher feature either way), Cmd+Option+Esc, Ctrl+Cmd+Q, Cmd+Shift+3/4/5 and
+Ctrl+arrows. A warned binding is still saved and still fires where the tap sees the
+key first.
 
 Every change is written to the file at once; there is no save button. The pane shows
 the path of the file it edits in its footer.
@@ -95,6 +101,8 @@ presses against the bindings and runs the action off the tap through
 `PerformHotkeyAction`; `HotkeyBindingsStore` reads and writes the file and watches the
 directory; `HotkeyBinding`, `KeyCombo`, `ModifierKey`, `HotkeyAction` and
 `HotkeyActionType` are the file's shape, with `KeyNames` turning key codes into
-labels; `HotkeysSettingsView` lists a `HotkeyBindingRow` per binding, built from
-`KeyRecorderField` (wrapping `KeyRecorderButton`), `AppPicker` over `InstalledApps`
-and the warnings from `HotkeyConflicts`.
+labels; `HotkeysSettingsView` holds the sections of the settings pane, listing a
+`HotkeyBindingRow` per binding, built from `KeyRecorderField` (wrapping
+`KeyRecorderButton`, which draws a `KeyRecorderLabel`: the capsule, or the combo in
+the shared `KeycapsView`), `AppPicker` over `InstalledApps` and the warnings from
+`HotkeyConflicts`.
