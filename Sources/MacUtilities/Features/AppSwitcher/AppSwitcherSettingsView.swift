@@ -66,7 +66,7 @@ struct AppSwitcherSettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 LabeledContent(batchQuitStore.quitsUnlistedApps ? "Apps to keep" : "Apps to quit") {
-                    BatchQuitAppPicker(batchQuitStore: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
+                    AppListPicker(store: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
                 }
                 Button(batchQuitStore.quitsUnlistedApps ? "Quit unlisted apps" : "Quit listed apps") { runBatchQuit(batchQuitStore) }
             }

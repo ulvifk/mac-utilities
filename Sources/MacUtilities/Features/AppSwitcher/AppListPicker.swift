@@ -3,13 +3,13 @@ import SwiftUI
 /// The checklist scrolls beyond this height, so a long list of running apps stays on screen.
 private let checklistMaxHeight: CGFloat = 440
 
-/// A button counting the running apps on the Batch Quit list. It opens a popover with a checkbox for each app that can go on it, the ones listed
-/// at that moment above a divider; unlike a menu, the popover stays open while several are checked, and its rows stay in place meanwhile.
-struct BatchQuitAppPicker: View {
-    @ObservedObject var batchQuitStore: BatchQuitStore
+/// A button counting the running apps on a saved app list. It opens a popover with a checkbox for each app that can go on it, the ones listed at
+/// that moment above a divider; unlike a menu, the popover stays open while several are checked, and its rows stay in place meanwhile.
+struct AppListPicker<Store: AppListStore>: View {
+    @ObservedObject var store: Store
     /// By name.
     let apps: [NSRunningApplication]
-    @StateObject private var state = BatchQuitPickerState()
+    @StateObject private var state = AppListPickerState()
 
     var body: some View {
         Button { showChecklist() } label: {
@@ -26,13 +26,13 @@ struct BatchQuitAppPicker: View {
     }
 
     private func showChecklist() {
-        state.listedWhenShown = Set(apps.map { $0.bundleIdentifier! }.filter(batchQuitStore.isListed))
+        state.listedWhenShown = Set(apps.map { $0.bundleIdentifier! }.filter(store.isListed))
         state.isShown = true
     }
 
     /// A count rather than names, which would stretch the button across the tab.
     private func getSummary() -> String {
-        let listedCount = apps.filter { batchQuitStore.isListed($0.bundleIdentifier!) }.count
+        let listedCount = apps.filter { store.isListed($0.bundleIdentifier!) }.count
         if listedCount == 0 { return "None" }
         if listedCount == 1 { return "1 app" }
 
@@ -83,8 +83,8 @@ struct BatchQuitAppPicker: View {
 
     private func buildListedBinding(bundleIdentifier: String) -> Binding<Bool> {
         return Binding(
-            get: { batchQuitStore.isListed(bundleIdentifier) },
-            set: { batchQuitStore.setListed(bundleIdentifier, $0) }
+            get: { store.isListed(bundleIdentifier) },
+            set: { store.setListed(bundleIdentifier, $0) }
         )
     }
 }

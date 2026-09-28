@@ -134,10 +134,10 @@ with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the w
 cards keeps a look and darkness in UserDefaults, set in `GlassSettingsRows`, and
 `WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
 and the whitelist in UserDefaults and publishes changes to the tab; `BatchQuitStore`
-keeps the Batch Quit list and its mode the same way and `BatchQuitAppPicker` edits
-it; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is the strip
-along each side edge that takes the drag and `BackgroundCursor.swift` lets the panel
-show the resize cursor while the app is inactive; `RecentAppsTracker` and
+keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits the
+list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is the
+strip along each side edge that takes the drag and `BackgroundCursor.swift` lets the
+panel show the resize cursor while the app is inactive; `RecentAppsTracker` and
 `RunningApps` provide the most-recently-used order and the windowed apps.
 
 ## Dev
