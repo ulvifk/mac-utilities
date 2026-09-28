@@ -8,7 +8,7 @@ let popoverSectionSpacing: CGFloat = 12
 let popoverTitleFont = Font.system(size: 15, weight: .bold)
 /// Tile subtitles and the header's status line.
 let secondaryLineFont = Font.system(size: 11)
-/// A round toggle filling or emptying.
+/// A toggle filling or a chip being picked.
 let popoverStateAnimation = Animation.easeOut(duration: 0.15)
 
 let tileSpacing: CGFloat = 8
@@ -22,3 +22,8 @@ let roundToggleSymbolFont = Font.system(size: 15, weight: .semibold)
 let roundToggleOffFill = Color.primary.opacity(0.1)
 /// Between the round toggle and its title.
 let roundToggleSpacing: CGFloat = 10
+
+let chipHeight: CGFloat = 26
+let chipSpacing: CGFloat = 6
+let chipFill = Color.primary.opacity(0.08)
+let chipFont = Font.system(size: 12, weight: .medium)

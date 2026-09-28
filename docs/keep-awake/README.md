@@ -14,16 +14,22 @@ sleep is held off and the display may still sleep.
 
 ## The tile
 
-The round toggle turns Keep Awake on for the "Turn off after" time, or off again. Its
-subtitle reads "Off", "On until turned off", or counts down the time left second by
-second, "1:29:05 left".
+- The round toggle turns Keep Awake on for the "Turn off after" time, or off again.
+  Its subtitle reads "Off", "On until turned off", or counts down the time left
+  second by second, "1:29:05 left".
+- Under it, the chips 30 min, 1 hr, 2 hr and ∞ turn Keep Awake on for that long from
+  now; the one in use is filled orange. A chip clicked while it is on starts it over
+  for the new time, re-reading both settings. The chip clicked also becomes "Turn off
+  after" in the settings tab, so the round toggle and the `toggleKeepAwake` hotkey use
+  that time from then on.
 
 A set time ends on a one-shot timer at the deactivation date, on the wall clock, so a
 Mac that slept past it turns Keep Awake off on waking.
 
 ## Settings tab
 
-- Turn off after: 30 minutes, 1 hour, 2 hours or until turned off.
+- Turn off after: 30 minutes, 1 hour, 2 hours or until turned off; the chips set it
+  too.
 - Keep awake with the lid closed: on by default.
 
 Both apply the next time Keep awake is turned on.
@@ -68,4 +74,4 @@ Settings", until the next time it is turned on.
 on the one-shot timer; the session holds the `PowerAssertion` and, with the lid switch
 on, the watchdog from `LidClosedSleep`; `KeepAwakePreferences` keeps the
 `KeepAwakeAutoOff` choice and the lid switch in UserDefaults for
-`KeepAwakeSettingsView`, the settings tab.
+`KeepAwakeSettingsView`, the settings tab, and the tile's chips.

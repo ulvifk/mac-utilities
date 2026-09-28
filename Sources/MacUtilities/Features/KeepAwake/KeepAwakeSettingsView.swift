@@ -14,7 +14,7 @@ struct KeepAwakeSettingsView: View {
                 }
                 Toggle("Keep awake with the lid closed", isOn: buildLidClosedBinding())
             } footer: {
-                Text("Both apply the next time Keep awake is turned on. Keeping a closed lid awake runs pmset as root through the sudoers line install.sh installs; with it off only idle sleep is held off and the display may still sleep.")
+                Text("The duration chips in the menu bar popover set Turn off after too. Both apply the next time Keep awake is turned on. Keeping a closed lid awake runs pmset as root through the sudoers line install.sh installs; with it off only idle sleep is held off and the display may still sleep.")
             }
         }
         .formStyle(.grouped)

@@ -53,6 +53,16 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         }
     }
 
+    /// On for that long from now, starting over when it is on already; the time becomes the remembered one the toggle uses.
+    func turnOn(for autoOff: KeepAwakeAutoOff) {
+        preferences.setAutoOff(autoOff)
+
+        if session != nil {
+            deactivate()
+        }
+        activate()
+    }
+
     private func activate() {
         guard let session = KeepAwakeSession(preferences: preferences) else {
             isPmsetRefused = true

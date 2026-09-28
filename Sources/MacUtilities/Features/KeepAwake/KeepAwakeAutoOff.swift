@@ -16,6 +16,16 @@ enum KeepAwakeAutoOff: String, CaseIterable {
         }
     }
 
+    /// On the chips in the popover tile.
+    var shortTitle: String {
+        switch self {
+        case .thirtyMinutes: return "30 min"
+        case .oneHour: return "1 hr"
+        case .twoHours: return "2 hr"
+        case .untilTurnedOff: return "∞"
+        }
+    }
+
     var duration: TimeInterval? {
         switch self {
         case .thirtyMinutes: return 30 * 60
