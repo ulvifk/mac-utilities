@@ -7,6 +7,8 @@ import SwiftUI
 final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
+    let iconSymbolName = "rectangle.stack.fill"
+    let iconGradient = Gradient(colors: [.blue, .indigo])
 
     private let panel: SwitcherPanel
     /// Shows the glass live while it is set in the settings tab; clicks pass through it to the tab.

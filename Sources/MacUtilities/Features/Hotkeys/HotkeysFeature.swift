@@ -5,6 +5,8 @@ import SwiftUI
 final class HotkeysFeature: Feature {
     let identifier = "hotkeys"
     let displayName = "Hotkeys"
+    let iconSymbolName = "command"
+    let iconGradient = Gradient(colors: [.purple, .pink])
 
     private let store = HotkeyBindingsStore()
     private let toggleKeepAwake: () -> Void

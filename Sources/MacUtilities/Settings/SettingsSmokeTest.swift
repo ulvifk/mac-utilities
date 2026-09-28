@@ -1,24 +1,26 @@
 import AppKit
 
-/// SETTINGS_SMOKE_TEST=1: opens the settings window, captures every tab to /tmp/settings-<tab>-smoke.png one second apart and exits. Nothing activates the app here, so the window is ordered front by force.
+/// SETTINGS_SMOKE_TEST=1: opens the settings window, captures every pane to /tmp/settings-<pane>-smoke.png one second apart and exits. Nothing
+/// activates the app here, so the window is ordered front by force, and it floats, so a click in another app meanwhile does not cover it.
 func runSettingsSmokeTestIfRequested(controller: AppController) {
     guard ProcessInfo.processInfo.environment["SETTINGS_SMOKE_TEST"] != nil else { return }
 
-    let tabIdentifiers = [generalTabIdentifier] + controller.features.map { $0.identifier }
+    let paneIdentifiers = [generalPaneIdentifier] + controller.features.map { $0.identifier }
 
     controller.openSettings()
+    controller.settingsWindow.level = .floating
     controller.settingsWindow.orderFrontRegardless()
-    for (index, tabIdentifier) in tabIdentifiers.enumerated() {
+    for (index, paneIdentifier) in paneIdentifiers.enumerated() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5 + Double(index)) {
-            controller.selectedSettingsTabIdentifier = tabIdentifier
+            controller.settingsWindow.showPane(paneIdentifier)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0 + Double(index)) {
-            let window = controller.settingsWindow
-            print("smoke: tab=\(tabIdentifier) frame=\(window.frame) visible=\(window.isVisible) key=\(window.isKeyWindow)")
-            writeCapture(around: window, path: "/tmp/settings-\(tabIdentifier)-smoke.png")
+            let window = controller.settingsWindow!
+            print("smoke: pane=\(paneIdentifier) title=\(window.title) frame=\(window.frame) visible=\(window.isVisible) key=\(window.isKeyWindow)")
+            writeCapture(around: window, path: "/tmp/settings-\(paneIdentifier)-smoke.png")
         }
     }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5 + Double(tabIdentifiers.count)) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5 + Double(paneIdentifiers.count)) {
         exit(0)
     }
 }

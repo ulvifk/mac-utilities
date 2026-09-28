@@ -9,14 +9,14 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     private let menuBarGlyph = buildMenuBarGlyph()
     private let preferences = Preferences()
     private(set) lazy var menuBarPopover = MenuBarPopover(rootView: MenuBarPopoverView(controller: self), statusItemButton: statusItem.button!)
-    private(set) lazy var settingsWindow = SettingsWindow(rootView: SettingsView(controller: self))
+    /// Built at launch rather than when first opened, since building every pane takes a moment.
+    private(set) var settingsWindow: SettingsWindow!
 
     private var eventTap: EventTap!
     /// The running features, in the order the tap offers events to them.
     @Published private(set) var enabledFeatures: [Feature] = []
     /// While paused every event passes through untouched; the features keep running.
     @Published private(set) var isPaused = false
-    @Published var selectedSettingsTabIdentifier = generalTabIdentifier
 
     init(features: [Feature]) {
         self.features = features
@@ -30,6 +30,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         statusItem.button!.target = self
         statusItem.button!.action = #selector(AppController.toggleMenuBarPopover)
         startEnabledFeatures()
+        settingsWindow = SettingsWindow(controller: self)
         requestAccessibilityTrust()
         eventTap.start()
         runSettingsSmokeTestIfRequested(controller: self)

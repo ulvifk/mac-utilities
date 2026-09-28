@@ -9,6 +9,8 @@ let keepAwakeSymbolName = "cup.and.saucer.fill"
 final class KeepAwakeFeature: Feature, ObservableObject {
     let identifier = "keep-awake"
     let displayName = "Keep Awake"
+    let iconSymbolName = keepAwakeSymbolName
+    let iconGradient = Gradient(colors: [.orange, .brown])
 
     private let preferences = KeepAwakePreferences()
     private let setMenuBarSymbol: (String?) -> Void
