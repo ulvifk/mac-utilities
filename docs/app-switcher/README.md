@@ -70,6 +70,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything.
+- Cmd+` while apps are listed does nothing, rather than cycling the windows of the app
+  behind the panel.
 - Dragging the panel's left or right edge with the mouse changes its width by whole
   icons, the rows re-wrapping live; the panel stays centered. The horizontal resize
   cursor shows over the edge. The width is clamped between one icon and the visible

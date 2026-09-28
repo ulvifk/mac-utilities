@@ -222,6 +222,10 @@ final class AppSwitcherFeature: Feature {
             return true
         }
 
+        if isAnySwitcherShortcut(event) {
+            return true
+        }
+
         if isForwardShortcut(event) {
             advanceSelection(backward: false)
             return true
@@ -309,10 +313,15 @@ final class AppSwitcherFeature: Feature {
         return isSwitcherShortcut(event)
     }
 
-    /// Swallowed while windows are listed: passed on, Cmd+Tab would open the system switcher over the panel and the others would act on the
-    /// app behind it.
-    private func isAppShortcut(_ event: CGEvent) -> Bool {
+    /// The other list's one is swallowed while the panel is open: passed on, Cmd+Tab would open the system switcher over the panel and Cmd+`
+    /// would cycle the windows of the app behind it.
+    private func isAnySwitcherShortcut(_ event: CGEvent) -> Bool {
         if isSwitcherShortcut(event) { return true }
+        return isWindowSwitcherShortcut(event)
+    }
+
+    /// Swallowed while windows are listed: passed on, they would act on the app behind the panel.
+    private func isAppShortcut(_ event: CGEvent) -> Bool {
         if isWhitelistToggleShortcut(event) { return true }
         if isFilterToggleShortcut(event) { return true }
         if isQuitShortcut(event) { return true }
