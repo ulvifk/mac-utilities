@@ -11,7 +11,7 @@ final class AppSwitcherFeature: Feature {
     let iconGradient = Gradient(colors: [.blue, .indigo])
 
     private let panel: SwitcherPanel
-    /// Shows the glass live while it is set in the settings tab; clicks pass through it to the tab.
+    /// Shows the glass live while it is set in the settings pane; clicks pass through it to the pane.
     private let previewPanel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()

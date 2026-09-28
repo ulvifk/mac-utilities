@@ -79,7 +79,7 @@ let windowCellMetrics = SwitcherCellMetrics(
 /// The black tint's opacity until the darkness slider is moved; it pulls the glass down so the icons and the name stand out.
 let defaultGlassDarkness: CGFloat = 0.14
 let maxGlassDarkness: CGFloat = 0.6
-/// How long the preview stays after the last change in the settings tab.
+/// How long the preview stays after the last change in the settings pane.
 let glassPreviewDuration: TimeInterval = 1
 /// The capsule saying only the whitelist is listed, centered in the band above the top row where the dots would be.
 let badgeHeight: CGFloat = 16

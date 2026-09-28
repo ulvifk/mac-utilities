@@ -2,7 +2,7 @@
 
 Feature of `MacUtilities.app` that binds global key combos to actions: jump to the
 terminal or launch it, hide it again, run a shell line, toggle keep-awake. The
-bindings live in a JSON file you can edit by hand and version; the Hotkeys tab of
+bindings live in a JSON file you can edit by hand and version; the Hotkeys pane of
 the settings window is the friendly front to the same file.
 
 A bound combo is swallowed by the event tap, so the focused app never sees it. The
@@ -32,7 +32,7 @@ bindings, each with a `key` and an `action`:
 ```
 
 - `keyCode` is the virtual key code of the key (17 is T, 49 is Space on every
-  layout; letters follow the current layout). The settings tab records it for you;
+  layout; letters follow the current layout). The settings pane records it for you;
   for hand edits the common ones are: A 0, S 1, D 2, F 3, H 4, G 5, Z 6, X 7, C 8,
   V 9, B 11, Q 12, W 13, E 14, R 15, Y 16, T 17, 1 18, 2 19, 3 20, 4 21, 6 22, 5 23,
   9 25, 7 26, 8 28, 0 29, O 31, U 32, I 34, P 35, L 37, J 38, K 40, N 45, M 46,
@@ -44,10 +44,10 @@ bindings, each with a `key` and an `action`:
   writes until a shortcut is recorded.
 - `type` is one of the actions below; `target` is what it acts on.
 
-The file is written on every change made in the tab (pretty-printed, keys sorted)
+The file is written on every change made in the pane (pretty-printed, keys sorted)
 and the directory is watched, so a hand edit applies on the spot while the app runs.
 A file that does not parse is reported on stdout, the bindings in use stay as they
-were, and the tab shows the parse error in place of the rows and writes nothing
+were, and the pane shows the parse error in place of the rows and writes nothing
 until it parses again, so hand edits are never overwritten.
 
 ## Actions
@@ -65,7 +65,7 @@ until it parses again, so hand edits are never overwritten.
   time. Does nothing while the keep-awake feature is switched off in Settings >
   General.
 
-## Settings tab
+## Settings pane
 
 One row per binding: the recorder button, the action, its target and a warning when
 the key is taken. Click the recorder and press the combo; it shows as symbols
@@ -85,7 +85,7 @@ claimed by macOS or the app-switcher feature either way), Cmd+Option+Esc, Ctrl+C
 Cmd+Shift+3/4/5 and Ctrl+arrows. A warned binding is still saved and still fires
 where the tap sees the key first.
 
-Every change is written to the file at once; there is no save button. The tab shows
+Every change is written to the file at once; there is no save button. The pane shows
 the path of the file it edits in its footer.
 
 ## Code

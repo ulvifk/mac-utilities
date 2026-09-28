@@ -19,7 +19,7 @@ final class HotkeysFeature: Feature {
 
     func stop() {}
 
-    /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again. While the settings tab records a shortcut every combo passes, so a bound one can be recorded again.
+    /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again. While the settings pane records a shortcut every combo passes, so a bound one can be recorded again.
     func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type != .keyDown { return false }
         if isRecordingShortcut() { return false }

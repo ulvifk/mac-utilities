@@ -2,7 +2,7 @@ import ApplicationServices
 import Combine
 import ServiceManagement
 
-/// What the General tab shows besides the feature switches: the Accessibility grant and the login item, both granted outside the app and so re-read on demand.
+/// What the General pane shows besides the feature switches: the Accessibility grant and the login item, both granted outside the app and so re-read on demand.
 final class GeneralSettingsState: ObservableObject {
     @Published private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
     @Published private(set) var loginItemStatus = SMAppService.mainApp.status

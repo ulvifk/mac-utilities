@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// The filter switch and the whitelisted bundle identifiers, in UserDefaults. Publishes every change, so the settings tab follows the in-switcher shortcuts.
+/// The filter switch and the whitelisted bundle identifiers, in UserDefaults. Publishes every change, so the settings pane follows the in-switcher shortcuts.
 final class WhitelistStore: AppListStore {
     private let filterEnabledKey = "filterEnabled"
     private let whitelistKey = "whitelist"

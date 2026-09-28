@@ -10,7 +10,7 @@ It also replaces Cmd+`, the native "next window of the same app", with the same 
 listing the frontmost app's windows as thumbnails; see [Windows](#windows). With the
 feature off, Cmd+` behaves as macOS has it.
 
-The App Switcher tab of the settings window toggles the filter, manages the
+The App Switcher pane of the settings window toggles the filter, manages the
 whitelist, picks the panel's glass (Clear or Frosted, and a Darkness slider for its
 black tint) separately for apps and for windows, switches the cards around windows on
 or off and picks their own look and darkness, sets up Batch Quit and runs it, and
@@ -50,10 +50,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
   window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
   windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
-  the settings tab previews it live until a second after the last change: the apps'
+  the settings pane previews it live until a second after the last change: the apps'
   glass with the running apps, the windows' glass and the card settings with the
   windows of the app used last, the one behind the settings window. Clicks pass
-  through to the tab.
+  through to the pane.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -123,12 +123,12 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Each window sits in a dark card, the selected one ringed in the accent colour as
   Mission Control rings a hovered window, so the selection stands out on bright glass
   too. The cards have their own Look and Darkness under "Window cards" in the settings
-  tab: Clear lets what is behind the panel show through the card's black fill, Frosted
+  pane: Clear lets what is behind the panel show through the card's black fill, Frosted
   blurs it away first; the fill starts at 30%. With "Cards around windows" off, the
   thumbnails and titles sit on the glass and only the highlight marks the selection.
 - Thumbnails need Screen Recording permission (System Settings > Privacy & Security >
   Screen & System Audio Recording); macOS asks the first time one is captured, when
-  Cmd+` opens the panel or the settings tab previews the windows' glass or the cards.
+  Cmd+` opens the panel or the settings pane previews the windows' glass or the cards.
   Without it every window shows its app's icon.
 - Arrows, the highlight, clicking a window, Esc and dragging an edge work as with
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
@@ -141,7 +141,7 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 
 `Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
 keys and keeps the candidates, the listed windows and the selection;
-`AppSwitcherSettingsView` is the settings tab, listing the apps `RunningRegularApps`
+`AppSwitcherSettingsView` is the settings pane, listing the apps `RunningRegularApps`
 keeps current; `SwitcherPanel` draws the glass panel from a `SwitcherState` using
 `SwitcherLayout`, which places the content of a `SwitcherContentView` from the top down
 so it stays in place while the hint band grows in, `IconCellView` or `WindowCellView`
@@ -154,7 +154,7 @@ API, which also raises them, and `WindowThumbnails.swift` captures their thumbna
 with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the window
 cards keeps a look and darkness in UserDefaults, set in `GlassSettingsRows`, and
 `WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
-and the whitelist in UserDefaults and publishes changes to the tab; `BatchQuitStore`
+and the whitelist in UserDefaults and publishes changes to the pane; `BatchQuitStore`
 keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
 either list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is
 the strip along each side edge that takes the drag and `BackgroundCursor.swift` lets

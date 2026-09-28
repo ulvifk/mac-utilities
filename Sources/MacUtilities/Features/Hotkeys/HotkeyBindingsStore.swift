@@ -6,7 +6,7 @@ final class HotkeyBindingsStore: ObservableObject {
     let path: String
 
     @Published private(set) var bindings: [HotkeyBinding] = []
-    /// Why the file does not parse right now; the tab shows it and writes nothing while it is set, so hand edits are never overwritten.
+    /// Why the file does not parse right now; the pane shows it and writes nothing while it is set, so hand edits are never overwritten.
     @Published private(set) var loadError: String?
 
     private let directory: String

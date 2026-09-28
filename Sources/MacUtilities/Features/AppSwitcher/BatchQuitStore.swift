@@ -2,7 +2,7 @@ import Combine
 import Foundation
 
 /// The bundle identifiers on the Batch Quit list, in UserDefaults, so an app stays on it while it is not running, and whether Batch Quit quits
-/// the listed apps or the others. Publishes every change to the settings tab.
+/// the listed apps or the others. Publishes every change to the settings pane.
 final class BatchQuitStore: AppListStore {
     private let batchQuitListKey = "batchQuitList"
     private let quitsUnlistedAppsKey = "batchQuitUnlistedApps"
