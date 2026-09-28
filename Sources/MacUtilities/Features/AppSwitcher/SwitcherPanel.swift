@@ -6,13 +6,16 @@ final class SwitcherPanel: NSPanel {
     /// The width the edge drag asks for, before clamping.
     var onWidthDragged: (CGFloat) -> Void = { _ in }
 
+    private let glassStore: GlassStore
+
     /// The last state shown.
     private var state: SwitcherState!
     private var cells: [IconCellView] = []
     private var highlight = NSView()
     private var nameLabel = NSTextField(labelWithString: "")
 
-    init() {
+    init(glassStore: GlassStore) {
+        self.glassStore = glassStore
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -30,9 +33,9 @@ final class SwitcherPanel: NSPanel {
     }
 
     /// Glass in a window without the active appearance draws a frosted, near-opaque stand-in, and this panel is never key. AppKit asks this
-    /// private method, so answering yes gets the real see-through glass without taking keyboard focus from the frontmost app.
+    /// private method, so answering yes gets the real see-through glass without taking keyboard focus from the frontmost app; Frosted keeps the stand-in.
     @objc func _hasActiveAppearance() -> Bool {
-        return true
+        return !glassStore.isFrosted
     }
 
     func show(state: SwitcherState) {
@@ -241,7 +244,7 @@ final class SwitcherPanel: NSPanel {
 
         glass.style = .clear
         glass.cornerRadius = panelCornerRadius
-        glass.tintColor = panelTintColor
+        glass.tintColor = NSColor.black.withAlphaComponent(glassStore.darkness)
 
         return glass
     }

@@ -7,9 +7,10 @@ final class AppSwitcherFeature: Feature {
     let displayName = "App Switcher"
     let menuItems: [NSMenuItem] = []
 
-    private let panel = SwitcherPanel()
+    private let panel: SwitcherPanel
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
+    private let glassStore = GlassStore()
     private let panelWidthStore = PanelWidthStore()
     private var observers: [NSObjectProtocol] = []
 
@@ -23,6 +24,7 @@ final class AppSwitcherFeature: Feature {
     private var pendingAdvance = 0
 
     init() {
+        panel = SwitcherPanel(glassStore: glassStore)
         wirePanel()
     }
 
@@ -56,7 +58,7 @@ final class AppSwitcherFeature: Feature {
     }
 
     func buildSettingsView() -> AnyView {
-        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore))
+        return AnyView(AppSwitcherSettingsView(whitelistStore: whitelistStore, glassStore: glassStore))
     }
 
     private func runSmokeTestIfRequested() {

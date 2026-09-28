@@ -7,7 +7,8 @@ shown: if the filter is on but no whitelisted app is running, the switcher lists
 every running app instead, so the shortcuts below always stay reachable.
 
 The App Switcher tab of the settings window toggles the filter, quits every running
-regular app not in the whitelist, manages the whitelist (every running regular app
+regular app not in the whitelist, picks the panel's glass (Clear or Frosted, and a
+Darkness slider for its black tint), manages the whitelist (every running regular app
 is listed by name with its icon, switch on = whitelisted) and lists the in-switcher
 shortcuts as a reminder. Changes made there and with the shortcuts below show up in
 each other on the spot.
@@ -35,6 +36,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   under it, clamped to the panel edges and truncated rather than ever widening the
   panel.
 - The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
+  Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
+  window. Both, and the tint's darkness, apply from the next time the switcher opens.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -70,7 +73,8 @@ tapped keys and keeps the candidates and the selection; `AppSwitcherSettingsView
 the settings tab, listing the apps `RunningRegularApps` keeps current;
 `SwitcherPanel` draws the glass panel from a `SwitcherState` using `SwitcherLayout`,
 `IconCellView` and `WhitelistBadgeView`, with the sizes and colours in
-`SwitcherMetrics`; `WhitelistStore` keeps the filter switch and the whitelist in
+`SwitcherMetrics`; `GlassStore` keeps the glass look and darkness in UserDefaults;
+`WhitelistStore` keeps the filter switch and the whitelist in
 UserDefaults and publishes changes to the tab; `PanelWidthStore` keeps the dragged
 panel width, `ResizeHandleView` is the strip along each side edge that takes the
 drag and `BackgroundCursor.swift` lets the panel show the resize cursor while the
