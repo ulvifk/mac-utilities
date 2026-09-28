@@ -259,7 +259,7 @@ final class AppSwitcherFeature: Feature {
 
         if isWhitelistToggleShortcut(event) {
             let bundleIdentifier = candidates[selectedIndex].bundleIdentifier!
-            whitelistStore.setWhitelisted(bundleIdentifier, !whitelistStore.isWhitelisted(bundleIdentifier))
+            whitelistStore.setListed(bundleIdentifier, !whitelistStore.isListed(bundleIdentifier))
             panel.update(state: buildState())
             return true
         }
