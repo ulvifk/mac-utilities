@@ -1,6 +1,7 @@
 import AppKit
 
-/// Where the cells sit for a cell count: full rows from the top down, centered on each other, the last one possibly shorter.
+/// Where the cells sit for a cell count, in the content counted from the top down: full rows from the top, centered on each other, the last one
+/// possibly shorter.
 struct SwitcherLayout {
     let contentSize: NSSize
     /// [index] -> the cell's frame in the content
@@ -19,7 +20,7 @@ struct SwitcherLayout {
         for index in 0..<cellCount {
             let row = index / cellsPerRow
             let x = horizontalPadding + getVisualColumn(index: index, cellCount: cellCount, cellsPerRow: cellsPerRow) * (cellSize.width + itemSpacing)
-            let y = height - metrics.verticalPadding - cellSize.height - CGFloat(row) * (cellSize.height + metrics.rowSpacing)
+            let y = metrics.verticalPadding + CGFloat(row) * (cellSize.height + metrics.rowSpacing)
 
             frames.append(alignToPixels(NSRect(x: x, y: y, width: cellSize.width, height: cellSize.height)))
         }
@@ -31,13 +32,20 @@ struct SwitcherLayout {
 
     /// Of an icon cell.
     func getIconFrame(index: Int) -> NSRect {
-        return iconFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY)
+        return convertFromCell(iconFrameInCell, index: index)
     }
 
     /// Hugs the selected icon's squircle rather than boxing the whole cell, the name sitting below it, outside; around a window's thumbnail and
     /// title together.
     func getHighlightFrame(index: Int) -> NSRect {
-        return alignToPixels(highlightFrameInCell.offsetBy(dx: cellFrames[index].minX, dy: cellFrames[index].minY))
+        return alignToPixels(convertFromCell(highlightFrameInCell, index: index))
+    }
+
+    /// From a cell's own coordinates, which count up from its bottom edge.
+    private func convertFromCell(_ rect: NSRect, index: Int) -> NSRect {
+        let cellFrame = cellFrames[index]
+
+        return NSRect(x: cellFrame.minX + rect.minX, y: cellFrame.maxY - rect.maxY, width: rect.width, height: rect.height)
     }
 }
 

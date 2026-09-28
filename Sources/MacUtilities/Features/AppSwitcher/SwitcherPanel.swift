@@ -124,7 +124,7 @@ final class SwitcherPanel: NSPanel {
 
     private func buildContent(glassDarkness: CGFloat) {
         let layout = buildLayout()
-        let container = NSView(frame: NSRect(origin: .zero, size: layout.contentSize))
+        let container = SwitcherContentView(frame: NSRect(origin: .zero, size: layout.contentSize))
 
         // Icons draw as aqua like my-dock's tiles, so system images keep their light variants on the dark glass.
         container.appearance = NSAppearance(named: .aqua)
@@ -262,7 +262,7 @@ final class SwitcherPanel: NSPanel {
         let nameSize = nameLabel.fittingSize
         let width = min(nameSize.width, maxWidth)
 
-        return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.minY - nameTopSpacing - nameSize.height, width: width, height: nameSize.height))
+        return alignToPixels(NSRect(x: iconFrame.midX - width / 2, y: iconFrame.maxY + nameTopSpacing, width: width, height: nameSize.height))
     }
 
     private func buildNameLabel(text: String) -> NSTextField {
@@ -304,11 +304,11 @@ final class SwitcherPanel: NSPanel {
 
         badge.frame = alignToPixels(NSRect(
             x: (size.width - badgeSize.width) / 2,
-            y: size.height - iconVerticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
+            y: iconVerticalPadding + nameBandHeight / 2 - badgeSize.height / 2,
             width: badgeSize.width,
             height: badgeSize.height
         ))
-        badge.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin]
+        badge.autoresizingMask = [.minXMargin, .maxXMargin]
 
         return badge
     }
