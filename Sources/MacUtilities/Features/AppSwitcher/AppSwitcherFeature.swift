@@ -569,7 +569,8 @@ final class AppSwitcherFeature: Feature {
 
     /// Shows what the glass is for on the glass just set and hides it a moment after the last change: the running apps, or the windows of the
     /// app used last, the one behind the settings window. Only windows without a thumbnail yet are captured, so dragging the slider does not
-    /// capture on every step. Left out while the switcher is open, since it shares the candidates.
+    /// capture on every step. Left out while the switcher is open, since it shares the candidates, and hidden with nothing to list, since a
+    /// thumbnail still arriving would redraw it from the empty list.
     private func previewGlass(_ glassStore: GlassStore) {
         if panel.isVisible { return }
 
@@ -579,7 +580,10 @@ final class AppSwitcherFeature: Feature {
         } else {
             loadApps()
         }
-        if getItemCount() == 0 { return }
+        if getItemCount() == 0 {
+            previewPanel.hide()
+            return
+        }
 
         selectedIndex = 0
         previewPanel.show(state: buildState(), glassStore: glassStore)
