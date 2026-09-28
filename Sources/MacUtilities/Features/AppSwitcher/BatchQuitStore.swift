@@ -36,7 +36,7 @@ final class BatchQuitStore: ObservableObject {
     }
 
     /// Listed, or unlisted while the unlisted apps are the ones quit.
-    func isQuitting(_ bundleIdentifier: String) -> Bool {
+    func isBatchQuitTarget(_ bundleIdentifier: String) -> Bool {
         if quitsUnlistedApps { return !isListed(bundleIdentifier) }
         return isListed(bundleIdentifier)
     }
