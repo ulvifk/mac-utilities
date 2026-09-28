@@ -51,10 +51,10 @@ final class AppSwitcherFeature: Feature {
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
-        lookChanges.append(observeLookChanges(of: appGlassStore, previewing: appGlassStore))
-        lookChanges.append(observeLookChanges(of: windowGlassStore, previewing: windowGlassStore))
-        lookChanges.append(observeLookChanges(of: windowCardStore, previewing: windowGlassStore))
-        lookChanges.append(observeLookChanges(of: windowCardGlassStore, previewing: windowGlassStore))
+        lookChanges.append(observeLookChanges(of: appGlassStore, listingWindows: false))
+        lookChanges.append(observeLookChanges(of: windowGlassStore, listingWindows: true))
+        lookChanges.append(observeLookChanges(of: windowCardStore, listingWindows: true))
+        lookChanges.append(observeLookChanges(of: windowCardGlassStore, listingWindows: true))
         runSmokeTestIfRequested()
     }
 
@@ -154,12 +154,12 @@ final class AppSwitcherFeature: Feature {
         return observers
     }
 
-    /// The store announces a change before making it; the main queue runs the preview on the list's glass after, and also while a slider is
-    /// being dragged.
-    private func observeLookChanges(of store: some ObservableObject, previewing glassStore: GlassStore) -> AnyCancellable {
+    /// The store announces a change before making it; the main queue runs the preview of the list it styles after, and also while a slider
+    /// is being dragged.
+    private func observeLookChanges(of store: some ObservableObject, listingWindows: Bool) -> AnyCancellable {
         return store.objectWillChange
             .receive(on: DispatchQueue.main)
-            .sink { _ in self.previewGlass(glassStore) }
+            .sink { _ in self.previewGlass(listingWindows: listingWindows) }
     }
 
     // MARK: events
@@ -533,12 +533,12 @@ final class AppSwitcherFeature: Feature {
         }
 
         selectedIndex = candidates.firstIndex { $0.bundleIdentifier == selectedIdentifier } ?? 0
-        panel.show(state: buildState(), glassStore: appGlassStore)
+        panel.show(state: buildState(), glassStore: getGlassStore())
     }
 
     /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.
     private func showPanel() {
-        panel.show(state: buildState(), glassStore: isListingWindows ? windowGlassStore : appGlassStore)
+        panel.show(state: buildState(), glassStore: getGlassStore())
         refreshThumbnails(of: windows.map { $0.windowID }, in: panel)
     }
 
@@ -550,6 +550,12 @@ final class AppSwitcherFeature: Feature {
 
             switcherPanel.update(state: self.buildState())
         }
+    }
+
+    /// The glass of the list loaded last.
+    private func getGlassStore() -> GlassStore {
+        if isListingWindows { return windowGlassStore }
+        return appGlassStore
     }
 
     private func buildState() -> SwitcherState {
@@ -585,10 +591,10 @@ final class AppSwitcherFeature: Feature {
     /// app used last, the one behind the settings window. Only windows without a thumbnail yet are captured, so dragging the slider does not
     /// capture on every step. Left out while the switcher is open, since it shares the candidates, and hidden with nothing to list, since a
     /// thumbnail still arriving would redraw it from the empty list.
-    private func previewGlass(_ glassStore: GlassStore) {
+    private func previewGlass(listingWindows: Bool) {
         if panel.isVisible { return }
 
-        if glassStore === windowGlassStore {
+        if listingWindows {
             guard let app = getRecentRunningApps().first else { return }
             loadWindows(of: app)
         } else {
@@ -600,7 +606,7 @@ final class AppSwitcherFeature: Feature {
         }
 
         selectedIndex = 0
-        previewPanel.show(state: buildState(), glassStore: glassStore)
+        previewPanel.show(state: buildState(), glassStore: getGlassStore())
         refreshThumbnails(of: windows.map { $0.windowID }.filter { thumbnails[$0] == nil }, in: previewPanel)
 
         previewHiding?.cancel()
