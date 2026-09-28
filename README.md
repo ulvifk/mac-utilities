@@ -85,9 +85,10 @@ SETTINGS_SMOKE_TEST=1 ./MacUtilities.app/Contents/MacOS/MacUtilities
 ```
 
 The app icon, three frosted glass tiles cascading on a midnight blue body with a ⌘
-key in front, is drawn in code by `scripts/render-app-icon.swift`.
-`Resources/AppIcon.icns` is the script's committed output, so a build needs no extra
-step. After changing the script, re-render the icon and rebuild:
+key in front, is drawn in code by `scripts/render-app-icon.swift`; the menu bar
+glyph is the same three tiles. `Resources/AppIcon.icns` is the script's committed
+output, so a build needs no extra step. After changing the script, re-render the icon
+and rebuild:
 
 ```sh
 swift scripts/render-app-icon.swift
@@ -110,8 +111,9 @@ Run `./create-signing-cert.sh` once. It creates a self-signed "mac-utilities" ce
 Sources/MacUtilities/
   main.swift          starts the app with the list of features
   Core/               the host: Feature protocol, AppController (menu bar item, feature
-                      lifecycle, pause), EventTap, key matching, Preferences,
-                      Accessibility trust, window capture for the smoke tests
+                      lifecycle, pause), the menu bar glyph, EventTap, key matching,
+                      Preferences, Accessibility trust, window capture for the smoke
+                      tests
   Settings/           the settings window, its General tab and the settings smoke test
   Features/<Name>/    one folder per feature
 scripts/              render-app-icon.swift, which draws the app icon

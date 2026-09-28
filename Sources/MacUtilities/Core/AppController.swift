@@ -1,13 +1,12 @@
 import AppKit
 import Combine
 
-private let appSymbolName = "square.stack.3d.up"
-
 /// Owns the menu bar item, the event tap, the settings window and the features; starts and stops features as their toggles change.
 final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private let menuBarGlyph = buildMenuBarGlyph()
     private let menu = NSMenu()
     private let pauseItem = NSMenuItem(title: "Paused", action: #selector(AppController.togglePause), keyEquivalent: "")
     private let settingsItem = NSMenuItem(title: "Settings...", action: #selector(AppController.openSettings), keyEquivalent: ",")
@@ -64,9 +63,14 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
-    /// A feature doing something in the background shows its own symbol in the menu bar; nil shows the app's.
+    /// A feature doing something in the background shows its own symbol in the menu bar; nil shows the app's glyph.
     func setMenuBarSymbol(_ symbolName: String?) {
-        statusItem.button?.image = NSImage(systemSymbolName: symbolName ?? appSymbolName, accessibilityDescription: "Mac Utilities")
+        guard let symbolName else {
+            statusItem.button!.image = menuBarGlyph
+            return
+        }
+
+        statusItem.button!.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Mac Utilities")
     }
 
     @objc func openSettings() {
