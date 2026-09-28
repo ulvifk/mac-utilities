@@ -9,15 +9,16 @@ private let switcherShortcuts: [(String, String)] = [
     ("Cmd+F", "Toggle the filter"),
     ("Cmd+W", "Toggle the selected app's whitelist membership"),
     ("Cmd+Q", "Quit the selected app"),
-    ("Cmd+X", "Quit every app not in the whitelist"),
+    ("Cmd+Shift+Q", "Quit the apps on the Batch Quit list"),
     ("Cmd+H", "Hide the selected app"),
     ("Esc", "Close without switching"),
 ]
 
 /// The filter switch, the panel's glass for apps and for windows, the window cards and their glass, the whitelist (every running regular app,
-/// switch = whitelisted) and the in-switcher shortcuts.
+/// switch = whitelisted), the Batch Quit list (picked in a popover) and the in-switcher shortcuts.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
+    @ObservedObject var batchQuitStore: BatchQuitStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
     @ObservedObject var windowCardStore: WindowCardStore
@@ -28,7 +29,6 @@ struct AppSwitcherSettingsView: View {
         Form {
             Section {
                 Toggle("Filter to the whitelist", isOn: buildFilterBinding())
-                Button("Quit apps not in the whitelist") { quitRegularAppsNotIn(whitelist: whitelistStore.getWhitelist()) }
             }
 
             Section("Apps (Cmd+Tab)") {
@@ -56,6 +56,13 @@ struct AppSwitcherSettingsView: View {
                         }
                     }
                 }
+            }
+
+            Section("Batch Quit") {
+                LabeledContent("Apps to quit") {
+                    BatchQuitAppPicker(batchQuitStore: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
+                }
+                Button("Quit listed apps") { runBatchQuit(batchQuitStore) }
             }
 
             Section("While switching") {
