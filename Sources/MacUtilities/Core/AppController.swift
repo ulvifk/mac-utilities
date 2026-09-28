@@ -1,24 +1,21 @@
 import AppKit
 import Combine
 
-/// Owns the menu bar item, the event tap, the settings window and the features; starts and stops features as their toggles change.
+/// Owns the menu bar item and its popover, the event tap, the settings window and the features; starts and stops features as their toggles change.
 final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menuBarGlyph = buildMenuBarGlyph()
-    private let menu = NSMenu()
-    private let pauseItem = NSMenuItem(title: "Paused", action: #selector(AppController.togglePause), keyEquivalent: "")
-    private let settingsItem = NSMenuItem(title: "Settings...", action: #selector(AppController.openSettings), keyEquivalent: ",")
-    private let quitItem = NSMenuItem(title: "Quit", action: #selector(AppController.quit), keyEquivalent: "q")
     private let preferences = Preferences()
+    private lazy var menuBarPopover = MenuBarPopover(rootView: MenuBarPopoverView(controller: self), statusItemButton: statusItem.button!)
     private(set) lazy var settingsWindow = SettingsWindow(rootView: SettingsView(controller: self))
 
     private var eventTap: EventTap!
     /// The running features, in the order the tap offers events to them.
     @Published private(set) var enabledFeatures: [Feature] = []
     /// While paused every event passes through untouched; the features keep running.
-    private var isPaused = false
+    @Published private(set) var isPaused = false
     @Published var selectedSettingsTabIdentifier = generalTabIdentifier
 
     init(features: [Feature]) {
@@ -26,16 +23,13 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         super.init()
 
         eventTap = EventTap { [unowned self] type, event in self.handle(type: type, event: event) }
-        pauseItem.target = self
-        settingsItem.target = self
-        quitItem.target = self
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setMenuBarSymbol(nil)
-        statusItem.menu = menu
+        statusItem.button!.target = self
+        statusItem.button!.action = #selector(AppController.toggleMenuBarPopover)
         startEnabledFeatures()
-        populateMenu()
         requestAccessibilityTrust()
         eventTap.start()
         runSettingsSmokeTestIfRequested(controller: self)
@@ -54,13 +48,21 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     func setFeatureEnabled(_ feature: Feature, _ enabled: Bool) {
         preferences.setFeatureEnabled(feature.identifier, enabled)
         enabledFeatures = getEnabledFeatures()
-        populateMenu()
 
         if enabled {
             feature.start()
         } else {
             feature.stop()
         }
+    }
+
+    /// Every shortcut depends on it; without Accessibility at launch there is none until the app is reopened.
+    var isEventTapRunning: Bool {
+        return eventTap.isRunning
+    }
+
+    func togglePause() {
+        isPaused = !isPaused
     }
 
     /// A feature doing something in the background shows its own symbol in the menu bar; nil shows the app's glyph.
@@ -73,8 +75,11 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         statusItem.button!.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Mac Utilities")
     }
 
-    @objc func openSettings() {
+    /// The popover would stay open over the window otherwise: it closes by itself only on a click elsewhere. The window goes first, so the
+    /// popover closing finds it key and leaves the app active.
+    func openSettings() {
         settingsWindow.open()
+        menuBarPopover.close()
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -98,27 +103,7 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         return features.filter { preferences.isFeatureEnabled($0.identifier) }
     }
 
-    /// Paused, then the enabled features' entries, then Settings and Quit.
-    private func populateMenu() {
-        menu.removeAllItems()
-
-        menu.addItem(pauseItem)
-        for feature in enabledFeatures {
-            for item in feature.menuItems {
-                menu.addItem(item)
-            }
-        }
-        menu.addItem(.separator())
-        menu.addItem(settingsItem)
-        menu.addItem(quitItem)
-    }
-
-    @objc private func togglePause(_ sender: NSMenuItem) {
-        isPaused = !isPaused
-        sender.state = isPaused ? .on : .off
-    }
-
-    @objc private func quit() {
-        NSApp.terminate(nil)
+    @objc private func toggleMenuBarPopover() {
+        menuBarPopover.toggle()
     }
 }

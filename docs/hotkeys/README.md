@@ -60,9 +60,10 @@ until it parses again, so hand edits are never overwritten.
   for; it outlives the app. It runs with the app's environment, which at login is
   launchd's (`PATH` is `/usr/bin:/bin:/usr/sbin:/sbin`), and its output is
   discarded, so use absolute paths.
-- `toggleKeepAwake`: `target` is empty. Toggles the Keep awake menu entry, the same
-  as clicking it. Does nothing while the keep-awake feature is switched off in
-  Settings > General.
+- `toggleKeepAwake`: `target` is empty. Toggles Keep Awake, the same as the round
+  toggle on its tile in the menu bar popover, so it turns on for the "Turn off after"
+  time. Does nothing while the keep-awake feature is switched off in Settings >
+  General.
 
 ## Settings tab
 

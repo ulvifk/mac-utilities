@@ -6,8 +6,6 @@ protocol Feature {
     /// Stable key the enabled state is stored under; never rename it.
     var identifier: String { get }
     var displayName: String { get }
-    /// Entries the feature adds to the menu bar menu while it is enabled; the feature keeps them current.
-    var menuItems: [NSMenuItem] { get }
 
     func start()
     func stop()
@@ -15,4 +13,6 @@ protocol Feature {
     func handle(type: CGEventType, event: CGEvent) -> Bool
     /// The feature's own tab in the settings window.
     func buildSettingsView() -> AnyView
+    /// The feature's tile in the menu bar popover while it is enabled; nil for most. The tile keeps itself current.
+    func buildPopoverTile() -> AnyView?
 }

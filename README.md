@@ -6,9 +6,18 @@ one login item. Swift Package, no Xcode project.
 
 ## Menu bar item and settings
 
-The menu bar item's menu has Paused, which lets every key press through untouched
-until it is unchecked; the entries of the enabled features, such as Keep awake;
-Settings..., which opens the settings window; and Quit.
+Clicking the menu bar item opens a popover in the style of Control Center, drawn as
+Liquid Glass. Its header says whether the shortcuts are live: "All shortcuts active"
+by a green dot, "Paused — keys pass through untouched" by an indigo one, or
+"Shortcuts off — see Settings" by an orange one while the event tap is not running.
+Below it sit rounded tiles, each with a round toggle filled with a colour while on:
+Pause Shortcuts, which lets every key press through untouched until it is toggled off
+again, then the tiles of the enabled features, such as Keep Awake. Settings… (Cmd+,)
+opens the settings window and Quit (Cmd+Q) quits.
+
+Showing the popover activates the app, so it takes clicks and keys at once. A click
+elsewhere, another click on the item or Esc closes it; after Esc the app that was in
+front before gets the keyboard back.
 
 The settings window has a General tab and one tab per feature. General holds a
 switch per feature (a feature switched off stops on the spot and stays off across
@@ -32,10 +41,10 @@ Screen Recording permission for the thumbnails). See
 
 ### keep-awake
 
-A "Keep awake" entry in the menu bar menu that holds a power assertion and, when
-wanted, disables sleep with the lid closed through `pmset`; optional auto-off timer.
-See [docs/keep-awake](docs/keep-awake/README.md) for the sudoers line it needs and
-what is restored on quit or crash.
+A Keep Awake tile in the menu bar popover that holds a power assertion and, when
+wanted, disables sleep with the lid closed through `pmset`; it counts down live when
+set to turn itself off. See [docs/keep-awake](docs/keep-awake/README.md) for the
+sudoers line it needs and what is restored on quit or crash.
 
 ### hotkeys
 
@@ -110,10 +119,12 @@ Run `./create-signing-cert.sh` once. It creates a self-signed "mac-utilities" ce
 ```
 Sources/MacUtilities/
   main.swift          starts the app with the list of features
-  Core/               the host: Feature protocol, AppController (menu bar item, feature
-                      lifecycle, pause), the menu bar glyph, EventTap, key matching,
-                      Preferences, Accessibility trust, window capture for the smoke
-                      tests
+  Core/               the host: Feature protocol, AppController (menu bar item and its
+                      popover, feature lifecycle, pause), the menu bar glyph, EventTap,
+                      key matching, Preferences, Accessibility trust, window capture for
+                      the smoke tests
+  MenuBar/            the menu bar popover and the tile and round toggle its tiles
+                      are built from
   Settings/           the settings window, its General tab and the settings smoke test
   Features/<Name>/    one folder per feature
 scripts/              render-app-icon.swift, which draws the app icon
@@ -122,9 +133,11 @@ docs/<name>/          the feature's README and screenshots
 ```
 
 A feature implements `Feature`: a stable `identifier` (the key its enabled state is
-stored under), a `displayName`, `menuItems` (its entries in the menu bar menu while
-enabled, empty for most), `start()`, `stop()`, `handle(type:event:) -> Bool` and
-`buildSettingsView() -> AnyView`, its tab in the settings window. The core tap hands
+stored under), a `displayName`, `start()`, `stop()`, `handle(type:event:) -> Bool`,
+`buildSettingsView() -> AnyView`, its tab in the settings window, and
+`buildPopoverTile() -> AnyView?`, its tile in the menu bar popover while it is
+enabled, nil for most; a tile observes its feature and keeps itself current. The
+popover lists the tiles in the features' order. The core tap hands
 every key press and modifier change to the enabled features in order; the first one
 returning `true` swallows the event. Enabled features are stopped when the app
 quits.

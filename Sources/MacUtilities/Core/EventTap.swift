@@ -10,6 +10,11 @@ final class EventTap {
         self.handle = handle
     }
 
+    /// False when macOS refused the tap at launch, which it does until Accessibility is granted; it is not retried.
+    var isRunning: Bool {
+        return tap != nil
+    }
+
     func start() {
         let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
         let tap = CGEvent.tapCreate(

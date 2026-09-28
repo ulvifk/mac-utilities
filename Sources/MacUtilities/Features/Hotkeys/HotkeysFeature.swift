@@ -5,7 +5,6 @@ import SwiftUI
 final class HotkeysFeature: Feature {
     let identifier = "hotkeys"
     let displayName = "Hotkeys"
-    let menuItems: [NSMenuItem] = []
 
     private let store = HotkeyBindingsStore()
     private let toggleKeepAwake: () -> Void
@@ -34,6 +33,10 @@ final class HotkeysFeature: Feature {
 
     func buildSettingsView() -> AnyView {
         return AnyView(HotkeysSettingsView(store: store))
+    }
+
+    func buildPopoverTile() -> AnyView? {
+        return nil
     }
 
     private func isRecordingShortcut() -> Bool {

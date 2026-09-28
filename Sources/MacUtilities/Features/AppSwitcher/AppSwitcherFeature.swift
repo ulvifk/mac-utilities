@@ -7,7 +7,6 @@ import SwiftUI
 final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
-    let menuItems: [NSMenuItem] = []
 
     private let panel: SwitcherPanel
     /// Shows the glass live while it is set in the settings tab; clicks pass through it to the tab.
@@ -91,6 +90,10 @@ final class AppSwitcherFeature: Feature {
             windowCardStore: windowCardStore,
             windowCardGlassStore: windowCardGlassStore
         ))
+    }
+
+    func buildPopoverTile() -> AnyView? {
+        return nil
     }
 
     private func runSmokeTestIfRequested() {
