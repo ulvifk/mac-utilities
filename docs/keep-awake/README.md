@@ -38,8 +38,8 @@ Both apply the next time Keep awake is turned on.
 
 `pmset -a disablesleep 1` outlives the process that set it, so it is put back to `0`:
 
-- when Keep awake is toggled off, its time is up, the feature is switched off in
-  Settings > General or the app quits (`applicationWillTerminate` stops every enabled
+- when Keep awake is toggled off, its time is up, the feature is switched off in its
+  settings pane or the app quits (`applicationWillTerminate` stops every enabled
   feature);
 - when the app dies any other way: activating spawns a child watchdog shell that
   outlives the app, `while kill -0 <pid>; do sleep 5; done; sudo -n /usr/bin/pmset -a

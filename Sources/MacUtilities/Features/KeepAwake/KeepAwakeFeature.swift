@@ -9,6 +9,7 @@ let keepAwakeSymbolName = "cup.and.saucer.fill"
 final class KeepAwakeFeature: Feature, ObservableObject {
     let identifier = "keep-awake"
     let displayName = "Keep Awake"
+    let summary = "Keeps the Mac awake from the menu bar, even with the lid closed."
     let iconSymbolName = keepAwakeSymbolName
     let iconGradient = Gradient(colors: [.orange, .brown])
 

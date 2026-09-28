@@ -7,6 +7,7 @@ import SwiftUI
 final class AppSwitcherFeature: Feature {
     let identifier = "app-switcher"
     let displayName = "App Switcher"
+    let summary = "Replaces ⌘Tab and ⌘` with a glass switcher for apps and their windows."
     let iconSymbolName = "rectangle.stack.fill"
     let iconGradient = Gradient(colors: [.blue, .indigo])
 

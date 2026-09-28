@@ -62,8 +62,8 @@ until it parses again, so hand edits are never overwritten.
   discarded, so use absolute paths.
 - `toggleKeepAwake`: `target` is empty. Toggles Keep Awake, the same as the round
   toggle on its tile in the menu bar popover, so it turns on for the "Turn off after"
-  time. Does nothing while the keep-awake feature is switched off in Settings >
-  General.
+  time. Does nothing while the keep-awake feature is switched off in its settings
+  pane.
 
 ## Settings pane
 

@@ -5,6 +5,7 @@ import SwiftUI
 final class HotkeysFeature: Feature {
     let identifier = "hotkeys"
     let displayName = "Hotkeys"
+    let summary = "Opens apps, runs commands and toggles Keep Awake with global keyboard shortcuts."
     let iconSymbolName = "command"
     let iconGradient = Gradient(colors: [.purple, .pink])
 

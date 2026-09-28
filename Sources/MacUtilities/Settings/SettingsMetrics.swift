@@ -12,6 +12,8 @@ let sidebarIconTitleSpacing: CGFloat = 8
 
 /// Icon tiles in the sidebar, the size System Settings draws its own.
 let sidebarIconSize: CGFloat = 20
+/// The tile in a feature pane's header.
+let paneHeaderIconSize: CGFloat = 44
 /// A tile's corner radius and its symbol's point size, as shares of its side, so tiles of every size look alike.
 let iconTileCornerRadiusShare: CGFloat = 0.25
 let iconTileSymbolShare: CGFloat = 0.52
@@ -20,3 +22,7 @@ let iconTileEdgeGradient = Gradient(colors: [.white.opacity(0.35), .white.opacit
 
 let generalIconSymbolName = "gearshape"
 let generalIconGradient = Gradient(colors: [Color(white: 0.62), Color(white: 0.44)])
+
+/// A switched-off feature's pane sections fade to this. Disabled controls dim on their own but their labels do not, so the whole is faded to
+/// read as off.
+let switchedOffFeatureOpacity: CGFloat = 0.5

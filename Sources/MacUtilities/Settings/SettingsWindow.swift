@@ -50,9 +50,9 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
         return toolbar
     }
 
-    /// General, then one pane per feature, holding its sections in a form.
+    /// General, then one pane per feature.
     private func buildPanes(controller: AppController) -> [SettingsPane] {
-        let general = SettingsPane(identifier: generalPaneIdentifier, title: "General", symbolName: generalIconSymbolName, gradient: generalIconGradient, view: AnyView(GeneralSettingsView(controller: controller)))
+        let general = SettingsPane(identifier: generalPaneIdentifier, title: "General", symbolName: generalIconSymbolName, gradient: generalIconGradient, view: AnyView(GeneralSettingsView()))
 
         return [general] + controller.features.map { feature in
             SettingsPane(
@@ -60,7 +60,7 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
                 title: feature.displayName,
                 symbolName: feature.iconSymbolName,
                 gradient: feature.iconGradient,
-                view: AnyView(Form { feature.buildSettingsSections() }.formStyle(.grouped))
+                view: AnyView(FeatureSettingsPane(controller: controller, feature: feature))
             )
         }
     }

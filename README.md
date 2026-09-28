@@ -27,10 +27,13 @@ are built at launch and kept, so opening it or switching panes never waits on
 building one. It opens at 720 by 540 points and can be made larger, or shorter down
 to 420.
 
-General holds a switch per feature (a feature switched off stops on the spot and
-stays off across launches), a "Launch at login" switch and an Accessibility row with
-a green or red dot and a button to the Privacy & Security > Accessibility pane; the
-dot is re-checked whenever the window comes back to the front. Every change applies
+A feature's pane opens with its icon, its name, one line on what it does and the
+switch that turns it on or off. A feature switched off stops on the spot and stays
+off across launches; the rest of its pane is faded and disabled until it is back on.
+
+General holds a "Launch at login" switch and an Accessibility row with a green or red
+dot and a button to the Privacy & Security > Accessibility pane; the dot is
+re-checked whenever the window comes back to the front. Every change applies
 immediately.
 
 ## Features
@@ -139,8 +142,9 @@ Sources/MacUtilities/
                       the smoke tests
   MenuBar/            the menu bar popover, the tile and round toggle its tiles are
                       built from, and the menu bar smoke test
-  Settings/           the settings window: its sidebar, the General pane, the icon
-                      tiles, and the settings smoke test
+  Settings/           the settings window: its sidebar, the header and switch opening
+                      every feature's pane, the General pane, the icon tiles, and the
+                      settings smoke test
   Features/<Name>/    one folder per feature
 scripts/              render-app-icon.swift, which draws the app icon
 Resources/            AppIcon.icns, the rendered app icon that build.sh bundles
@@ -148,14 +152,15 @@ docs/<name>/          the feature's README and screenshots
 ```
 
 A feature implements `Feature`: a stable `identifier` (the key its enabled state is
-stored under), a `displayName`, an `iconSymbolName` and `iconGradient` for its icon
-tile in the settings window, `start()`, `stop()`, `handle(type:event:) -> Bool`,
-`buildSettingsSections() -> AnyView`, the sections of its pane in the settings window,
-and `buildPopoverTile() -> AnyView?`, its tile in the menu bar popover while it is
-enabled, nil for most; a tile observes its feature and keeps itself current. The
-popover lists the tiles in the features' order. The core tap hands every key press
-and modifier change to the enabled features in order; the first one returning `true`
-swallows the event. Enabled features are stopped when the app quits.
+stored under), a `displayName`, a one-sentence `summary`, an `iconSymbolName` and
+`iconGradient` for its icon tile in the settings window, `start()`, `stop()`,
+`handle(type:event:) -> Bool`, `buildSettingsSections() -> AnyView`, the sections of
+its settings pane below the header, and `buildPopoverTile() -> AnyView?`, its tile in
+the menu bar popover while it is enabled, nil for most; a tile observes its feature
+and keeps itself current. The popover lists the tiles in the features' order. The
+core tap hands every key press and modifier change to the enabled features in order;
+the first one returning `true` swallows the event. Enabled features are stopped when
+the app quits.
 Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
 feature runs until it is switched off, new ones included. New features are
 registered in `main.swift`.
