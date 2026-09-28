@@ -185,7 +185,7 @@ final class SwitcherPanel: NSPanel {
     }
 
     private func buildLayout() -> SwitcherLayout {
-        return SwitcherLayout(appCount: state.apps.count, iconsPerRow: state.iconsPerRow)
+        return SwitcherLayout(cellCount: state.apps.count, cellsPerRow: state.cellsPerRow, metrics: iconCellMetrics)
     }
 
     private func isWhitelisted(_ app: NSRunningApplication) -> Bool {
@@ -256,7 +256,7 @@ final class SwitcherPanel: NSPanel {
 
         badge.frame = alignToPixels(NSRect(
             x: (size.width - badgeSize.width) / 2,
-            y: size.height - verticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
+            y: size.height - iconVerticalPadding - nameBandHeight / 2 - badgeSize.height / 2,
             width: badgeSize.width,
             height: badgeSize.height
         ))

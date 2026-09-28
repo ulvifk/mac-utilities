@@ -21,7 +21,7 @@ final class AppSwitcherFeature: Feature {
 
     private var candidates: [NSRunningApplication] = []
     private var isFiltered = false
-    private var iconsPerRow = 1
+    private var cellsPerRow = 1
     private var selectedIndex = 0
 
     private var isOpening = false
@@ -312,21 +312,16 @@ final class AppSwitcherFeature: Feature {
     private func loadCandidates() {
         candidates = getCandidates()
         isFiltered = isListingWhitelistOnly()
-        iconsPerRow = getIconsPerRow()
+        cellsPerRow = getCellsPerRow()
     }
 
-    /// The count nearest the panel width, so a drag has to travel half an icon either way before a column comes or goes; held between one and
+    /// The count nearest the panel width, so a drag has to travel half a cell either way before a column comes or goes; held between one and
     /// what fits on the visible screen, so a width dragged past the screen or remembered from a wider one still fits.
-    private func getIconsPerRow() -> Int {
-        let nearest = Int(getIconCount(forPanelWidth: getPanelWidth()).rounded())
-        let fitting = Int(getIconCount(forPanelWidth: NSScreen.main!.visibleFrame.width).rounded(.down))
+    private func getCellsPerRow() -> Int {
+        let nearest = Int(iconCellMetrics.getCellCount(forPanelWidth: getPanelWidth()).rounded())
+        let fitting = Int(iconCellMetrics.getCellCount(forPanelWidth: NSScreen.main!.visibleFrame.width).rounded(.down))
 
         return max(1, min(nearest, fitting))
-    }
-
-    /// How many icons a row of this panel width holds, fractional.
-    private func getIconCount(forPanelWidth width: CGFloat) -> CGFloat {
-        return (width - 2 * horizontalPadding + itemSpacing) / (iconSize + itemSpacing)
     }
 
     /// The remembered width, or the default share of the screen until the edge has been dragged once.
@@ -380,7 +375,7 @@ final class AppSwitcherFeature: Feature {
         if !panel.isVisible { return }
 
         panelWidthStore.setWidth(width)
-        iconsPerRow = getIconsPerRow()
+        cellsPerRow = getCellsPerRow()
         panel.resize(state: buildState())
     }
 
@@ -390,21 +385,21 @@ final class AppSwitcherFeature: Feature {
         panel.update(state: buildState())
     }
 
-    /// The icon drawn nearest above or below, wrapping at the top and bottom; of two equally near, the left one, as `min` keeps the first.
+    /// The cell drawn nearest above or below, wrapping at the top and bottom; of two equally near, the left one, as `min` keeps the first.
     private func moveSelectionBetweenRows(up: Bool) {
-        let rowCount = (candidates.count + iconsPerRow - 1) / iconsPerRow
+        let rowCount = (candidates.count + cellsPerRow - 1) / cellsPerRow
         let step = up ? -1 : 1
-        let targetRow = (selectedIndex / iconsPerRow + step + rowCount) % rowCount
-        let targetRowIndices = targetRow * iconsPerRow..<min((targetRow + 1) * iconsPerRow, candidates.count)
+        let targetRow = (selectedIndex / cellsPerRow + step + rowCount) % rowCount
+        let targetRowIndices = targetRow * cellsPerRow..<min((targetRow + 1) * cellsPerRow, candidates.count)
 
         selectedIndex = targetRowIndices.min { getColumnDistance(from: $0, to: selectedIndex) < getColumnDistance(from: $1, to: selectedIndex) }!
         panel.update(state: buildState())
     }
 
-    /// How far apart the two icons are drawn, in columns.
+    /// How far apart the two cells are drawn, in columns.
     private func getColumnDistance(from index: Int, to otherIndex: Int) -> CGFloat {
-        let column = getVisualColumn(index: index, appCount: candidates.count, iconsPerRow: iconsPerRow)
-        let otherColumn = getVisualColumn(index: otherIndex, appCount: candidates.count, iconsPerRow: iconsPerRow)
+        let column = getVisualColumn(index: index, cellCount: candidates.count, cellsPerRow: cellsPerRow)
+        let otherColumn = getVisualColumn(index: otherIndex, cellCount: candidates.count, cellsPerRow: cellsPerRow)
 
         return abs(column - otherColumn)
     }
@@ -439,7 +434,7 @@ final class AppSwitcherFeature: Feature {
     private func buildState() -> SwitcherState {
         return SwitcherState(
             apps: candidates,
-            iconsPerRow: iconsPerRow,
+            cellsPerRow: cellsPerRow,
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,
             whitelisted: whitelistStore.getWhitelist()

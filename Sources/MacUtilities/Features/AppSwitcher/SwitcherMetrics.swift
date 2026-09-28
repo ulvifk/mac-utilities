@@ -4,24 +4,24 @@ import AppKit
 let iconSize: CGFloat = 68
 let itemSpacing: CGFloat = 5
 let horizontalPadding: CGFloat = 22
-/// The panel width until its edge is dragged once, as a share of the screen; the icons wrap to the next row around it.
+/// The panel width until its edge is dragged once, as a share of the screen; the cells wrap to the next row around it.
 let defaultPanelWidthFraction: CGFloat = 0.7
-/// The strip along each side edge that shows the resize cursor and takes the drag; it fits inside the padding, clear of the icons.
+/// The strip along each side edge that shows the resize cursor and takes the drag; it fits inside the padding, clear of the cells.
 let resizeHandleWidth: CGFloat = 12
-let verticalPadding: CGFloat = 7.5
+let iconVerticalPadding: CGFloat = 7.5
 let dotSize: CGFloat = 5
 
 /// The 13pt name label's height. The whitelist dot gets a band of the same height above the icon, so the two mirror each other.
 let nameBandHeight: CGFloat = 16
 let nameTopSpacing: CGFloat = 0
 /// Rows overlap their bands: the name below one row's icons ends 3pt above the whitelist dots of the next.
-let rowSpacing: CGFloat = -8
+let iconRowSpacing: CGFloat = -8
 /// Below the band's centre, so the dot reads as attached to the icon rather than floating.
 let dotCenterFromCellTop: CGFloat = nameBandHeight / 2 + 3
 /// Mirrored bands above and below, so the icon lands exactly in the middle of the cell.
-let cellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
+let iconCellHeight: CGFloat = iconSize + 2 * (nameBandHeight + nameTopSpacing)
 let iconFrameInCell = NSRect(x: 0, y: nameBandHeight + nameTopSpacing, width: iconSize, height: iconSize)
-let dotFrameInCell = NSRect(x: (iconSize - dotSize) / 2, y: cellHeight - dotCenterFromCellTop - dotSize / 2, width: dotSize, height: dotSize)
+let dotFrameInCell = NSRect(x: (iconSize - dotSize) / 2, y: iconCellHeight - dotCenterFromCellTop - dotSize / 2, width: dotSize, height: dotSize)
 /// The native highlight hugs the icon's squircle with a 3pt margin and has no stroke.
 let highlightColor = NSColor.white.withAlphaComponent(0.30)
 let highlightCornerRadius: CGFloat = 15.5
@@ -29,6 +29,12 @@ let highlightCornerRadius: CGFloat = 15.5
 let highlightIconInset: CGFloat = 3.5
 /// Concentric with the highlight: its radius plus its distance from the side edges.
 let panelCornerRadius: CGFloat = highlightCornerRadius + horizontalPadding + highlightIconInset
+let iconCellMetrics = SwitcherCellMetrics(
+    cellSize: NSSize(width: iconSize, height: iconCellHeight),
+    highlightFrameInCell: iconFrameInCell.insetBy(dx: highlightIconInset, dy: highlightIconInset),
+    rowSpacing: iconRowSpacing,
+    verticalPadding: iconVerticalPadding
+)
 /// The black tint's opacity until the darkness slider is moved; it pulls the glass down so the icons and the name stand out.
 let defaultGlassDarkness: CGFloat = 0.14
 let maxGlassDarkness: CGFloat = 0.6
