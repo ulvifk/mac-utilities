@@ -5,19 +5,16 @@ struct KeepAwakeSettingsView: View {
     @ObservedObject var preferences: KeepAwakePreferences
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Turn off after", selection: buildAutoOffBinding()) {
-                    ForEach(KeepAwakeAutoOff.allCases, id: \.self) { autoOff in
-                        Text(autoOff.title)
-                    }
+        Section {
+            Picker("Turn off after", selection: buildAutoOffBinding()) {
+                ForEach(KeepAwakeAutoOff.allCases, id: \.self) { autoOff in
+                    Text(autoOff.title)
                 }
-                Toggle("Keep awake with the lid closed", isOn: buildLidClosedBinding())
-            } footer: {
-                Text("The duration chips in the menu bar popover set Turn off after too. Both apply the next time Keep awake is turned on. Keeping a closed lid awake runs pmset as root through the sudoers line install.sh installs; with it off only idle sleep is held off and the display may still sleep.")
             }
+            Toggle("Keep awake with the lid closed", isOn: buildLidClosedBinding())
+        } footer: {
+            Text("The duration chips in the menu bar popover set Turn off after too. Both apply the next time Keep awake is turned on. Keeping a closed lid awake runs pmset as root through the sudoers line install.sh installs; with it off only idle sleep is held off and the display may still sleep.")
         }
-        .formStyle(.grouped)
     }
 
     private func buildAutoOffBinding() -> Binding<KeepAwakeAutoOff> {

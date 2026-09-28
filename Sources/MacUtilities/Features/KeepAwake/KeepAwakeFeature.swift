@@ -36,7 +36,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         return false
     }
 
-    func buildSettingsView() -> AnyView {
+    func buildSettingsSections() -> AnyView {
         return AnyView(KeepAwakeSettingsView(preferences: preferences))
     }
 

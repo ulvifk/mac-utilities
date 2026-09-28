@@ -141,8 +141,8 @@ docs/<name>/          the feature's README and screenshots
 
 A feature implements `Feature`: a stable `identifier` (the key its enabled state is
 stored under), a `displayName`, `start()`, `stop()`, `handle(type:event:) -> Bool`,
-`buildSettingsView() -> AnyView`, its tab in the settings window, and
-`buildPopoverTile() -> AnyView?`, its tile in the menu bar popover while it is
+`buildSettingsSections() -> AnyView`, the sections of its tab in the settings window,
+and `buildPopoverTile() -> AnyView?`, its tile in the menu bar popover while it is
 enabled, nil for most; a tile observes its feature and keeps itself current. The
 popover lists the tiles in the features' order. The core tap hands
 every key press and modifier change to the enabled features in order; the first one

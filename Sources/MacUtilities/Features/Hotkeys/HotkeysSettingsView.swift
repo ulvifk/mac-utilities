@@ -6,19 +6,16 @@ struct HotkeysSettingsView: View {
     @StateObject private var installedApps = InstalledApps()
 
     var body: some View {
-        Form {
-            Section {
-                if let loadError = store.loadError {
-                    Label(loadError, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                } else {
-                    bindingRows
-                }
-            } footer: {
-                Text("Stored in \(store.path); edits made there apply on the spot. A bound key never reaches the focused app.")
+        Section {
+            if let loadError = store.loadError {
+                Label(loadError, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            } else {
+                bindingRows
             }
+        } footer: {
+            Text("Stored in \(store.path); edits made there apply on the spot. A bound key never reaches the focused app.")
         }
-        .formStyle(.grouped)
     }
 
     @ViewBuilder private var bindingRows: some View {

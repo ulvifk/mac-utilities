@@ -26,47 +26,44 @@ struct AppSwitcherSettingsView: View {
     @StateObject private var runningApps = RunningRegularApps()
 
     var body: some View {
-        Form {
-            Section("Whitelist") {
-                Toggle("Filter to the whitelist", isOn: buildFilterBinding())
-                LabeledContent("Whitelisted apps") {
-                    AppListPicker(store: whitelistStore, apps: runningApps.apps)
-                }
-            }
-
-            Section("Apps (Cmd+Tab)") {
-                GlassSettingsRows(glassStore: appGlassStore)
-            }
-
-            Section("Windows (Cmd+`)") {
-                GlassSettingsRows(glassStore: windowGlassStore)
-            }
-
-            Section("Window cards") {
-                Toggle("Cards around windows", isOn: buildWindowCardsBinding())
-                GlassSettingsRows(glassStore: windowCardGlassStore)
-                    .disabled(!windowCardStore.showsCards)
-            }
-
-            Section("Batch Quit") {
-                Picker("Quit", selection: buildQuitsUnlistedAppsBinding()) {
-                    Text("Listed apps").tag(false)
-                    Text("Unlisted apps").tag(true)
-                }
-                .pickerStyle(.segmented)
-                LabeledContent(batchQuitStore.quitsUnlistedApps ? "Apps to keep" : "Apps to quit") {
-                    AppListPicker(store: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
-                }
-                Button(batchQuitStore.quitsUnlistedApps ? "Quit unlisted apps" : "Quit listed apps") { runBatchQuit(batchQuitStore) }
-            }
-
-            Section("While switching") {
-                ForEach(switcherShortcuts, id: \.0) { shortcut, meaning in
-                    LabeledContent(meaning, value: shortcut)
-                }
+        Section("Whitelist") {
+            Toggle("Filter to the whitelist", isOn: buildFilterBinding())
+            LabeledContent("Whitelisted apps") {
+                AppListPicker(store: whitelistStore, apps: runningApps.apps)
             }
         }
-        .formStyle(.grouped)
+
+        Section("Apps (Cmd+Tab)") {
+            GlassSettingsRows(glassStore: appGlassStore)
+        }
+
+        Section("Windows (Cmd+`)") {
+            GlassSettingsRows(glassStore: windowGlassStore)
+        }
+
+        Section("Window cards") {
+            Toggle("Cards around windows", isOn: buildWindowCardsBinding())
+            GlassSettingsRows(glassStore: windowCardGlassStore)
+                .disabled(!windowCardStore.showsCards)
+        }
+
+        Section("Batch Quit") {
+            Picker("Quit", selection: buildQuitsUnlistedAppsBinding()) {
+                Text("Listed apps").tag(false)
+                Text("Unlisted apps").tag(true)
+            }
+            .pickerStyle(.segmented)
+            LabeledContent(batchQuitStore.quitsUnlistedApps ? "Apps to keep" : "Apps to quit") {
+                AppListPicker(store: batchQuitStore, apps: runningApps.apps.filter(isBatchQuittable))
+            }
+            Button(batchQuitStore.quitsUnlistedApps ? "Quit unlisted apps" : "Quit listed apps") { runBatchQuit(batchQuitStore) }
+        }
+
+        Section("While switching") {
+            ForEach(switcherShortcuts, id: \.0) { shortcut, meaning in
+                LabeledContent(meaning, value: shortcut)
+            }
+        }
     }
 
     private func buildFilterBinding() -> Binding<Bool> {

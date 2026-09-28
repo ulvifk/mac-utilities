@@ -11,8 +11,8 @@ protocol Feature {
     func stop()
     /// Returns true when the event is swallowed and must not reach the focused app.
     func handle(type: CGEventType, event: CGEvent) -> Bool
-    /// The feature's own tab in the settings window.
-    func buildSettingsView() -> AnyView
+    /// The sections of the feature's own tab in the settings window, which puts them in a form.
+    func buildSettingsSections() -> AnyView
     /// The feature's tile in the menu bar popover while it is enabled; nil for most. The tile keeps itself current.
     func buildPopoverTile() -> AnyView?
 }

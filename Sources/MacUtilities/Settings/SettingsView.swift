@@ -13,7 +13,8 @@ struct SettingsView: View {
                 .tag(generalTabIdentifier)
 
             ForEach(controller.features, id: \.identifier) { feature in
-                feature.buildSettingsView()
+                Form { feature.buildSettingsSections() }
+                    .formStyle(.grouped)
                     .tabItem { Text(feature.displayName) }
                     .tag(feature.identifier)
             }

@@ -81,7 +81,7 @@ final class AppSwitcherFeature: Feature {
         return false
     }
 
-    func buildSettingsView() -> AnyView {
+    func buildSettingsSections() -> AnyView {
         return AnyView(AppSwitcherSettingsView(
             whitelistStore: whitelistStore,
             batchQuitStore: batchQuitStore,

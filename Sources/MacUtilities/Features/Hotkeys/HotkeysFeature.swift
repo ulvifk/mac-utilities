@@ -31,7 +31,7 @@ final class HotkeysFeature: Feature {
         return true
     }
 
-    func buildSettingsView() -> AnyView {
+    func buildSettingsSections() -> AnyView {
         return AnyView(HotkeysSettingsView(store: store))
     }
 
