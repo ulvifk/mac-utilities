@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// The bindings in $XDG_CONFIG_HOME/mac-utilities/hotkeys.json (~/.config by default). Every edit is written on the spot; the directory is watched, so hand edits are picked up while the app runs.
+/// Reads, writes, and watches hotkeys.json in the config directory.
 final class HotkeyBindingsStore: ObservableObject {
     let path: String
 
@@ -11,15 +11,24 @@ final class HotkeyBindingsStore: ObservableObject {
 
     private let directory: String
     private var directoryWatcher: DispatchSourceFileSystemObject!
+    private var fileWatcher: DispatchSourceFileSystemObject?
 
     init() {
         directory = getConfigDirectory() + "/mac-utilities"
         path = directory + "/hotkeys.json"
 
         try! FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
-        load()
+
         directoryWatcher = buildDirectoryWatcher()
         directoryWatcher.resume()
+        refreshFileWatcher()
+
+        load()
+    }
+
+    deinit {
+        directoryWatcher.cancel()
+        fileWatcher?.cancel()
     }
 
     func add(_ binding: HotkeyBinding) {
@@ -64,13 +73,34 @@ final class HotkeyBindingsStore: ObservableObject {
         }
     }
 
-    /// Editors save by writing a new file and renaming it over the old one, which a watcher on the file itself misses; the directory sees every such change.
+    /// The directory catches file creation and replacement; each replacement needs a new file watcher.
     private func buildDirectoryWatcher() -> DispatchSourceFileSystemObject {
         let descriptor = open(directory, O_EVTONLY)
         let watcher = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: .main)
 
-        watcher.setEventHandler { [unowned self] in self.load() }
+        watcher.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.refreshFileWatcher()
+
+            self.load()
+        }
+        watcher.setCancelHandler { close(descriptor) }
         return watcher
+    }
+
+    private func refreshFileWatcher() {
+        fileWatcher?.cancel()
+        fileWatcher = nil
+
+        let descriptor = open(path, O_EVTONLY)
+        if descriptor == -1 { return }
+
+        let watcher = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: .main)
+        watcher.setEventHandler { [weak self] in self?.load() }
+        watcher.setCancelHandler { close(descriptor) }
+
+        fileWatcher = watcher
+        watcher.resume()
     }
 }
 

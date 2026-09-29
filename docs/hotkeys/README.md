@@ -45,7 +45,8 @@ bindings, each with a `key` and an `action`:
 - `type` is one of the actions below; `target` is what it acts on.
 
 The file is written on every change made in the pane (pretty-printed, keys sorted)
-and the directory is watched, so a hand edit applies on the spot while the app runs.
+and both the file and its directory are watched, so in-place edits and editor
+saves that replace the file apply on the spot while the app runs.
 A file that does not parse is reported on stdout, the bindings in use stay as they
 were, and the pane shows the parse error in place of the rows and writes nothing
 until it parses again, so hand edits are never overwritten.
@@ -100,8 +101,8 @@ file exists.
 
 `Sources/MacUtilities/Features/Hotkeys/`: `HotkeysFeature` matches tapped key
 presses against the bindings and runs the action off the tap through
-`PerformHotkeyAction`; `HotkeyBindingsStore` reads and writes the file and watches the
-directory; `HotkeyBinding`, `KeyCombo`, `ModifierKey`, `HotkeyAction` and
+`PerformHotkeyAction`; `HotkeyBindingsStore` reads and writes the file and watches
+it and its directory; `HotkeyBinding`, `KeyCombo`, `ModifierKey`, `HotkeyAction` and
 `HotkeyActionType` are the file's shape, with `KeyNames` turning key codes into
 labels; `HotkeysSettingsView` holds the sections of the settings pane, listing a
 `HotkeyBindingRow` per binding, built from `KeyRecorderField` (wrapping
