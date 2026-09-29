@@ -4,8 +4,7 @@ import SwiftUI
 
 let keepAwakeSymbolName = "cup.and.saucer.fill"
 
-/// Keeps the Mac awake from the menu bar popover: a power assertion and, when wanted, lid-closed sleep disabled through pmset; turns itself off
-/// after the set time. Publishes its state to its tile.
+/// Owns Keep Awake transitions and publishes the session after its power commands succeed.
 final class KeepAwakeFeature: Feature, ObservableObject {
     private static let sleepRestorationRetryInterval: TimeInterval = 5
 
@@ -18,14 +17,15 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     private let preferences = KeepAwakePreferences()
     private let setMenuBarSymbol: (String?) -> Void
 
-    /// nil while off.
     @Published private(set) var session: KeepAwakeSession?
-    /// Sudo refused pmset at the last turn-on, so nothing is held; until the next turn-on.
+    @Published private(set) var isChangingSession = false
     @Published private(set) var isPmsetRefused = false
     @Published private(set) var isSleepRestorationRefused = false
 
-    /// Ends the session at its deadline or retries failed sleep restoration.
+    private var requestedSession: KeepAwakeSession?
+    private var transition: Task<Void, Never>?
     private var deactivation: DispatchWorkItem?
+    private var isTerminating = false
 
     init(setMenuBarSymbol: @escaping (String?) -> Void) {
         self.setMenuBarSymbol = setMenuBarSymbol
@@ -34,9 +34,17 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     func start() {}
 
     func stop() {
-        if session == nil { return }
+        requestedSession = nil
+        updateSession()
+    }
 
-        deactivate()
+    @MainActor func prepareForTermination() async {
+        isTerminating = true
+        stop()
+        await transition?.value
+
+        deactivation?.cancel()
+        deactivation = nil
     }
 
     func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -51,63 +59,86 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         return AnyView(KeepAwakeTile(feature: self))
     }
 
-    /// On for the remembered time, or off.
     func toggle() {
-        if session == nil {
-            activate()
-        } else {
-            deactivate()
+        if isTerminating { return }
+        if isSleepRestorationRefused {
+            stop()
+            return
         }
-    }
-
-    /// On for that long from now, starting over when it is on already; the time becomes the remembered one the toggle uses.
-    func turnOn(for autoOff: KeepAwakeAutoOff) {
-        preferences.setAutoOff(autoOff)
-
-        if session != nil {
-            let didDeactivate = deactivate()
-            if !didDeactivate { return }
-        }
-        activate()
-    }
-
-    private func activate() {
-        guard let session = KeepAwakeSession(preferences: preferences) else {
-            isPmsetRefused = true
+        if requestedSession != nil {
+            stop()
             return
         }
 
-        self.session = session
-        isPmsetRefused = false
-        if let deactivationDate = session.deactivationDate {
-            deactivation = scheduleDeactivation(at: deactivationDate)
-        }
-
-        setMenuBarSymbol(keepAwakeSymbolName)
+        requestedSession = KeepAwakeSession(preferences: preferences)
+        updateSession()
     }
 
-    @discardableResult
-    private func deactivate() -> Bool {
+    func turnOn(for autoOff: KeepAwakeAutoOff) {
+        if isTerminating { return }
+
+        preferences.setAutoOff(autoOff)
+        requestedSession = KeepAwakeSession(preferences: preferences)
+        updateSession()
+    }
+
+    private func updateSession() {
         deactivation?.cancel()
         deactivation = nil
+        if transition != nil { return }
+        if session === requestedSession { return }
 
-        let didRestoreSleep = session!.end()
-        if !didRestoreSleep {
-            isSleepRestorationRefused = true
-            deactivation = scheduleDeactivation(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
-            return false
+        transition = Task { @MainActor in
+            isChangingSession = true
+            await reconcileSession()
+            isChangingSession = false
+            transition = nil
         }
-
-        session = nil
-        isSleepRestorationRefused = false
-
-        setMenuBarSymbol(nil)
-        return true
     }
 
-    /// On the wall clock, so a Mac that slept past the date turns it off on waking.
-    private func scheduleDeactivation(at date: Date) -> DispatchWorkItem {
-        let deactivation = DispatchWorkItem { [unowned self] in self.deactivate() }
+    @MainActor private func reconcileSession() async {
+        while session !== requestedSession {
+            if let session {
+                let didRestoreSleep = await session.end()
+                if !didRestoreSleep {
+                    isSleepRestorationRefused = true
+                    deactivation = scheduleUpdate(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
+                    return
+                }
+
+                self.session = nil
+                isSleepRestorationRefused = false
+                setMenuBarSymbol(nil)
+                continue
+            }
+
+            let nextSession = requestedSession!
+            let didBegin = await nextSession.begin()
+            if !didBegin {
+                isPmsetRefused = true
+                if requestedSession === nextSession { requestedSession = nil }
+                continue
+            }
+
+            session = nextSession
+            isPmsetRefused = false
+            setMenuBarSymbol(keepAwakeSymbolName)
+        }
+
+        if let deactivationDate = session?.deactivationDate {
+            deactivation = scheduleUpdate(at: deactivationDate, turnsOff: true)
+        }
+    }
+
+    /// Uses wall time so a Mac that slept past its deadline turns off on waking.
+    private func scheduleUpdate(at date: Date, turnsOff: Bool = false) -> DispatchWorkItem {
+        let deactivation = DispatchWorkItem { [unowned self] in
+            if turnsOff {
+                stop()
+                return
+            }
+            updateSession()
+        }
         DispatchQueue.main.asyncAfter(wallDeadline: .now() + date.timeIntervalSinceNow, execute: deactivation)
         return deactivation
     }

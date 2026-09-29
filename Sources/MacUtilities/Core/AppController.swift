@@ -37,10 +37,19 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         runMenuBarSmokeTestIfRequested(controller: self)
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         for feature in enabledFeatures {
             feature.stop()
         }
+        enabledFeatures = []
+
+        Task { @MainActor in
+            for feature in features {
+                await feature.prepareForTermination()
+            }
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     func isFeatureEnabled(_ feature: Feature) -> Bool {

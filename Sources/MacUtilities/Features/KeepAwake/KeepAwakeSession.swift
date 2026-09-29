@@ -8,33 +8,37 @@ final class KeepAwakeSession {
     /// nil when the session runs until turned off.
     let deactivationDate: Date?
 
-    private let assertion: PowerAssertion
-    private let lidClosedSleepWatchdog: Process?
+    private let keepsAwakeWithLidClosed: Bool
+    private var assertion: PowerAssertion!
+    private var lidClosedSleepWatchdog: Process?
 
-    init?(preferences: KeepAwakePreferences) {
+    init(preferences: KeepAwakePreferences) {
         autoOff = preferences.autoOff
         deactivationDate = autoOff.duration.map { Date(timeIntervalSinceNow: $0) }
+        keepsAwakeWithLidClosed = preferences.keepsAwakeWithLidClosed
+    }
 
-        if !preferences.keepsAwakeWithLidClosed {
+    @MainActor func begin() async -> Bool {
+        if !keepsAwakeWithLidClosed {
             assertion = PowerAssertion(type: kIOPMAssertionTypePreventUserIdleSystemSleep as String)
-            lidClosedSleepWatchdog = nil
-            return
+            return true
         }
 
         let watchdog = launchLidClosedSleepWatchdog()
-        let didDisableSleep = setLidClosedSleepDisabled(true)
+        let didDisableSleep = await setLidClosedSleepDisabled(true)
         if !didDisableSleep {
             watchdog.terminate()
-            return nil
+            return false
         }
 
         assertion = PowerAssertion(type: kIOPMAssertionTypePreventUserIdleDisplaySleep as String)
         lidClosedSleepWatchdog = watchdog
+        return true
     }
 
-    func end() -> Bool {
+    @MainActor func end() async -> Bool {
         if let lidClosedSleepWatchdog {
-            let didRestoreSleep = setLidClosedSleepDisabled(false)
+            let didRestoreSleep = await setLidClosedSleepDisabled(false)
             if !didRestoreSleep { return false }
             lidClosedSleepWatchdog.terminate()
         }

@@ -4,9 +4,9 @@ final class Process {
     var executableURL: URL?
     var arguments: [String] = []
     var terminationStatus: Int32 = 0
+    var terminationHandler: ((Process) -> Void)?
 
     func run() throws {}
-    func waitUntilExit() {}
 }
 
 let watchdog = launchLidClosedSleepWatchdog()

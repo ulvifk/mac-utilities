@@ -37,6 +37,10 @@ struct KeepAwakeTile: View {
                 .foregroundStyle(.orange)
         }
 
+        if feature.isChangingSession {
+            return Text(feature.session == nil ? "Turning on…" : "Restoring sleep…")
+        }
+
         if feature.isPmsetRefused {
             return Text("\(Image(systemName: "exclamationmark.triangle.fill")) Couldn't keep a closed lid awake: run install.sh, or turn the lid option off in Settings")
                 .fontWeight(.medium)

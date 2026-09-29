@@ -15,10 +15,16 @@ protocol Feature {
 
     func start()
     func stop()
+    /// Finishes outstanding external effects, including cleanup owned by a disabled feature.
+    @MainActor func prepareForTermination() async
     /// Returns true when the event is swallowed and must not reach the focused app.
     func handle(type: CGEventType, event: CGEvent) -> Bool
     /// The sections of the feature's settings pane, below the header with its name and switch.
     func buildSettingsSections() -> AnyView
     /// The feature's tile in the menu bar popover while it is enabled; nil for most. The tile keeps itself current.
     func buildPopoverTile() -> AnyView?
+}
+
+extension Feature {
+    @MainActor func prepareForTermination() async {}
 }
