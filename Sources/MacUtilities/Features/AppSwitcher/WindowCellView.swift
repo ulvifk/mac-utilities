@@ -3,6 +3,9 @@ import AppKit
 /// A clickable window cell: the window's thumbnail, or its app's icon until one is captured, and the window's title under it, framed in a card
 /// unless cards are switched off.
 final class WindowCellView: SwitcherCellView {
+    private let card = NSView()
+    private let blur = NSVisualEffectView()
+    private let tint = NSView()
     /// Around the card, drawn over it: faint, or the selection's ring.
     private let border = NSView()
     private let thumbnail = NSImageView()
@@ -11,6 +14,19 @@ final class WindowCellView: SwitcherCellView {
     /// Without a card glass, cards are off.
     convenience init(window: AppWindow, cardGlass: GlassStore?) {
         self.init(frame: .zero)
+
+        card.frame = alignToPixels(windowCardFrameInCell)
+        card.wantsLayer = true
+        card.layer?.cornerRadius = highlightCornerRadius
+        card.layer?.masksToBounds = true
+
+        blur.frame = card.bounds
+        blur.material = .hudWindow
+        blur.blendingMode = .behindWindow
+        blur.state = .active
+
+        tint.frame = card.bounds
+        tint.wantsLayer = true
 
         border.wantsLayer = true
         border.layer?.cornerRadius = highlightCornerRadius
@@ -29,12 +45,23 @@ final class WindowCellView: SwitcherCellView {
         title.maximumNumberOfLines = 1
         title.frame = alignToPixels(windowTitleFrameInCell)
 
-        if let cardGlass {
-            addSubview(buildCard(glass: cardGlass))
-            addSubview(border)
-        }
+        card.addSubview(blur)
+        card.addSubview(tint)
+        addSubview(card)
+        addSubview(border)
         addSubview(thumbnail)
         addSubview(title)
+
+        updateCardGlass(cardGlass)
+    }
+
+    func updateCardGlass(_ glass: GlassStore?) {
+        card.isHidden = glass == nil
+        border.isHidden = glass == nil
+        guard let glass else { return }
+
+        blur.isHidden = !glass.isFrosted
+        tint.layer?.backgroundColor = NSColor.black.withAlphaComponent(glass.darkness).cgColor
     }
 
     func showThumbnail(_ image: NSImage) {
@@ -44,35 +71,5 @@ final class WindowCellView: SwitcherCellView {
     func showSelected(_ isSelected: Bool) {
         border.layer?.borderWidth = isSelected ? selectedWindowCardBorderWidth : windowCardBorderWidth
         border.layer?.borderColor = (isSelected ? NSColor.controlAccentColor : windowCardBorderColor).cgColor
-    }
-
-    /// A dark fill as dark as the glass setting says; Frosted blurs what is behind the panel under it. The panel is never key, so the blur is kept
-    /// active or it would draw as a flat inactive gray.
-    private func buildCard(glass: GlassStore) -> NSView {
-        let card = NSView(frame: alignToPixels(windowCardFrameInCell))
-        let tint = NSView(frame: card.bounds)
-
-        card.wantsLayer = true
-        card.layer?.cornerRadius = highlightCornerRadius
-        card.layer?.masksToBounds = true
-        tint.wantsLayer = true
-        tint.layer?.backgroundColor = NSColor.black.withAlphaComponent(glass.darkness).cgColor
-
-        if glass.isFrosted {
-            card.addSubview(buildBlur(size: card.bounds.size))
-        }
-        card.addSubview(tint)
-
-        return card
-    }
-
-    private func buildBlur(size: NSSize) -> NSVisualEffectView {
-        let blur = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
-
-        blur.material = .hudWindow
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-
-        return blur
     }
 }

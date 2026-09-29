@@ -52,6 +52,7 @@ final class SwitcherPanel {
     static var instances: [SwitcherPanel] = []
     static var shownStates: [SwitcherState] = []
     static var updatedStates: [SwitcherState] = []
+    static var glassUpdatedStates: [SwitcherState] = []
     static var feedback: [SwitcherFeedback] = []
 
     var onCellClicked: (Int) -> Void = { _ in }
@@ -75,6 +76,7 @@ final class SwitcherPanel {
     }
 
     func update(state: SwitcherState) { Self.updatedStates.append(state) }
+    func updateGlass(state: SwitcherState, glassStore: GlassStore) { Self.glassUpdatedStates.append(state) }
     func resize(state: SwitcherState) {}
     func removeApp(at index: Int, state: SwitcherState) {}
     func showHintsAfterDelay() {}
@@ -127,7 +129,11 @@ final class GlassStore: ObservableObject {
 }
 
 final class WindowCardStore: ObservableObject {
+    static var store: WindowCardStore!
+
     let showsCards = false
+
+    init() { Self.store = self }
 }
 
 final class PanelWidthStore {
@@ -157,9 +163,24 @@ struct AppSwitcherSettingsView: View {
     var body: some View { EmptyView() }
 }
 
-func getRegularRunningApps() -> [NSRunningApplication] { return RecentAppsTracker.apps }
-func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication] { return apps }
-func getWindows(of app: NSRunningApplication) -> [AppWindow] { return AppWindow.windows }
+enum AppQueries {
+    static var runningApps = 0
+    static var appsWithWindows = 0
+    static var windows = 0
+}
+
+func getRegularRunningApps() -> [NSRunningApplication] {
+    AppQueries.runningApps += 1
+    return RecentAppsTracker.apps
+}
+func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
+    AppQueries.appsWithWindows += 1
+    return apps
+}
+func getWindows(of app: NSRunningApplication) -> [AppWindow] {
+    AppQueries.windows += 1
+    return AppWindow.windows
+}
 func getAppName(_ app: NSRunningApplication) -> String { return app.localizedName! }
 func runBatchQuit(_ store: BatchQuitStore) -> Int {
     BatchQuitStore.quitCount += 1

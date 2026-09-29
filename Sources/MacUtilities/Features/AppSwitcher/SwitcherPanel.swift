@@ -65,6 +65,30 @@ final class SwitcherPanel: NSPanel {
         }
     }
 
+    func updateGlass(state: SwitcherState, glassStore: GlassStore) {
+        self.state = state
+        let glass = contentView as! NSGlassEffectView
+
+        if isFrosted != glassStore.isFrosted {
+            // The effect resolves the panel's active appearance when attached.
+            isFrosted = glassStore.isFrosted
+            let container = glass.contentView
+            let updatedGlass = buildGlassView(size: glass.frame.size, darkness: glassStore.darkness)
+
+            glass.contentView = nil
+            updatedGlass.contentView = container
+            contentView = updatedGlass
+        } else {
+            glass.tintColor = NSColor.black.withAlphaComponent(glassStore.darkness)
+        }
+
+        if !state.isListingWindows { return }
+
+        for cell in cells {
+            (cell as! WindowCellView).updateCardGlass(state.windowCardGlass)
+        }
+    }
+
     func update(state: SwitcherState) {
         self.state = state
         let layout = buildLayout()

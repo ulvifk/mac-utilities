@@ -33,11 +33,15 @@ func resetFixtures(itemCount: Int = 3) {
     SwitcherPanel.instances = []
     SwitcherPanel.shownStates = []
     SwitcherPanel.updatedStates = []
+    SwitcherPanel.glassUpdatedStates = []
     SwitcherPanel.feedback = []
     WhitelistStore.filterChanges = []
     BatchQuitStore.quitCount = 0
     GlassStore.stores = [:]
     ThumbnailRequest.requests = []
+    AppQueries.runningApps = 0
+    AppQueries.appsWithWindows = 0
+    AppQueries.windows = 0
 }
 
 func drainMainQueue() {
@@ -414,4 +418,106 @@ runScenario("preview/continuous-window-look") { feature in
 
     precondition(SwitcherPanel.updatedStates.count == 1, "Continuous preview lost its capture")
     precondition(ThumbnailRequest.requests.count == 1, "Continuous preview repeated thumbnail capture")
+}
+
+for listingWindows in [false, true] {
+    let list = listingWindows ? "windows" : "apps"
+    runScenario("preview/\(list)-slider-reuses-list") { feature in
+        let store = GlassStore.stores[listingWindows ? "windowGlass" : "appGlass"]!
+        store.objectWillChange.send()
+        drainMainQueue()
+        RecentAppsTracker.apps = [NSRunningApplication(index: 9)]
+        AppWindow.windows = [AppWindow(windowID: 9)]
+
+        for _ in 0..<20 {
+            store.objectWillChange.send()
+            drainMainQueue()
+        }
+
+        precondition(AppQueries.runningApps == 1, "Slider repeated running app queries")
+        precondition(AppQueries.appsWithWindows == 1, "Slider repeated apps-with-windows queries")
+        precondition(AppQueries.windows == (listingWindows ? 1 : 0), "Slider repeated window queries")
+        precondition(SwitcherPanel.shownStates.count == 1, "Slider rebuilt the panel")
+        precondition(SwitcherPanel.glassUpdatedStates.count == 20, "Slider lost appearance changes")
+        let state = SwitcherPanel.glassUpdatedStates.last!
+        precondition((listingWindows ? state.windows.count : state.apps.count) == 3, "Slider replaced preview candidates")
+        precondition(ThumbnailRequest.requests.count == (listingWindows ? 1 : 0), "Slider repeated thumbnail capture")
+    }
+}
+
+runScenario("preview/cards-reuse-window-list") { feature in
+    GlassStore.stores["windowGlass"]!.objectWillChange.send()
+    drainMainQueue()
+    WindowCardStore.store.objectWillChange.send()
+    drainMainQueue()
+    GlassStore.stores["windowCardGlass"]!.objectWillChange.send()
+    drainMainQueue()
+
+    precondition(AppQueries.windows == 1, "Card changes repeated window queries")
+    precondition(SwitcherPanel.shownStates.count == 1, "Card changes rebuilt the panel")
+    precondition(SwitcherPanel.glassUpdatedStates.count == 2, "Card changes lost appearance updates")
+    precondition(ThumbnailRequest.requests.count == 1, "Card changes repeated thumbnail capture")
+}
+
+runScenario("preview/mode-change-loads-fresh-list") { feature in
+    GlassStore.stores["appGlass"]!.objectWillChange.send()
+    drainMainQueue()
+    AppWindow.windows = [AppWindow(windowID: 9)]
+    GlassStore.stores["windowGlass"]!.objectWillChange.send()
+    drainMainQueue()
+
+    precondition(AppQueries.runningApps == 2, "Mode change reused the old app query")
+    precondition(AppQueries.windows == 1, "Mode change did not load windows")
+    precondition(SwitcherPanel.shownStates.count == 2, "Mode change did not rebuild for windows")
+    precondition(SwitcherPanel.shownStates.last!.windows.map { $0.windowID } == [9], "Mode change kept stale windows")
+    precondition(ThumbnailRequest.requests[0].windowIDs == [9], "Mode change captured the old windows")
+}
+
+runScenario("preview/empty-mode-change-hides-list") { feature in
+    GlassStore.stores["appGlass"]!.objectWillChange.send()
+    drainMainQueue()
+    AppWindow.windows = []
+    GlassStore.stores["windowGlass"]!.objectWillChange.send()
+    drainMainQueue()
+
+    precondition(!SwitcherPanel.instances[1].isVisible, "Empty window preview kept the app preview visible")
+    precondition(SwitcherPanel.shownStates.count == 1, "Empty window preview built content")
+    AppWindow.windows = [AppWindow(windowID: 9)]
+    GlassStore.stores["windowGlass"]!.objectWillChange.send()
+    drainMainQueue()
+    precondition(SwitcherPanel.shownStates.last!.windows.map { $0.windowID } == [9], "Next preview did not recover after an empty list")
+    precondition(AppQueries.windows == 2, "Next preview did not reload after an empty list")
+}
+
+runScenario("preview/normal-switcher-loads-fresh-list") { feature in
+    GlassStore.stores["appGlass"]!.objectWillChange.send()
+    drainMainQueue()
+    RecentAppsTracker.apps = [NSRunningApplication(index: 9)]
+    press(feature, keyCode: tabKeyCode)
+    drainMainQueue()
+
+    precondition(!SwitcherPanel.instances[1].isVisible, "Normal switcher kept its preview visible")
+    precondition(AppQueries.runningApps == 2, "Normal switcher reused preview candidates")
+    precondition(SwitcherPanel.shownStates.last!.apps.map { $0.bundleIdentifier! } == ["test.app.9"], "Normal switcher kept stale preview apps")
+}
+
+runScenario("preview/idle-expiry-refreshes-list") { feature in
+    let store = GlassStore.stores["appGlass"]!
+    store.objectWillChange.send()
+    drainMainQueue()
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.6))
+    store.objectWillChange.send()
+    drainMainQueue()
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.6))
+    precondition(SwitcherPanel.instances[1].isVisible, "Old expiry hid a continuing preview")
+    precondition(AppQueries.runningApps == 1, "Continuing preview reloaded apps")
+
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
+    precondition(!SwitcherPanel.instances[1].isVisible, "Preview did not expire after the last change")
+    RecentAppsTracker.apps = [NSRunningApplication(index: 9)]
+    store.objectWillChange.send()
+    drainMainQueue()
+
+    precondition(AppQueries.runningApps == 2, "New preview did not reload after expiry")
+    precondition(SwitcherPanel.shownStates.last!.apps.map { $0.bundleIdentifier! } == ["test.app.9"], "New preview kept candidates from before expiry")
 }

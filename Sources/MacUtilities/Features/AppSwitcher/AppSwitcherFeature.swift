@@ -687,35 +687,26 @@ final class AppSwitcherFeature: Feature {
 
     // MARK: preview
 
-    /// Shows what the glass is for on the glass just set and hides it a moment after the last change: the running apps, or the windows of the
-    /// app used last, the one behind the settings window. Their thumbnails are captured when the preview comes up on them, not again on every
-    /// step of a slider drag. Left out while the switcher is open, since it shares the candidates, and hidden with nothing to list, since a
-    /// thumbnail still arriving would redraw it from the empty list.
+    /// Reuses the visible preview's list and views until its mode changes or it hides.
     private func previewGlass(listingWindows: Bool) {
         if panel.isVisible { return }
         if isOpening { return }
 
-        let wasPreviewingWindows = isPreviewingWindows()
-        if !previewPanel.isVisible {
-            previewSession += 1
-        } else if isListingWindows != listingWindows {
-            hidePreview()
-        }
-
-        if listingWindows {
-            guard let app = getRecentRunningApps().first else { return }
-            loadWindows(of: app)
+        if isPreviewing(listingWindows: listingWindows) {
+            previewPanel.updateGlass(state: buildState(), glassStore: getGlassStore())
         } else {
-            loadApps()
-        }
-        if getItemCount() == 0 {
             hidePreview()
-            return
-        }
 
-        selectedIndex = 0
-        previewPanel.show(state: buildState(), glassStore: getGlassStore())
-        if !wasPreviewingWindows {
+            if listingWindows {
+                guard let app = getRecentRunningApps().first else { return }
+                loadWindows(of: app)
+            } else {
+                loadApps()
+            }
+            if getItemCount() == 0 { return }
+
+            selectedIndex = 0
+            previewPanel.show(state: buildState(), glassStore: getGlassStore())
             refreshThumbnails(of: windows.map { $0.windowID }, in: previewPanel)
         }
 
@@ -724,10 +715,9 @@ final class AppSwitcherFeature: Feature {
         DispatchQueue.main.asyncAfter(deadline: .now() + glassPreviewDuration, execute: previewHiding!)
     }
 
-    /// While the preview is up, the candidates are its own: the switcher hides it before loading.
-    private func isPreviewingWindows() -> Bool {
+    private func isPreviewing(listingWindows: Bool) -> Bool {
         if !previewPanel.isVisible { return false }
-        return isListingWindows
+        return isListingWindows == listingWindows
     }
 
     private func hidePreview() {
