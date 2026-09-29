@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-struct AppSwitcherEventTests {
+struct SwitcherAppearanceTests {
     @Test
-    func eventHandlingPreservesDirectionCancellationAndPreviewReuse() throws {
+    func glassChangesReuseProductionPanelViewsAndThumbnails() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -12,15 +12,15 @@ struct AppSwitcherEventTests {
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
         defer { try! FileManager.default.removeItem(at: temporaryDirectory) }
 
-        let executable = temporaryDirectory.appendingPathComponent("switcher-event-tests")
+        let executable = temporaryDirectory.appendingPathComponent("switcher-appearance-tests")
         let compilerOutput = temporaryDirectory.appendingPathComponent("compiler-output")
         let sources = [
-            "Sources/MacUtilities/Features/AppSwitcher/AppSwitcherFeature.swift",
-            "Sources/MacUtilities/Features/AppSwitcher/SwitcherState.swift",
-            "Sources/MacUtilities/Core/Feature.swift",
-            "Sources/MacUtilities/Core/KeyMatching.swift",
-            "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/AppSwitcherFakes.swift",
-            "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/main.swift",
+            "SwitcherPanel", "SwitcherState", "SwitcherCellView", "IconCellView", "WindowCellView",
+            "SwitcherContentView", "SwitcherLayout", "SwitcherCellMetrics", "SwitcherMetrics",
+            "HintBandView", "ShortcutHint", "SwitcherFeedback", "WhitelistBadgeView", "ResizeHandleView",
+        ].map { "Sources/MacUtilities/Features/AppSwitcher/\($0).swift" } + [
+            "Tests/MacUtilitiesTests/Fixtures/SwitcherAppearance/SwitcherAppearanceFakes.swift",
+            "Tests/MacUtilitiesTests/Fixtures/SwitcherAppearance/main.swift",
         ]
         let compiler = Process()
         compiler.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
@@ -35,15 +35,12 @@ struct AppSwitcherEventTests {
 
         let runner = Process()
         runner.executableURL = executable
-        var environment = ProcessInfo.processInfo.environment
-        environment.removeValue(forKey: "APP_SWITCHER_SMOKE_TEST")
-        runner.environment = environment
         let runnerOutput = temporaryDirectory.appendingPathComponent("runner-output")
 
         let runnerStatus = try run(runner, writingOutputTo: runnerOutput)
         let output = try String(contentsOf: runnerOutput, encoding: .utf8)
         #expect(runnerStatus == 0, "\(output)")
-        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 63, "\(output)")
+        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 8, "\(output)")
     }
 
     private func run(_ process: Process, writingOutputTo output: URL) throws -> Int32 {

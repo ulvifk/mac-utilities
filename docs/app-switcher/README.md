@@ -54,8 +54,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
   the settings pane previews it live until a second after the last change: the apps'
   glass with the running apps, the windows' glass and the card settings with the
-  windows of the app used last, the one behind the settings window. Clicks pass
-  through to the pane.
+  windows of the app used last, the one behind the settings window. The preview
+  keeps its list, cells and thumbnails while its settings are adjusted; changing
+  lists or opening a new preview loads fresh candidates. Clicks pass through to
+  the pane.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
