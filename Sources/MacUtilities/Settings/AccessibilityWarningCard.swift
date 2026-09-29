@@ -55,5 +55,5 @@ private func relaunch() {
     ]
 
     try! reopening.run()
-    NSApp.terminate(nil)
+    terminateApplication()
 }

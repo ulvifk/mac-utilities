@@ -23,10 +23,58 @@ struct KeepAwakeRestorationTests {
         ])
         try #require(compilation.status == 0, "\(compilation.output)")
 
-        let scenarios = ["session-retry", "idle-sleep", "activation-refusal", "toggle-retry", "replacement-refusal", "stop-retry", "timer-retry"]
+        let scenarios = [
+            "session-retry", "idle-sleep", "activation-refusal", "toggle-retry",
+            "replacement-refusal", "stop-retry", "timer-retry", "pending-activation-stop",
+            "rapid-toggles", "rapid-duration-replacement", "termination",
+            "termination-refusal", "termination-restoring"
+        ]
         for scenario in scenarios {
             let result = try Self.runProcess(harness.path, arguments: [scenario])
             #expect(result.status == 0, "\(scenario): \(result.output)")
+        }
+    }
+
+    @Test
+    func powerCommandsLeaveTheMainLoopResponsiveUntilProcessTermination() throws {
+        let directory = try Self.createTemporaryDirectory()
+        defer { try! FileManager.default.removeItem(at: directory) }
+
+        let harness = directory.appendingPathComponent("commands-harness")
+        let main = directory.appendingPathComponent("main.swift")
+        try FileManager.default.copyItem(at: Self.fixtures.appendingPathComponent("commands.swift"), to: main)
+        let compilation = try Self.runProcess("/usr/bin/xcrun", arguments: [
+            "swiftc", main.path,
+            Self.sources.appendingPathComponent("Features/KeepAwake/LidClosedSleep.swift").path,
+            "-o", harness.path
+        ])
+        try #require(compilation.status == 0, "\(compilation.output)")
+
+        let result = try Self.runProcess(harness.path, arguments: [])
+        #expect(result.status == 0, "\(result.output)")
+    }
+
+    @Test
+    func appKitTerminationFinishesCleanupFromQueuedAndNativeRequests() throws {
+        let directory = try Self.createTemporaryDirectory()
+        defer { try! FileManager.default.removeItem(at: directory) }
+
+        let harness = directory.appendingPathComponent("termination-harness")
+        let main = directory.appendingPathComponent("main.swift")
+        try FileManager.default.copyItem(at: Self.fixtures.appendingPathComponent("termination.swift"), to: main)
+        let compilation = try Self.runProcess("/usr/bin/xcrun", arguments: [
+            "swiftc", main.path,
+            Self.sources.appendingPathComponent("Core/AppController.swift").path,
+            Self.sources.appendingPathComponent("Core/ApplicationTermination.swift").path,
+            Self.sources.appendingPathComponent("Core/Feature.swift").path,
+            "-o", harness.path
+        ])
+        try #require(compilation.status == 0, "\(compilation.output)")
+
+        for context in ["dispatch", "task", "native"] {
+            let result = try Self.runProcess(harness.path, arguments: [context])
+            #expect(result.status == 0, "\(context): \(result.output)")
+            #expect(result.output.components(separatedBy: "PASS \(context)").count == 2, "\(result.output)")
         }
     }
 

@@ -71,7 +71,7 @@ struct MenuBarPopoverView: View {
 
             Spacer()
 
-            Button { NSApp.terminate(nil) } label: {
+            Button { terminateApplication() } label: {
                 Label("Quit", systemImage: "power")
             }
             .keyboardShortcut("q")

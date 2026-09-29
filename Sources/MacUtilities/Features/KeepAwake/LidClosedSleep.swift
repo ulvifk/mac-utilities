@@ -4,15 +4,17 @@ private let pmsetPath = "/usr/bin/pmset"
 
 /// `pmset -a disablesleep`, through the sudoers line install.sh installs, so a closed lid does not sleep the machine. False when sudo refuses it.
 @discardableResult
-func setLidClosedSleepDisabled(_ disabled: Bool) -> Bool {
+@MainActor func setLidClosedSleepDisabled(_ disabled: Bool) async -> Bool {
     let pmset = Process()
     pmset.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
     pmset.arguments = ["-n", pmsetPath, "-a", "disablesleep", disabled ? "1" : "0"]
 
-    try! pmset.run()
-    pmset.waitUntilExit()
-
-    return pmset.terminationStatus == 0
+    return await withCheckedContinuation { continuation in
+        pmset.terminationHandler = { process in
+            continuation.resume(returning: process.terminationStatus == 0)
+        }
+        try! pmset.run()
+    }
 }
 
 /// Retries restoring lid-closed sleep after the app exits until pmset succeeds.
