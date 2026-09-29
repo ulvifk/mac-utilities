@@ -1,7 +1,7 @@
 import Foundation
 import IOKit.pwr_mgt
 
-/// One stretch of keeping the Mac awake, from init until end(): the power assertion, lid-closed sleep disabled when the preference says so, and when it ends on its own. nil when sudo refuses pmset; nothing is left held then.
+/// Owns the power assertion and watchdog until sleep is restored successfully.
 final class KeepAwakeSession {
     /// How long it was set to last when it began.
     let autoOff: KeepAwakeAutoOff
@@ -22,7 +22,8 @@ final class KeepAwakeSession {
         }
 
         let watchdog = launchLidClosedSleepWatchdog()
-        if !setLidClosedSleepDisabled(true) {
+        let didDisableSleep = setLidClosedSleepDisabled(true)
+        if !didDisableSleep {
             watchdog.terminate()
             return nil
         }
@@ -31,11 +32,14 @@ final class KeepAwakeSession {
         lidClosedSleepWatchdog = watchdog
     }
 
-    func end() {
-        assertion.release()
+    func end() -> Bool {
+        if let lidClosedSleepWatchdog {
+            let didRestoreSleep = setLidClosedSleepDisabled(false)
+            if !didRestoreSleep { return false }
+            lidClosedSleepWatchdog.terminate()
+        }
 
-        guard let lidClosedSleepWatchdog else { return }
-        lidClosedSleepWatchdog.terminate()
-        setLidClosedSleepDisabled(false)
+        assertion.release()
+        return true
     }
 }

@@ -15,12 +15,12 @@ func setLidClosedSleepDisabled(_ disabled: Bool) -> Bool {
     return pmset.terminationStatus == 0
 }
 
-/// A child shell that outlives the app and re-enables lid-closed sleep once this process is gone, so a crash never leaves it disabled.
+/// Retries restoring lid-closed sleep after the app exits until pmset succeeds.
 func launchLidClosedSleepWatchdog() -> Process {
     let processIdentifier = ProcessInfo.processInfo.processIdentifier
     let watchdog = Process()
     watchdog.executableURL = URL(fileURLWithPath: "/bin/sh")
-    watchdog.arguments = ["-c", "while kill -0 \(processIdentifier); do sleep 5; done; sudo -n \(pmsetPath) -a disablesleep 0"]
+    watchdog.arguments = ["-c", "while kill -0 \(processIdentifier) 2>/dev/null; do sleep 5; done; until sudo -n \(pmsetPath) -a disablesleep 0; do sleep 5; done"]
 
     try! watchdog.run()
     return watchdog

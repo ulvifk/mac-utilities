@@ -31,6 +31,12 @@ struct KeepAwakeTile: View {
 
     /// Counts down live while a timer is set.
     private func buildSubtitle() -> Text {
+        if feature.isSleepRestorationRefused {
+            return Text("\(Image(systemName: "exclamationmark.triangle.fill")) Couldn't restore sleep; still on. Retrying automatically, or click the toggle to retry now.")
+                .fontWeight(.medium)
+                .foregroundStyle(.orange)
+        }
+
         if feature.isPmsetRefused {
             return Text("\(Image(systemName: "exclamationmark.triangle.fill")) Couldn't keep a closed lid awake: run install.sh, or turn the lid option off in Settings")
                 .fontWeight(.medium)

@@ -7,6 +7,8 @@ let keepAwakeSymbolName = "cup.and.saucer.fill"
 /// Keeps the Mac awake from the menu bar popover: a power assertion and, when wanted, lid-closed sleep disabled through pmset; turns itself off
 /// after the set time. Publishes its state to its tile.
 final class KeepAwakeFeature: Feature, ObservableObject {
+    private static let sleepRestorationRetryInterval: TimeInterval = 5
+
     let identifier = "keep-awake"
     let displayName = "Keep Awake"
     let summary = "Keeps the Mac awake from the menu bar, even with the lid closed."
@@ -20,7 +22,9 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     @Published private(set) var session: KeepAwakeSession?
     /// Sudo refused pmset at the last turn-on, so nothing is held; until the next turn-on.
     @Published private(set) var isPmsetRefused = false
-    /// Ends the session at its deactivation date; nil while off or on until turned off.
+    @Published private(set) var isSleepRestorationRefused = false
+
+    /// Ends the session at its deadline or retries failed sleep restoration.
     private var deactivation: DispatchWorkItem?
 
     init(setMenuBarSymbol: @escaping (String?) -> Void) {
@@ -61,7 +65,8 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         preferences.setAutoOff(autoOff)
 
         if session != nil {
-            deactivate()
+            let didDeactivate = deactivate()
+            if !didDeactivate { return }
         }
         activate()
     }
@@ -81,13 +86,23 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         setMenuBarSymbol(keepAwakeSymbolName)
     }
 
-    private func deactivate() {
-        session!.end()
-        session = nil
+    @discardableResult
+    private func deactivate() -> Bool {
         deactivation?.cancel()
         deactivation = nil
 
+        let didRestoreSleep = session!.end()
+        if !didRestoreSleep {
+            isSleepRestorationRefused = true
+            deactivation = scheduleDeactivation(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
+            return false
+        }
+
+        session = nil
+        isSleepRestorationRefused = false
+
         setMenuBarSymbol(nil)
+        return true
     }
 
     /// On the wall clock, so a Mac that slept past the date turns it off on waking.

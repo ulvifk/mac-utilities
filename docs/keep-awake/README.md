@@ -26,6 +26,10 @@ sleep is held off and the display may still sleep.
 A set time ends on a one-shot timer at the deactivation date, on the wall clock, so a
 Mac that slept past it turns Keep Awake off on waking.
 
+If restoring sleep fails, the tile stays on and shows a warning. The app retries
+every five seconds; clicking the round toggle retries immediately. A duration chip
+does not replace the active session until the previous session restores sleep.
+
 ## Settings pane
 
 - Turn off after: 30 min, 1 hr, 2 hr or Never, side by side in one segmented
@@ -43,9 +47,14 @@ Both apply the next time Keep Awake is turned on.
   settings pane or the app quits (`applicationWillTerminate` stops every enabled
   feature);
 - when the app dies any other way: activating spawns a child watchdog shell that
-  outlives the app, `while kill -0 <pid>; do sleep 5; done; sudo -n /usr/bin/pmset -a
-  disablesleep 0`, and is killed again on deactivation. So after a crash sleep is
-  back to normal within five seconds.
+  outlives the app and checks for exit every five seconds. After exit it runs
+  `sudo -n /usr/bin/pmset -a disablesleep 0`, retrying every five seconds until
+  successful. Deactivation stops the watchdog only after restoration succeeds.
+
+The power assertion, watchdog, session and coffee-cup icon remain active when
+restoration fails. The app keeps retrying even after the feature is switched off;
+if the app quits first, the watchdog takes over after exit. This also applies when
+the auto-off timer expires.
 
 After a power loss or kernel panic while active no process survives to restore it,
 so `disablesleep` stays `1` until Keep Awake is toggled again or `uninstall.sh` runs.
