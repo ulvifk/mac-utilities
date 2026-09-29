@@ -179,12 +179,12 @@ final class AppSwitcherFeature: Feature {
         }
 
         if isSwitcherShortcut(event) {
-            requestOpening(listingWindows: false)
+            requestOpening(listingWindows: false, backward: event.flags.contains(.maskShift))
             return true
         }
 
         if isWindowSwitcherShortcut(event) {
-            requestOpening(listingWindows: true)
+            requestOpening(listingWindows: true, backward: event.flags.contains(.maskShift))
             return true
         }
 
@@ -192,15 +192,17 @@ final class AppSwitcherFeature: Feature {
     }
 
     /// Presses arriving before the panel is up only advance the selection it opens with.
-    private func requestOpening(listingWindows: Bool) {
+    private func requestOpening(listingWindows: Bool, backward: Bool) {
+        let step = backward ? -1 : 1
+
         if isOpening {
-            pendingAdvance += 1
+            pendingAdvance += step
             return
         }
 
         isOpening = true
         commandReleasedWhileOpening = false
-        pendingAdvance = 0
+        pendingAdvance = step
         DispatchQueue.main.async { self.openSwitcher(listingWindows: listingWindows) }
     }
 
@@ -213,8 +215,7 @@ final class AppSwitcherFeature: Feature {
         let itemCount = getItemCount()
         if itemCount == 0 { return }
 
-        selectedIndex = (itemCount > 1 ? 1 : 0) + pendingAdvance
-        selectedIndex %= itemCount
+        selectedIndex = (pendingAdvance % itemCount + itemCount) % itemCount
 
         if commandReleasedWhileOpening {
             activateSelection()
