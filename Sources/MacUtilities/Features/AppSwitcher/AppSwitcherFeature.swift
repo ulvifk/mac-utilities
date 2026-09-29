@@ -40,6 +40,9 @@ final class AppSwitcherFeature: Feature {
     private var isOpening = false
     private var commandReleasedWhileOpening = false
     private var pendingAdvance = 0
+    private var featureSession = 0
+    private var switcherSession = 0
+    private var previewSession = 0
 
     init() {
         panel = SwitcherPanel()
@@ -62,14 +65,16 @@ final class AppSwitcherFeature: Feature {
     }
 
     func stop() {
+        featureSession += 1
+
         for observer in observers {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         observers = []
         lookChanges = []
         tracker.stop()
-        panel.hide()
-        previewPanel.hide()
+        dismissSwitcher()
+        hidePreview()
     }
 
     func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -104,8 +109,11 @@ final class AppSwitcherFeature: Feature {
         guard environment["APP_SWITCHER_SMOKE_TEST"] != nil else { return }
 
         whitelistStore.setFilterEnabled(environment["APP_SWITCHER_SMOKE_FILTER"] == "1")
+        let session = featureSession
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if self.featureSession != session { return }
+
             self.loadCandidates(listingWindows: environment["APP_SWITCHER_SMOKE_WINDOWS"] == "1")
             self.selectedIndex = Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!
             self.showPanel()
@@ -113,6 +121,8 @@ final class AppSwitcherFeature: Feature {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 + hintDelay) {
+            if self.featureSession != session { return }
+
             print("smoke: frame=\(self.panel.frame) visible=\(self.panel.isVisible) alpha=\(self.panel.alphaValue) apps=\(self.candidates.count) windows=\(self.windows.count) selected=\(self.selectedIndex)")
             print("smoke: candidates=\(self.candidates.compactMap { $0.localizedName }) windows=\(self.windows.map { $0.title }) thumbnails=\(self.thumbnails.count)")
             writeCapture(around: self.panel, path: smokeCapturePath)
@@ -166,8 +176,13 @@ final class AppSwitcherFeature: Feature {
     /// is being dragged.
     private func observeLookChanges(of store: some ObservableObject, listingWindows: Bool) -> AnyCancellable {
         return store.objectWillChange
+            .map { _ in self.switcherSession }
             .receive(on: DispatchQueue.main)
-            .sink { _ in self.previewGlass(listingWindows: listingWindows) }
+            .sink { session in
+                if self.switcherSession != session { return }
+
+                self.previewGlass(listingWindows: listingWindows)
+            }
     }
 
     // MARK: events
@@ -176,6 +191,13 @@ final class AppSwitcherFeature: Feature {
     private func handleKeyDown(_ event: CGEvent) -> Bool {
         if panel.isVisible {
             return handleKeyDownWhileVisible(event)
+        }
+
+        if isOpening {
+            if isCancelShortcut(event) {
+                dismissSwitcher()
+                return true
+            }
         }
 
         if isSwitcherShortcut(event) {
@@ -203,12 +225,18 @@ final class AppSwitcherFeature: Feature {
         isOpening = true
         commandReleasedWhileOpening = false
         pendingAdvance = step
-        DispatchQueue.main.async { self.openSwitcher(listingWindows: listingWindows) }
+        switcherSession += 1
+        hidePreview()
+
+        let session = switcherSession
+        DispatchQueue.main.async {
+            if self.switcherSession != session { return }
+
+            self.openSwitcher(listingWindows: listingWindows)
+        }
     }
 
-    /// The glass preview goes first: it shares the candidates, and a thumbnail arriving for it would redraw it from the ones loaded here.
     private func openSwitcher(listingWindows: Bool) {
-        previewPanel.hide()
         loadCandidates(listingWindows: listingWindows)
         isOpening = false
 
@@ -256,7 +284,7 @@ final class AppSwitcherFeature: Feature {
         }
 
         if isCancelShortcut(event) {
-            panel.hide()
+            dismissSwitcher()
             return true
         }
 
@@ -274,12 +302,26 @@ final class AppSwitcherFeature: Feature {
         }
 
         if isFilterToggleShortcut(event) {
-            DispatchQueue.main.async { self.toggleFilterAndRefreshCandidates() }
+            let session = switcherSession
+            DispatchQueue.main.async {
+                if self.switcherSession != session { return }
+
+                self.toggleFilterAndRefreshCandidates()
+            }
             return true
         }
 
         if isBatchQuitShortcut(event) {
-            DispatchQueue.main.async { self.runBatchQuitShowingCount() }
+            let session = switcherSession
+            let activeFeatureSession = featureSession
+            DispatchQueue.main.async {
+                if self.featureSession != activeFeatureSession { return }
+
+                let quitCount = runBatchQuit(self.batchQuitStore)
+                if self.switcherSession != session { return }
+
+                self.panel.showFeedback(.quittingApps(count: quitCount))
+            }
             return true
         }
 
@@ -309,7 +351,12 @@ final class AppSwitcherFeature: Feature {
 
     /// On the next turn of the main queue: showing it can grow the panel, an animation the tap callback must not wait on.
     private func showFeedback(_ feedback: SwitcherFeedback) {
-        DispatchQueue.main.async { self.panel.showFeedback(feedback) }
+        let session = switcherSession
+        DispatchQueue.main.async {
+            if self.switcherSession != session { return }
+
+            self.panel.showFeedback(feedback)
+        }
     }
 
     /// Releasing Cmd activates the selection; the release itself always reaches the focused app.
@@ -541,7 +588,7 @@ final class AppSwitcherFeature: Feature {
     private func removeCandidate(at index: Int) {
         candidates.remove(at: index)
         if candidates.isEmpty {
-            panel.hide()
+            dismissSwitcher()
             return
         }
 
@@ -556,7 +603,7 @@ final class AppSwitcherFeature: Feature {
         whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
         loadApps()
         if candidates.isEmpty {
-            panel.hide()
+            dismissSwitcher()
             return
         }
 
@@ -572,11 +619,6 @@ final class AppSwitcherFeature: Feature {
         return .showingAllApps
     }
 
-    private func runBatchQuitShowingCount() {
-        let quitCount = runBatchQuit(batchQuitStore)
-        panel.showFeedback(.quittingApps(count: quitCount))
-    }
-
     /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.
     private func showPanel() {
         panel.show(state: buildState(), glassStore: getGlassStore())
@@ -586,10 +628,13 @@ final class AppSwitcherFeature: Feature {
 
     /// Each thumbnail shows in the panel as it arrives, while the panel is up.
     private func refreshThumbnails(of windowIDs: [CGWindowID], in switcherPanel: SwitcherPanel) {
+        let session = switcherPanel === panel ? switcherSession : previewSession
         captureThumbnails(of: windowIDs) { windowID, thumbnail in
-            self.thumbnails[windowID] = thumbnail
+            let currentSession = switcherPanel === self.panel ? self.switcherSession : self.previewSession
+            if currentSession != session { return }
             if !switcherPanel.isVisible { return }
 
+            self.thumbnails[windowID] = thumbnail
             switcherPanel.update(state: self.buildState())
         }
     }
@@ -617,15 +662,27 @@ final class AppSwitcherFeature: Feature {
 
     /// A window is raised on the next turn of the main queue: its accessibility round trips must stay out of the tap callback releasing Cmd.
     private func activateSelection() {
-        panel.hide()
-
         if isListingWindows {
             let window = windows[selectedIndex]
-            DispatchQueue.main.async { window.bringToFront() }
+            dismissSwitcher()
+
+            let session = featureSession
+            DispatchQueue.main.async {
+                if self.featureSession != session { return }
+
+                window.bringToFront()
+            }
             return
         }
 
+        dismissSwitcher()
         candidates[selectedIndex].activate(options: [.activateAllWindows])
+    }
+
+    private func dismissSwitcher() {
+        switcherSession += 1
+        isOpening = false
+        panel.hide()
     }
 
     // MARK: preview
@@ -636,8 +693,15 @@ final class AppSwitcherFeature: Feature {
     /// thumbnail still arriving would redraw it from the empty list.
     private func previewGlass(listingWindows: Bool) {
         if panel.isVisible { return }
+        if isOpening { return }
 
         let wasPreviewingWindows = isPreviewingWindows()
+        if !previewPanel.isVisible {
+            previewSession += 1
+        } else if isListingWindows != listingWindows {
+            hidePreview()
+        }
+
         if listingWindows {
             guard let app = getRecentRunningApps().first else { return }
             loadWindows(of: app)
@@ -645,7 +709,7 @@ final class AppSwitcherFeature: Feature {
             loadApps()
         }
         if getItemCount() == 0 {
-            previewPanel.hide()
+            hidePreview()
             return
         }
 
@@ -656,7 +720,7 @@ final class AppSwitcherFeature: Feature {
         }
 
         previewHiding?.cancel()
-        previewHiding = DispatchWorkItem { self.previewPanel.hide() }
+        previewHiding = DispatchWorkItem { self.hidePreview() }
         DispatchQueue.main.asyncAfter(deadline: .now() + glassPreviewDuration, execute: previewHiding!)
     }
 
@@ -664,5 +728,12 @@ final class AppSwitcherFeature: Feature {
     private func isPreviewingWindows() -> Bool {
         if !previewPanel.isVisible { return false }
         return isListingWindows
+    }
+
+    private func hidePreview() {
+        previewSession += 1
+        previewHiding?.cancel()
+        previewHiding = nil
+        previewPanel.hide()
     }
 }

@@ -81,7 +81,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   dialog and stays listed until it has quit; the others leave the list as they quit.
 - Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
   a second press does nothing.
-- Esc closes the switcher without activating anything.
+- Esc closes the switcher without activating anything, including when pressed before
+  the panel appears. Pending filter changes and shortcut feedback end with that
+  opening; quit requests already accepted still run. Turning the feature off closes
+  both panels and cancels their pending work.
 - Cmd+` while apps are listed does nothing, rather than cycling the windows of the app
   behind the panel.
 - Once the switcher has been open for 0.9 seconds, the panel grows a band along its
@@ -144,6 +147,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 
 `Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
 keys and keeps the candidates, the listed windows and the selection;
+its switcher and preview sessions keep delayed opening, filtering, feedback and
+thumbnail deliveries with the panel that requested them;
 `AppSwitcherSettingsView` holds the sections of the settings pane, listing the apps
 `RunningRegularApps` keeps current and drawing the shortcuts with the shared
 `KeycapsView`; `SwitcherPanel` draws the glass panel from a `SwitcherState` using

@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-struct AppSwitcherOpeningTests {
+struct AppSwitcherEventTests {
     @Test
-    func openingShortcutsPreserveDirectionBeforeThePanelAppears() throws {
+    func eventHandlingPreservesDirectionAndCancelsDismissedInteractions() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -12,7 +12,7 @@ struct AppSwitcherOpeningTests {
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
         defer { try! FileManager.default.removeItem(at: temporaryDirectory) }
 
-        let executable = temporaryDirectory.appendingPathComponent("switcher-opening-tests")
+        let executable = temporaryDirectory.appendingPathComponent("switcher-event-tests")
         let compilerOutput = temporaryDirectory.appendingPathComponent("compiler-output")
         let sources = [
             "Sources/MacUtilities/Features/AppSwitcher/AppSwitcherFeature.swift",
@@ -43,7 +43,7 @@ struct AppSwitcherOpeningTests {
         let runnerStatus = try run(runner, writingOutputTo: runnerOutput)
         let output = try String(contentsOf: runnerOutput, encoding: .utf8)
         #expect(runnerStatus == 0, "\(output)")
-        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 26, "\(output)")
+        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 56, "\(output)")
     }
 
     private func run(_ process: Process, writingOutputTo output: URL) throws -> Int32 {
