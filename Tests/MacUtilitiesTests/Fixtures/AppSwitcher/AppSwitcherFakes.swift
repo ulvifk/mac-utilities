@@ -4,6 +4,10 @@ import SwiftUI
 
 // These collaborators keep the production feature's event handling isolated from apps, windows and preferences.
 final class NSRunningApplication {
+    static var activatedIdentifiers: [String] = []
+    static var quitIdentifiers: [String] = []
+    static var hiddenIdentifiers: [String] = []
+
     let bundleIdentifier: String?
     let processIdentifier: pid_t
     let localizedName: String? = "Test App"
@@ -15,15 +19,15 @@ final class NSRunningApplication {
     }
 
     func activate(options: AppKit.NSApplication.ActivationOptions) {
-        fatalError("Opening tests must not activate apps")
+        Self.activatedIdentifiers.append(bundleIdentifier!)
     }
 
     func terminate() {
-        fatalError("Opening tests must not quit apps")
+        Self.quitIdentifiers.append(bundleIdentifier!)
     }
 
     func hide() {
-        fatalError("Opening tests must not hide apps")
+        Self.hiddenIdentifiers.append(bundleIdentifier!)
     }
 }
 
@@ -45,7 +49,10 @@ final class NSScreen {
 }
 
 final class SwitcherPanel {
+    static var instances: [SwitcherPanel] = []
     static var shownStates: [SwitcherState] = []
+    static var updatedStates: [SwitcherState] = []
+    static var feedback: [SwitcherFeedback] = []
 
     var onCellClicked: (Int) -> Void = { _ in }
     var onWidthDragged: (CGFloat) -> Void = { _ in }
@@ -53,6 +60,10 @@ final class SwitcherPanel {
     var isVisible = false
     let frame = NSRect.zero
     let alphaValue: CGFloat = 1
+
+    init() {
+        Self.instances.append(self)
+    }
 
     func show(state: SwitcherState, glassStore: GlassStore) {
         Self.shownStates.append(state)
@@ -63,11 +74,11 @@ final class SwitcherPanel {
         isVisible = false
     }
 
-    func update(state: SwitcherState) {}
+    func update(state: SwitcherState) { Self.updatedStates.append(state) }
     func resize(state: SwitcherState) {}
     func removeApp(at index: Int, state: SwitcherState) {}
     func showHintsAfterDelay() {}
-    func showFeedback(_ feedback: SwitcherFeedback) {}
+    func showFeedback(_ feedback: SwitcherFeedback) { Self.feedback.append(feedback) }
 }
 
 final class RecentAppsTracker {
@@ -82,18 +93,37 @@ final class RecentAppsTracker {
 }
 
 final class WhitelistStore {
-    let isFilterEnabled = false
+    static var filterChanges: [Bool] = []
 
-    func getWhitelist() -> Set<String> { return [] }
-    func isListed(_ identifier: String) -> Bool { return false }
-    func setFilterEnabled(_ enabled: Bool) { fatalError("Unexpected preference change") }
-    func setListed(_ identifier: String, _ listed: Bool) { fatalError("Unexpected preference change") }
+    private(set) var isFilterEnabled = false
+    private var whitelist: Set<String> = []
+
+    func getWhitelist() -> Set<String> { return whitelist }
+    func isListed(_ identifier: String) -> Bool { return whitelist.contains(identifier) }
+    func setFilterEnabled(_ enabled: Bool) {
+        isFilterEnabled = enabled
+        Self.filterChanges.append(enabled)
+    }
+    func setListed(_ identifier: String, _ listed: Bool) {
+        if listed {
+            whitelist.insert(identifier)
+            return
+        }
+
+        whitelist.remove(identifier)
+    }
 }
 
-final class BatchQuitStore {}
+final class BatchQuitStore {
+    static var quitCount = 0
+}
 
 final class GlassStore: ObservableObject {
-    init(keyPrefix: String, defaultDarkness: CGFloat) {}
+    static var stores: [String: GlassStore] = [:]
+
+    init(keyPrefix: String, defaultDarkness: CGFloat) {
+        Self.stores[keyPrefix] = self
+    }
 }
 
 final class WindowCardStore: ObservableObject {
@@ -108,11 +138,12 @@ final class PanelWidthStore {
 
 struct AppWindow {
     static var windows: [AppWindow] = []
+    static var raisedWindowIDs: [CGWindowID] = []
 
     let windowID: CGWindowID
     let title = "Test Window"
 
-    func bringToFront() { fatalError("Opening tests must not raise windows") }
+    func bringToFront() { Self.raisedWindowIDs.append(windowID) }
 }
 
 struct AppSwitcherSettingsView: View {
@@ -130,9 +161,16 @@ func getRegularRunningApps() -> [NSRunningApplication] { return RecentAppsTracke
 func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication] { return apps }
 func getWindows(of app: NSRunningApplication) -> [AppWindow] { return AppWindow.windows }
 func getAppName(_ app: NSRunningApplication) -> String { return app.localizedName! }
-func runBatchQuit(_ store: BatchQuitStore) -> Int { fatalError("Opening tests must not quit apps") }
+func runBatchQuit(_ store: BatchQuitStore) -> Int {
+    BatchQuitStore.quitCount += 1
+    return 2
+}
 func enableCursorChangesWhileInactive() {}
-func captureThumbnails(of ids: [CGWindowID], completion: (CGWindowID, NSImage) -> Void) {}
+func captureThumbnails(of ids: [CGWindowID], completion: @escaping (CGWindowID, NSImage) -> Void) {
+    if ids.isEmpty { return }
+
+    ThumbnailRequest.requests.append(ThumbnailRequest(windowIDs: ids, completion: completion))
+}
 func showCaptureBackdrop(behind panel: SwitcherPanel) {}
 func writeCapture(around panel: SwitcherPanel, path: String) {}
 
@@ -158,6 +196,13 @@ enum SwitcherFeedback {
     case hidden
     case quittingApp(name: String)
     case quittingApps(count: Int)
+}
+
+struct ThumbnailRequest {
+    static var requests: [ThumbnailRequest] = []
+
+    let windowIDs: [CGWindowID]
+    let completion: (CGWindowID, NSImage) -> Void
 }
 
 let defaultGlassDarkness: CGFloat = 0.14
