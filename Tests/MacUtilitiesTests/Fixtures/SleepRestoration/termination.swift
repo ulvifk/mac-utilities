@@ -127,19 +127,21 @@ let observation = NotificationCenter.default.addObserver(forName: NSApplication.
     fflush(stdout)
 }
 
-DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
-    EventTap.instance.sendEvent()
-    precondition(enabled.eventCount == 1, "The enabled feature did not receive events before Quit")
-    precondition(disabled.eventCount == 0, "A disabled feature received events before Quit")
+let launchObservation = NotificationCenter.default.addObserver(forName: NSApplication.didFinishLaunchingNotification, object: application, queue: nil) { _ in
+    DispatchQueue.main.async {
+        EventTap.instance.sendEvent()
+        precondition(enabled.eventCount == 1, "The enabled feature did not receive events before Quit")
+        precondition(disabled.eventCount == 0, "A disabled feature received events before Quit")
 
-    switch CommandLine.arguments[1] {
-    case "dispatch": terminateApplication()
-    case "task": Task { @MainActor in terminateApplication() }
-    case "native":
-        CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue) {
-            application.terminate(nil)
+        switch CommandLine.arguments[1] {
+        case "dispatch": terminateApplication()
+        case "task": Task { @MainActor in terminateApplication() }
+        case "native":
+            CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue) {
+                application.terminate(nil)
+            }
+        default: fatalError("Unknown termination context")
         }
-    default: fatalError("Unknown termination context")
     }
 }
 DispatchQueue.global().asyncAfter(deadline: .now() + 3) {

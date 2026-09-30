@@ -54,6 +54,7 @@ final class SwitcherPanel {
     static var updatedStates: [SwitcherState] = []
     static var glassUpdatedStates: [SwitcherState] = []
     static var feedback: [SwitcherFeedback] = []
+    static var previewPositionCount = 0
 
     var onCellClicked: (Int) -> Void = { _ in }
     var onWidthDragged: (CGFloat) -> Void = { _ in }
@@ -66,7 +67,7 @@ final class SwitcherPanel {
         Self.instances.append(self)
     }
 
-    func show(state: SwitcherState, glassStore: GlassStore) {
+    func show(state: SwitcherState, glassStore: GlassStore, beside settingsWindow: NSWindow? = nil) {
         Self.shownStates.append(state)
         isVisible = true
     }
@@ -77,6 +78,7 @@ final class SwitcherPanel {
 
     func update(state: SwitcherState) { Self.updatedStates.append(state) }
     func updateGlass(state: SwitcherState, glassStore: GlassStore) { Self.glassUpdatedStates.append(state) }
+    func positionPreview(beside settingsWindow: NSWindow) { Self.previewPositionCount += 1 }
     func resize(state: SwitcherState) {}
     func removeApp(at index: Int, state: SwitcherState) {}
     func showHintsAfterDelay() {}
@@ -145,22 +147,27 @@ final class PanelWidthStore {
 struct AppWindow {
     static var windows: [AppWindow] = []
     static var raisedWindowIDs: [CGWindowID] = []
+    static var onBringToFront: (AppWindow) -> Void = { _ in }
 
     let windowID: CGWindowID
     let title = "Test Window"
 
-    func bringToFront() { Self.raisedWindowIDs.append(windowID) }
+    func bringToFront() {
+        Self.raisedWindowIDs.append(windowID)
+        Self.onBringToFront(self)
+    }
 }
 
 struct AppSwitcherSettingsView: View {
-    let whitelistStore: WhitelistStore
-    let batchQuitStore: BatchQuitStore
-    let appGlassStore: GlassStore
-    let windowGlassStore: GlassStore
-    let appCardStore: SwitcherCardStore
-    let appCardGlassStore: GlassStore
-    let windowCardStore: SwitcherCardStore
-    let windowCardGlassStore: GlassStore
+    static var previewStore: SwitcherPreviewStore!
+
+    init(whitelistStore: WhitelistStore, batchQuitStore: BatchQuitStore,
+         appGlassStore: GlassStore, windowGlassStore: GlassStore,
+         appCardStore: SwitcherCardStore, appCardGlassStore: GlassStore,
+         windowCardStore: SwitcherCardStore, windowCardGlassStore: GlassStore,
+         previewStore: SwitcherPreviewStore) {
+        Self.previewStore = previewStore
+    }
 
     var body: some View { EmptyView() }
 }
@@ -232,5 +239,4 @@ let defaultGlassDarkness: CGFloat = 0.14
 let defaultCardDarkness: CGFloat = 0.3
 let defaultPanelWidthFraction: CGFloat = 0.7
 let hintDelay: TimeInterval = 0.9
-let glassPreviewDuration: TimeInterval = 1
 let smokeCapturePath = "/unused"

@@ -27,6 +27,7 @@ struct AppSwitcherSettingsView: View {
     let appCardGlassStore: GlassStore
     @ObservedObject var windowCardStore: SwitcherCardStore
     let windowCardGlassStore: GlassStore
+    @ObservedObject var previewStore: SwitcherPreviewStore
     @StateObject private var runningApps = RunningRegularApps()
 
     var body: some View {
@@ -42,6 +43,14 @@ struct AppSwitcherSettingsView: View {
         }
 
         Section {
+            Toggle("Show preview", isOn: $previewStore.isShown)
+                .toggleStyle(.checkbox)
+            Picker("Preview", selection: $previewStore.isListingWindows) {
+                Text("Apps").tag(false)
+                Text("Windows").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!previewStore.isShown)
             GlassSettingsRow(title: "Apps", glassStore: appGlassStore)
             GlassSettingsRow(title: "Windows", glassStore: windowGlassStore)
             Toggle("Cards around apps", isOn: buildCardsBinding(appCardStore))
@@ -53,7 +62,7 @@ struct AppSwitcherSettingsView: View {
         } header: {
             Text("Glass")
         } footer: {
-            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Each change previews on screen.")
+            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Show preview keeps the selected list on screen while this pane is open.")
         }
 
         Section {

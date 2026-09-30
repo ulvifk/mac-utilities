@@ -24,9 +24,11 @@ final class AppSwitcherFeature: Feature {
     private let windowCardStore = SwitcherCardStore(key: "windowCards")
     private let windowCardGlassStore = GlassStore(keyPrefix: "windowCardGlass", defaultDarkness: defaultCardDarkness)
     private let panelWidthStore = PanelWidthStore()
+    private let previewStore = SwitcherPreviewStore()
     private var observers: [NSObjectProtocol] = []
-    private var lookChanges: [AnyCancellable] = []
-    private var previewHiding: DispatchWorkItem?
+    private var previewChanges: [AnyCancellable] = []
+
+    private weak var settingsWindow: NSWindow?
 
     private var isListingWindows = false
     /// Empty while windows are listed.
@@ -59,12 +61,13 @@ final class AppSwitcherFeature: Feature {
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
-        lookChanges.append(observeLookChanges(of: appGlassStore, listingWindows: false))
-        lookChanges.append(observeLookChanges(of: windowGlassStore, listingWindows: true))
-        lookChanges.append(observeLookChanges(of: appCardStore, listingWindows: false))
-        lookChanges.append(observeLookChanges(of: appCardGlassStore, listingWindows: false))
-        lookChanges.append(observeLookChanges(of: windowCardStore, listingWindows: true))
-        lookChanges.append(observeLookChanges(of: windowCardGlassStore, listingWindows: true))
+        previewChanges.append(observePreviewChanges(of: appGlassStore))
+        previewChanges.append(observePreviewChanges(of: windowGlassStore))
+        previewChanges.append(observePreviewChanges(of: appCardStore))
+        previewChanges.append(observePreviewChanges(of: appCardGlassStore))
+        previewChanges.append(observePreviewChanges(of: windowCardStore))
+        previewChanges.append(observePreviewChanges(of: windowCardGlassStore))
+        previewChanges.append(observePreviewChanges(of: previewStore))
         runSmokeTestIfRequested()
     }
 
@@ -75,8 +78,9 @@ final class AppSwitcherFeature: Feature {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         observers = []
-        lookChanges = []
+        previewChanges = []
         tracker.stop()
+        previewStore.isShown = false
         dismissSwitcher()
         hidePreview()
     }
@@ -102,8 +106,22 @@ final class AppSwitcherFeature: Feature {
             appCardStore: appCardStore,
             appCardGlassStore: appCardGlassStore,
             windowCardStore: windowCardStore,
-            windowCardGlassStore: windowCardGlassStore
+            windowCardGlassStore: windowCardGlassStore,
+            previewStore: previewStore
         ))
+    }
+
+    func settingsWindowChanged(_ window: NSWindow?) {
+        settingsWindow = window
+        if let window {
+            if previewPanel.isVisible {
+                previewPanel.positionPreview(beside: window)
+            }
+            return
+        }
+
+        previewStore.isShown = false
+        hidePreview()
     }
 
     func buildPopoverTile() -> AnyView? {
@@ -178,16 +196,15 @@ final class AppSwitcherFeature: Feature {
         return observers
     }
 
-    /// The store announces a change before making it; the main queue runs the preview of the list it styles after, and also while a slider
-    /// is being dragged.
-    private func observeLookChanges(of store: some ObservableObject, listingWindows: Bool) -> AnyCancellable {
+    /// The stores announce changes before making them, so the preview reads them on the next main-queue turn.
+    private func observePreviewChanges(of store: some ObservableObject) -> AnyCancellable {
         return store.objectWillChange
             .map { _ in self.switcherSession }
             .receive(on: DispatchQueue.main)
             .sink { session in
                 if self.switcherSession != session { return }
 
-                self.previewGlass(listingWindows: listingWindows)
+                self.refreshPreview()
             }
     }
 
@@ -247,7 +264,10 @@ final class AppSwitcherFeature: Feature {
         isOpening = false
 
         let itemCount = getItemCount()
-        if itemCount == 0 { return }
+        if itemCount == 0 {
+            dismissSwitcher()
+            return
+        }
 
         selectedIndex = (pendingAdvance % itemCount + itemCount) % itemCount
 
@@ -677,33 +697,49 @@ final class AppSwitcherFeature: Feature {
     private func activateSelection() {
         if isListingWindows {
             let window = windows[selectedIndex]
-            dismissSwitcher()
-
             let session = featureSession
             DispatchQueue.main.async {
                 if self.featureSession != session { return }
 
                 window.bringToFront()
             }
+
+            // Dismissal queues preview restoration after the window raise.
+            dismissSwitcher()
             return
         }
 
+        let app = candidates[selectedIndex]
         dismissSwitcher()
-        candidates[selectedIndex].activate(options: [.activateAllWindows])
+        app.activate(options: [.activateAllWindows])
     }
 
     private func dismissSwitcher() {
         switcherSession += 1
         isOpening = false
         panel.hide()
+
+        let session = switcherSession
+        DispatchQueue.main.async {
+            if self.switcherSession != session { return }
+
+            self.refreshPreview()
+        }
     }
 
     // MARK: preview
 
     /// Reuses the visible preview's list and views until its mode changes or it hides.
-    private func previewGlass(listingWindows: Bool) {
+    private func refreshPreview() {
+        guard let settingsWindow else { return }
+        if !previewStore.isShown {
+            hidePreview()
+            return
+        }
         if panel.isVisible { return }
         if isOpening { return }
+
+        let listingWindows = previewStore.isListingWindows
 
         if isPreviewing(listingWindows: listingWindows) {
             previewPanel.updateGlass(state: buildState(), glassStore: getGlassStore())
@@ -713,19 +749,18 @@ final class AppSwitcherFeature: Feature {
             if listingWindows {
                 guard let app = getRecentRunningApps().first else { return }
                 loadWindows(of: app)
+                windows = Array(windows.prefix(1))
             } else {
                 loadApps()
+                candidates = Array(candidates.prefix(2))
             }
             if getItemCount() == 0 { return }
 
+            cellsPerRow = listingWindows ? 1 : 2
             selectedIndex = 0
-            previewPanel.show(state: buildState(), glassStore: getGlassStore())
+            previewPanel.show(state: buildState(), glassStore: getGlassStore(), beside: settingsWindow)
             refreshThumbnails(of: windows.map { $0.windowID }, in: previewPanel)
         }
-
-        previewHiding?.cancel()
-        previewHiding = DispatchWorkItem { self.hidePreview() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + glassPreviewDuration, execute: previewHiding!)
     }
 
     private func isPreviewing(listingWindows: Bool) -> Bool {
@@ -735,8 +770,6 @@ final class AppSwitcherFeature: Feature {
 
     private func hidePreview() {
         previewSession += 1
-        previewHiding?.cancel()
-        previewHiding = nil
         previewPanel.hide()
     }
 }

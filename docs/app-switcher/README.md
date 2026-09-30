@@ -53,13 +53,19 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
   Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
   window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
-  windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
-  the settings pane previews it live until a second after the last change: the apps'
-  glass and app-card settings with the running apps, the windows' glass and window-card
-  settings with the windows of the app used last, the one behind the settings window. The preview
-  keeps its list, cells and thumbnails while its settings are adjusted; changing
-  lists or opening a new preview loads fresh candidates. Clicks pass through to
-  the pane.
+  windows (Cmd+`) and apply from the next time the switcher opens. Check "Show preview"
+  in the Glass section to keep a live preview on screen while the App Switcher
+  settings pane is open. Its Apps / Windows selector previews the first two running
+  apps or the first window of the app used last. The compact preview
+  sits beside settings, moving with the window so its controls stay visible. If settings
+  fills the screen, the preview sits in its bottom-left corner. Adjusting either mode's
+  settings keeps the selected preview mode; its list, cells and thumbnails are reused
+  while its appearance changes. Changing the selected mode or opening a new preview
+  loads fresh candidates. Clicks pass through to the pane. Unchecking the box hides
+  it and prevents appearance changes from showing it. Closing or minimizing settings,
+  leaving the pane, or turning the feature off hides the preview and resets the
+  checkbox. Normal switching temporarily hides it and restores the checked preview
+  after switching or canceling. The checkbox is not saved across launches.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -138,7 +144,7 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   marks the selection.
 - Thumbnails need Screen Recording permission (System Settings > Privacy & Security >
   Screen & System Audio Recording); macOS asks the first time one is captured, when
-  Cmd+` opens the panel or the settings pane previews the windows' glass or the cards.
+  Cmd+` opens the panel or "Show preview" is checked with Windows selected in settings.
   Without it every window shows its app's icon.
 - Arrows, the highlight, clicking a window, Esc and dragging an edge work as with
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
@@ -155,7 +161,10 @@ its switcher and preview sessions keep delayed opening, filtering, feedback and
 thumbnail deliveries with the panel that requested them;
 `AppSwitcherSettingsView` holds the sections of the settings pane, listing the apps
 `RunningRegularApps` keeps current and drawing the shortcuts with the shared
-`KeycapsView`; `SwitcherPanel` draws the glass panel from a `SwitcherState` using
+`KeycapsView`; `SwitcherPreviewStore` holds the transient preview checkbox and selected
+mode. `SettingsWindow` and `SettingsSplitViewController` report pane visibility through
+`Feature.settingsWindowChanged`, including close, minimize, sidebar and geometry changes;
+`SwitcherPanel` draws the glass panel from a `SwitcherState` using
 `SwitcherLayout`, which places the content of a `SwitcherContentView` from the top down
 so it stays in place while the hint band grows in, `IconCellView` or `WindowCellView`
 (both `SwitcherCellView`s), `WhitelistBadgeView` and `HintBandView`, which shows the

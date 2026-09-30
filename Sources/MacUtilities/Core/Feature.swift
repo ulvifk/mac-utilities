@@ -21,10 +21,12 @@ protocol Feature {
     func handle(type: CGEventType, event: CGEvent) -> Bool
     /// The sections of the feature's settings pane, below the header with its name and switch.
     func buildSettingsSections() -> AnyView
+    func settingsWindowChanged(_ window: AppKit.NSWindow?)
     /// The feature's tile in the menu bar popover while it is enabled; nil for most. The tile keeps itself current.
     func buildPopoverTile() -> AnyView?
 }
 
 extension Feature {
     @MainActor func prepareForTermination() async {}
+    func settingsWindowChanged(_ window: AppKit.NSWindow?) {}
 }
