@@ -13,7 +13,7 @@ class NSPanel: AppKit.NSPanel {
 final class NSRunningApplication {
     let bundleIdentifier: String? = "test.app"
     let localizedName: String? = "Test App"
-    let isHidden = false
+    var isHidden = false
     let icon: NSImage? = NSImage(size: NSSize(width: 68, height: 68))
 }
 

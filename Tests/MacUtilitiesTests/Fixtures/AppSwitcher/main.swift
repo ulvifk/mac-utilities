@@ -1,7 +1,7 @@
 import AppKit
 
 _ = AppKit.NSApplication.shared.setActivationPolicy(.prohibited)
-let settingsWindow = NSWindow(contentRect: NSRect(x: 360, y: 180, width: 720, height: 540),
+let settingsWindow = SettingsTestWindow(contentRect: NSRect(x: 360, y: 180, width: 720, height: 540),
                               styleMask: .titled, backing: .buffered, defer: false)
 
 struct OpeningScenario {
@@ -28,6 +28,7 @@ let scenarios = [
 ]
 
 func resetFixtures(itemCount: Int = 3) {
+    settingsWindow.hasFocus = true
     RecentAppsTracker.apps = (0..<itemCount).map { NSRunningApplication(index: $0) }
     AppWindow.windows = (0..<itemCount).map { AppWindow(windowID: CGWindowID($0)) }
     NSRunningApplication.activatedIdentifiers = []
@@ -442,7 +443,7 @@ runScenario("preview/continuous-window-look") { feature in
 
     precondition(SwitcherPanel.updatedStates.count == 1, "Continuous preview lost its capture")
     precondition(ThumbnailRequest.requests.count == 1, "Continuous preview repeated thumbnail capture")
-    precondition(ThumbnailRequest.requests[0].windowIDs == [0], "Compact preview captured windows outside its sample")
+    precondition(ThumbnailRequest.requests[0].windowIDs == [0, 1, 2], "Preview did not capture the full window list")
 }
 
 for listingWindows in [false, true] {
@@ -464,7 +465,7 @@ for listingWindows in [false, true] {
         precondition(SwitcherPanel.shownStates.count == 1, "Slider rebuilt the panel")
         precondition(SwitcherPanel.glassUpdatedStates.count == 20, "Slider lost appearance changes")
         let state = SwitcherPanel.glassUpdatedStates.last!
-        precondition((listingWindows ? state.windows.count : state.apps.count) == (listingWindows ? 1 : 2), "Slider replaced preview candidates")
+        precondition((listingWindows ? state.windows.count : state.apps.count) == 3, "Slider replaced preview candidates")
         precondition(ThumbnailRequest.requests.count == (listingWindows ? 1 : 0), "Slider repeated thumbnail capture")
     }
 }
@@ -630,7 +631,7 @@ for listingWindows in [false, true] {
         expectActivation(listingWindows: !listingWindows, selection: 1)
         precondition(SwitcherPanel.instances[1].isVisible, "Activation did not restore the checked preview")
         precondition(SwitcherPanel.shownStates.last!.isListingWindows == listingWindows, "Activation restored the wrong preview mode")
-        precondition(SwitcherPanel.shownStates.last!.selectedIndex == 0, "Preview kept the switcher's selection")
+        precondition(SwitcherPanel.shownStates.last!.selectedIndex == 1, "Preview did not select the next app or window")
     }
 
     for releaseWhileOpening in [false, true] {
@@ -659,7 +660,7 @@ for listingWindows in [false, true] {
             let restoredPreview = SwitcherPanel.shownStates.last!
             precondition(restoredPreview.isListingWindows == listingWindows, "Window activation restored the wrong preview mode")
             if listingWindows {
-                precondition(restoredPreview.windows.map { $0.windowID } == [1], "Restored preview kept the previous frontmost window")
+                precondition(restoredPreview.windows.map { $0.windowID } == [1, 0, 2], "Restored preview kept the previous frontmost window")
             }
         }
     }
@@ -717,4 +718,67 @@ runScenario("preview/geometry-keeps-checked-list") { feature in
     precondition(SwitcherPanel.shownStates.count == 1, "Geometry change rebuilt the preview")
     precondition(AppQueries.runningApps == 1, "Geometry change reloaded candidates")
     precondition(SwitcherPanel.instances[1].ignoresMouseEvents, "Preview prevented settings interaction")
+}
+
+for listingWindows in [false, true] {
+    let mode = listingWindows ? "windows" : "apps"
+    runScenario("preview/\(mode)-matches-switcher") { feature in
+        showPreview(feature, listingWindows: listingWindows)
+        let preview = SwitcherPanel.shownStates.last!
+        press(feature, keyCode: listingWindows ? graveKeyCode : tabKeyCode)
+        drainMainQueue()
+        let switcher = SwitcherPanel.shownStates.last!
+
+        precondition(preview.apps.map { $0.bundleIdentifier! } == switcher.apps.map { $0.bundleIdentifier! }, "Preview app list differs from Cmd+Tab")
+        precondition(preview.windows.map { $0.windowID } == switcher.windows.map { $0.windowID }, "Preview window list differs from Cmd+`")
+        precondition(preview.cellsPerRow == switcher.cellsPerRow, "Preview width differs from the switcher")
+        precondition(preview.selectedIndex == switcher.selectedIndex, "Preview selection differs from the switcher")
+    }
+
+    runScenario("preview/\(mode)-focus-loss-and-return") { feature in
+        showPreview(feature, listingWindows: listingWindows)
+        settingsWindow.hasFocus = false
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: settingsWindow)
+        precondition(!SwitcherPanel.instances[1].isVisible, "Unfocused settings kept the preview visible")
+        precondition(AppSwitcherSettingsView.previewStore.isShown, "Focus loss cleared the preview preference")
+
+        GlassStore.stores["appGlass"]!.objectWillChange.send()
+        drainMainQueue()
+        precondition(!SwitcherPanel.instances[1].isVisible, "Appearance change reopened an unfocused preview")
+
+        settingsWindow.hasFocus = true
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: settingsWindow)
+        precondition(SwitcherPanel.instances[1].isVisible, "Focus return did not restore the checked preview")
+        precondition(SwitcherPanel.shownStates.count == 2, "Focus return did not load a fresh preview")
+    }
+}
+
+runScenario("preview/hide-and-unhide-refresh-icons") { feature in
+    showPreview(feature)
+    for name in [NSWorkspace.didHideApplicationNotification, NSWorkspace.didUnhideApplicationNotification] {
+        NSWorkspace.shared.notificationCenter.post(name: name, object: nil)
+    }
+    precondition(SwitcherPanel.updatedStates.count == 2, "Preview missed hide or unhide notification")
+}
+
+runScenario("preview/filter-changes-refresh-list") { feature in
+    showPreview(feature)
+    let whitelist = AppSwitcherSettingsView.whitelistStore!
+    whitelist.setListed("test.app.2", true)
+    whitelist.setFilterEnabled(true)
+    drainMainQueue()
+    precondition(SwitcherPanel.shownStates.last!.apps.map { $0.bundleIdentifier! } == ["test.app.2"], "Preview ignored the filter or whitelist")
+    precondition(SwitcherPanel.shownStates.last!.isFiltered, "Preview omitted the whitelist badge")
+
+    whitelist.setFilterEnabled(false)
+    drainMainQueue()
+    precondition(SwitcherPanel.shownStates.last!.apps.count == 3, "Preview did not restore all apps")
+}
+
+runScenario("preview/termination-refreshes-list") { feature in
+    showPreview(feature)
+    let terminated = RecentAppsTracker.apps.removeLast()
+    NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didTerminateApplicationNotification, object: nil,
+                                              userInfo: [NSWorkspace.applicationUserInfoKey: terminated])
+    precondition(SwitcherPanel.shownStates.last!.apps.count == 2, "Preview kept a terminated app")
 }

@@ -30,10 +30,11 @@ final class IconCellView: SwitcherCellView {
         card.updateGlass(cardGlass)
     }
 
-    /// Hidden apps dim. With the filter off a dot marks the whitelisted apps; with it on every app listed is whitelisted, so the ones taken
-    /// off the whitelist with Cmd+W turn gray instead.
-    func showStatus(app: NSRunningApplication, whitelisted: Bool, isFiltered: Bool) {
-        icon.alphaValue = app.isHidden ? hiddenIconAlpha : 1
+    func showStatus(app: NSRunningApplication, whitelisted: Bool, isFiltered: Bool, dimHiddenApps: Bool) {
+        icon.alphaValue = 1
+        if dimHiddenApps {
+            icon.alphaValue = app.isHidden ? hiddenIconAlpha : 1
+        }
 
         if isFiltered {
             dot.isHidden = true

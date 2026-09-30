@@ -13,6 +13,7 @@ func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int
         selectedIndex: selectedIndex,
         isFiltered: false,
         isFilterEnabled: false,
+        dimHiddenApps: true,
         whitelisted: []
     )
 }
@@ -140,6 +141,28 @@ precondition(appContainer !== container, "New opening reused the old mode's cont
 precondition(getCells(in: appContainer).allSatisfy { $0 is IconCellView }, "New opening kept window cells")
 print("PASS new-opening/builds-new-mode-content")
 panel.hide()
+
+var dimmingState = buildState(listingWindows: false, cardGlass: nil)
+dimmingState.apps[0].isHidden = true
+panel.show(state: dimmingState, glassStore: panelGlass)
+let dimmingContainer = (panel.contentView as! NSGlassEffectView).contentView!
+let dimmingCells = getCells(in: dimmingContainer)
+let hiddenCell = dimmingCells[0] as! IconCellView
+let visibleCell = dimmingCells[1] as! IconCellView
+precondition(hiddenCell.icon.alphaValue == 0.4, "Hidden icon did not start dimmed")
+
+for dimHiddenApps in [false, true, false] {
+    dimmingState = SwitcherState(apps: dimmingState.apps, windows: [], thumbnails: [:], isListingWindows: false,
+                                cardGlass: nil, cellsPerRow: 2, selectedIndex: 0, isFiltered: false,
+                                isFilterEnabled: false, dimHiddenApps: dimHiddenApps, whitelisted: ["test.app"])
+    panel.updateGlass(state: dimmingState, glassStore: panelGlass)
+    precondition(hiddenCell.icon.alphaValue == (dimHiddenApps ? 0.4 : 1), "Appearance change did not refresh hidden icon opacity")
+    precondition(visibleCell.icon.alphaValue == 1, "Appearance change dimmed a visible app")
+    precondition(!hiddenCell.dot.isHidden, "Appearance change lost the whitelist marker")
+    expectSameViews(panel: panel, container: dimmingContainer, cells: dimmingCells)
+}
+panel.hide()
+print("PASS appearance/dimming-refreshes-existing-icons")
 
 struct PreviewPlacementScenario {
     let name: String

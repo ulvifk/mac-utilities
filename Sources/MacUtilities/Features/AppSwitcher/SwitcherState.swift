@@ -15,5 +15,6 @@ struct SwitcherState {
     let isFiltered: Bool
     /// The filter switch, which Cmd+F flips, on even while none of the whitelisted apps is running.
     let isFilterEnabled: Bool
+    let dimHiddenApps: Bool
     let whitelisted: Set<String>
 }

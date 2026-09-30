@@ -21,6 +21,7 @@ private let appShortcuts: [(String, [[String]])] = [
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
     @ObservedObject var batchQuitStore: BatchQuitStore
+    @ObservedObject var appearanceStore: SwitcherAppearanceStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
     @ObservedObject var appCardStore: SwitcherCardStore
@@ -43,6 +44,7 @@ struct AppSwitcherSettingsView: View {
         }
 
         Section {
+            Toggle("Dim hidden apps", isOn: buildDimHiddenAppsBinding())
             Toggle("Show preview", isOn: $previewStore.isShown)
                 .toggleStyle(.checkbox)
             Picker("Preview", selection: $previewStore.isListingWindows) {
@@ -62,7 +64,7 @@ struct AppSwitcherSettingsView: View {
         } header: {
             Text("Glass")
         } footer: {
-            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Show preview keeps the selected list on screen while this pane is open.")
+            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Show preview shows the full switcher while this pane has focus.")
         }
 
         Section {
@@ -130,6 +132,13 @@ struct AppSwitcherSettingsView: View {
         return Binding(
             get: { store.showsCards },
             set: { store.setShowsCards($0) }
+        )
+    }
+
+    private func buildDimHiddenAppsBinding() -> Binding<Bool> {
+        return Binding(
+            get: { appearanceStore.dimHiddenApps },
+            set: { appearanceStore.setDimHiddenApps($0) }
         )
     }
 

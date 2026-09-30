@@ -2,6 +2,12 @@ import AppKit
 import Combine
 import SwiftUI
 
+final class SettingsTestWindow: NSWindow {
+    var hasFocus = true
+
+    override var isKeyWindow: Bool { return hasFocus }
+}
+
 // These collaborators keep the production feature's event handling isolated from apps, windows and preferences.
 final class NSRunningApplication {
     static var activatedIdentifiers: [String] = []
@@ -96,7 +102,7 @@ final class RecentAppsTracker {
     func stop() {}
 }
 
-final class WhitelistStore {
+final class WhitelistStore: ObservableObject {
     static var filterChanges: [Bool] = []
 
     private(set) var isFilterEnabled = false
@@ -105,10 +111,12 @@ final class WhitelistStore {
     func getWhitelist() -> Set<String> { return whitelist }
     func isListed(_ identifier: String) -> Bool { return whitelist.contains(identifier) }
     func setFilterEnabled(_ enabled: Bool) {
+        objectWillChange.send()
         isFilterEnabled = enabled
         Self.filterChanges.append(enabled)
     }
     func setListed(_ identifier: String, _ listed: Bool) {
+        objectWillChange.send()
         if listed {
             whitelist.insert(identifier)
             return
@@ -160,13 +168,16 @@ struct AppWindow {
 
 struct AppSwitcherSettingsView: View {
     static var previewStore: SwitcherPreviewStore!
+    static var whitelistStore: WhitelistStore!
 
     init(whitelistStore: WhitelistStore, batchQuitStore: BatchQuitStore,
+         appearanceStore: SwitcherAppearanceStore,
          appGlassStore: GlassStore, windowGlassStore: GlassStore,
          appCardStore: SwitcherCardStore, appCardGlassStore: GlassStore,
          windowCardStore: SwitcherCardStore, windowCardGlassStore: GlassStore,
          previewStore: SwitcherPreviewStore) {
         Self.previewStore = previewStore
+        Self.whitelistStore = whitelistStore
     }
 
     var body: some View { EmptyView() }

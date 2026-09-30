@@ -43,8 +43,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   wrapping between the top and bottom rows; of two equally near icons, the left one.
 - Click an icon to switch to it.
 - Apps without open windows are left out.
-- Hidden apps stay listed with a dimmed icon, whether they were hidden with Cmd+H here
-  or anywhere else; releasing Cmd on one unhides and activates it.
+- Hidden apps stay listed, whether they were hidden with Cmd+H here or anywhere else;
+  releasing Cmd on one unhides and activates it. "Dim hidden apps" in settings defaults
+  to on and gives hidden icons 40% opacity. Turn it off for normal opacity; the choice
+  is saved across restarts.
 - Cards frame the app icons, with an accent-colour ring around the selected card.
   Their Clear/Frosted look, darkness, and visibility are set separately from window
   cards. The highlight is a rounded square hugging the selected icon; the app's name
@@ -55,8 +57,9 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
   windows (Cmd+`) and apply from the next time the switcher opens. Check "Show preview"
   in the Glass section to keep a live preview on screen while the App Switcher
-  settings pane is open. Its Apps / Windows selector previews the first two running
-  apps or the first window of the app used last. The compact preview
+  settings pane has focus. Its Apps / Windows selector previews the full app list
+  or all windows of the app used last, using the switcher's width, selection and hints.
+  The preview
   sits beside settings, moving with the window so its controls stay visible. If settings
   fills the screen, the preview sits in its bottom-left corner. Adjusting either mode's
   settings keeps the selected preview mode; its list, cells and thumbnails are reused
@@ -65,7 +68,9 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   it and prevents appearance changes from showing it. Closing or minimizing settings,
   leaving the pane, or turning the feature off hides the preview and resets the
   checkbox. Normal switching temporarily hides it and restores the checked preview
-  after switching or canceling. The checkbox is not saved across launches.
+  after switching or canceling while settings has focus. Losing focus hides the preview;
+  returning to settings restores it while the checkbox is checked. The checkbox is
+  not saved across launches.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -89,7 +94,7 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   quits nothing, or everything in the second mode. Finder is never offered for the
   list nor quit. Each app gets a normal quit, so one with unsaved changes shows its
   dialog and stays listed until it has quit; the others leave the list as they quit.
-- Cmd+H while the switcher is open hides the selected app; it stays listed, dimmed, and
+- Cmd+H while the switcher is open hides the selected app; it stays listed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything, including when pressed before
   the panel appears. Pending filter changes and shortcut feedback end with that
@@ -176,7 +181,8 @@ API, which also raises them, and `WindowThumbnails.swift` captures their thumbna
 with ScreenCaptureKit; one `GlassStore` each for the app and window panels and their
 cards keeps a look and darkness in UserDefaults, each set in a `GlassSettingsRow`.
 `SwitcherCardView` draws the shared card fill and selection border, and
-`SwitcherCardStore` keeps each list's cards switch; `WhitelistStore` keeps the filter switch
+`SwitcherCardStore` keeps each list's cards switch; `SwitcherAppearanceStore` saves
+the hidden-app dimming preference; `WhitelistStore` keeps the filter switch
 and the whitelist in UserDefaults and publishes changes to the pane; `BatchQuitStore`
 keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
 either list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is
