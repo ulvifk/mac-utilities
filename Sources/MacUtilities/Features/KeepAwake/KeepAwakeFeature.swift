@@ -109,7 +109,10 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         }
 
         if transition != nil { return }
-        if session === getEligibleSession() { return }
+        if session === getEligibleSession() {
+            isSleepRestorationRefused = false
+            return
+        }
 
         transition = Task { @MainActor in
             isChangingSession = true
@@ -122,11 +125,16 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     @MainActor private func reconcileSession() async {
         while true {
             let eligibleSession = getEligibleSession()
-            if session === eligibleSession { return }
+            if session === eligibleSession {
+                isSleepRestorationRefused = false
+                return
+            }
 
             if let session {
                 let didRestoreSleep = await session.end()
                 if !didRestoreSleep {
+                    if session === getEligibleSession() { continue }
+
                     isSleepRestorationRefused = true
                     sleepRestorationRetry = scheduleUpdate(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
                     return

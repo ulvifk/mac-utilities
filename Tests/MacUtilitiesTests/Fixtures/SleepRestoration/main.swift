@@ -541,6 +541,44 @@ func require(_ condition: Bool, _ message: String) {
     require(commandHistory == [true, false, false], "Cleanup retry activated on battery")
 }
 
+@MainActor func testPowerRestorationFailureRecovery(reconnectsPower: Bool, beforeRestoreCompletes: Bool) async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    KeepAwakePreferences.autoOff = .oneHour
+    let feature = buildFeature()
+    await activate(feature)
+    let session = feature.session!
+    let deadline = session.deactivationDate
+
+    ExternalPowerSource.current.isConnected = false
+    await waitUntil { commands.count == 1 }
+    if !beforeRestoreCompletes {
+        await completeCommand(disabled: false, succeeds: false)
+        await waitUntil { !feature.isChangingSession }
+        require(feature.isSleepRestorationRefused, "Failed restoration did not report its warning")
+    }
+
+    if reconnectsPower {
+        ExternalPowerSource.current.isConnected = true
+    } else {
+        KeepAwakePreferences.current.setOnlyWhileConnectedToPower(false)
+    }
+    if beforeRestoreCompletes {
+        await completeCommand(disabled: false, succeeds: false)
+    }
+    try! await Task.sleep(nanoseconds: 20_000_000)
+    await waitUntil { !feature.isChangingSession }
+
+    require(feature.session === session, "Allowing power replaced the already active session")
+    require(feature.session!.deactivationDate == deadline, "Allowing power restarted the deadline")
+    require(!feature.isSleepRestorationRefused, "An eligible session retained an obsolete restoration warning")
+    require(!feature.isWaitingForPower, "An eligible session still claimed it was waiting for power")
+    require(assertionReleaseCount == 0, "Failed restoration released the eligible session's assertion")
+    require(watchdogTerminationCount == 0, "Failed restoration stopped the eligible session's watchdog")
+
+    try! await Task.sleep(nanoseconds: 5_200_000_000)
+    require(commandHistory == [true, false], "An eligible session retried obsolete restoration")
+}
+
 Task { @MainActor in
     switch CommandLine.arguments[1] {
     case "session-retry": await testSessionRetry()
@@ -567,6 +605,10 @@ Task { @MainActor in
     case "power-pending-activation": await testPowerPendingActivation()
     case "power-pending-restoration": await testPowerPendingRestoration()
     case "power-restoration-retry": await testPowerRestorationRetry()
+    case "power-reconnect-after-failure": await testPowerRestorationFailureRecovery(reconnectsPower: true, beforeRestoreCompletes: false)
+    case "power-reconnect-during-failure": await testPowerRestorationFailureRecovery(reconnectsPower: true, beforeRestoreCompletes: true)
+    case "power-setting-after-failure": await testPowerRestorationFailureRecovery(reconnectsPower: false, beforeRestoreCompletes: false)
+    case "power-setting-during-failure": await testPowerRestorationFailureRecovery(reconnectsPower: false, beforeRestoreCompletes: true)
     default: fatalError("Unknown test scenario")
     }
     exit(0)

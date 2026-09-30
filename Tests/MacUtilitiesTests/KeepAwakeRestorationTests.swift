@@ -30,7 +30,9 @@ struct KeepAwakeRestorationTests {
             "termination-refusal", "termination-restoring", "power-lid-sleep",
             "power-idle-sleep", "battery-toggle", "battery-duration", "power-manual-off",
             "power-feature-stop", "power-expiration", "power-setting",
-            "power-pending-activation", "power-pending-restoration", "power-restoration-retry"
+            "power-pending-activation", "power-pending-restoration", "power-restoration-retry",
+            "power-reconnect-after-failure", "power-reconnect-during-failure",
+            "power-setting-after-failure", "power-setting-during-failure"
         ]
         for scenario in scenarios {
             let result = try Self.runProcess(harness.path, arguments: [scenario])
