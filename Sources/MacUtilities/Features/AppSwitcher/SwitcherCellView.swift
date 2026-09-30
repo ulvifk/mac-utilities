@@ -2,6 +2,8 @@ import AppKit
 
 /// A cell in the panel's rows; a click anywhere on it reports the cell's index.
 class SwitcherCellView: NSView {
+    let card = SwitcherCardView(glass: nil)
+
     var index = 0
     var onClick: (Int) -> Void = { _ in }
 

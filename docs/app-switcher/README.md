@@ -13,7 +13,7 @@ feature off, Cmd+` behaves as macOS has it.
 The App Switcher pane of the settings window toggles the filter, manages the
 whitelist, picks the panel's glass (Clear or Frosted, and a slider from light to
 dark for its black tint) in one row for the apps and one for the windows, switches the
-cards around windows on or off and picks their own look and darkness in a third row,
+cards around apps and windows on or off and picks each kind's own look and darkness,
 sets up Batch Quit and runs it, and lists the in-switcher shortcuts as keycaps, the
 switching ones apart from the ones acting on apps. Each section has a line under it
 saying what its settings mean. The whitelist and the Batch Quit list
@@ -45,16 +45,18 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Apps without open windows are left out.
 - Hidden apps stay listed with a dimmed icon, whether they were hidden with Cmd+H here
   or anywhere else; releasing Cmd on one unhides and activates it.
-- The highlight is a rounded square hugging the selected icon; the app's name sits
-  under it, clamped to the panel edges and truncated rather than ever widening the
-  panel.
+- Cards frame the app icons, with an accent-colour ring around the selected card.
+  Their Clear/Frosted look, darkness, and visibility are set separately from window
+  cards. The highlight is a rounded square hugging the selected icon; the app's name
+  sits under it, clamped to the panel edges and truncated rather than ever widening
+  the panel.
 - The panel is Liquid Glass tinted dark, its corners concentric with the highlight's.
   Clear glass shows what is behind it; Frosted blurs it away like glass in an inactive
   window. Both, and the tint's darkness, are set apart for the apps (Cmd+Tab) and the
   windows (Cmd+`) and apply from the next time the switcher opens. Changing either in
   the settings pane previews it live until a second after the last change: the apps'
-  glass with the running apps, the windows' glass and the card settings with the
-  windows of the app used last, the one behind the settings window. The preview
+  glass and app-card settings with the running apps, the windows' glass and window-card
+  settings with the windows of the app used last, the one behind the settings window. The preview
   keeps its list, cells and thumbnails while its settings are adjusted; changing
   lists or opening a new preview loads fresh candidates. Clicks pass through to
   the pane.
@@ -162,9 +164,10 @@ sizes and colours in `SwitcherMetrics` and the ones that differ between icon and
 cells in `SwitcherCellMetrics`;
 `AppWindows.swift` lists an app's windows as `AppWindow`s through the accessibility
 API, which also raises them, and `WindowThumbnails.swift` captures their thumbnails
-with ScreenCaptureKit; one `GlassStore` each for the apps, the windows and the window
-cards keeps a look and darkness in UserDefaults, each set in a `GlassSettingsRow`,
-and `WindowCardStore` keeps the cards switch; `WhitelistStore` keeps the filter switch
+with ScreenCaptureKit; one `GlassStore` each for the app and window panels and their
+cards keeps a look and darkness in UserDefaults, each set in a `GlassSettingsRow`.
+`SwitcherCardView` draws the shared card fill and selection border, and
+`SwitcherCardStore` keeps each list's cards switch; `WhitelistStore` keeps the filter switch
 and the whitelist in UserDefaults and publishes changes to the pane; `BatchQuitStore`
 keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
 either list; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is

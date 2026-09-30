@@ -128,12 +128,12 @@ final class GlassStore: ObservableObject {
     }
 }
 
-final class WindowCardStore: ObservableObject {
-    static var store: WindowCardStore!
+final class SwitcherCardStore: ObservableObject {
+    static var stores: [String: SwitcherCardStore] = [:]
 
-    let showsCards = false
+    var showsCards = false
 
-    init() { Self.store = self }
+    init(key: String) { Self.stores[key] = self }
 }
 
 final class PanelWidthStore {
@@ -157,7 +157,9 @@ struct AppSwitcherSettingsView: View {
     let batchQuitStore: BatchQuitStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
-    let windowCardStore: WindowCardStore
+    let appCardStore: SwitcherCardStore
+    let appCardGlassStore: GlassStore
+    let windowCardStore: SwitcherCardStore
     let windowCardGlassStore: GlassStore
 
     var body: some View { EmptyView() }
@@ -227,7 +229,7 @@ struct ThumbnailRequest {
 }
 
 let defaultGlassDarkness: CGFloat = 0.14
-let defaultWindowCardDarkness: CGFloat = 0.3
+let defaultCardDarkness: CGFloat = 0.3
 let defaultPanelWidthFraction: CGFloat = 0.7
 let hintDelay: TimeInterval = 0.9
 let glassPreviewDuration: TimeInterval = 1

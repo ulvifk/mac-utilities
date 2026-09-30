@@ -17,15 +17,15 @@ private let appShortcuts: [(String, [[String]])] = [
     ("Batch Quit", [["⇧", "⌘", "Q"]]),
 ]
 
-/// The App Switcher pane's sections: the filter and the whitelist, the panel's glass for apps and for windows, the window cards and their glass,
-/// Batch Quit (whether it quits the listed apps or the others, and its list) and the in-switcher shortcuts as keycaps. Both lists are picked in
-/// a popover checklist.
+/// Settings for filtering, glass, app and window cards, Batch Quit, and shortcuts.
 struct AppSwitcherSettingsView: View {
     @ObservedObject var whitelistStore: WhitelistStore
     @ObservedObject var batchQuitStore: BatchQuitStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
-    @ObservedObject var windowCardStore: WindowCardStore
+    @ObservedObject var appCardStore: SwitcherCardStore
+    let appCardGlassStore: GlassStore
+    @ObservedObject var windowCardStore: SwitcherCardStore
     let windowCardGlassStore: GlassStore
     @StateObject private var runningApps = RunningRegularApps()
 
@@ -44,7 +44,10 @@ struct AppSwitcherSettingsView: View {
         Section {
             GlassSettingsRow(title: "Apps", glassStore: appGlassStore)
             GlassSettingsRow(title: "Windows", glassStore: windowGlassStore)
-            Toggle("Cards around windows", isOn: buildWindowCardsBinding())
+            Toggle("Cards around apps", isOn: buildCardsBinding(appCardStore))
+            GlassSettingsRow(title: "App cards", glassStore: appCardGlassStore)
+                .disabled(!appCardStore.showsCards)
+            Toggle("Cards around windows", isOn: buildCardsBinding(windowCardStore))
             GlassSettingsRow(title: "Window cards", glassStore: windowCardGlassStore)
                 .disabled(!windowCardStore.showsCards)
         } header: {
@@ -114,10 +117,10 @@ struct AppSwitcherSettingsView: View {
         )
     }
 
-    private func buildWindowCardsBinding() -> Binding<Bool> {
+    private func buildCardsBinding(_ store: SwitcherCardStore) -> Binding<Bool> {
         return Binding(
-            get: { windowCardStore.showsCards },
-            set: { windowCardStore.setShowsCards($0) }
+            get: { store.showsCards },
+            set: { store.setShowsCards($0) }
         )
     }
 

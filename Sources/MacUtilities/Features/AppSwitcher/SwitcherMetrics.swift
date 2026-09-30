@@ -27,13 +27,17 @@ let highlightColor = NSColor.white.withAlphaComponent(0.30)
 let highlightCornerRadius: CGFloat = 15.5
 /// The 68pt image has a ~6.5pt transparent margin around the squircle, and the highlight sits 3pt outside it.
 let highlightIconInset: CGFloat = 3.5
+/// Whole-point insets keep the card centered on both 1x and 2x displays.
+let iconCardInset: CGFloat = 3
+let iconCardCornerRadius: CGFloat = 17.5
+let iconCardFrameInCell = iconFrameInCell.insetBy(dx: iconCardInset, dy: iconCardInset)
 /// Concentric with the highlight: its radius plus its distance from the side edges.
 let panelCornerRadius: CGFloat = highlightCornerRadius + horizontalPadding + highlightIconInset
 /// Leaves the hint tray about as far below the name band as above the bottom edge.
 let iconHintBandHeight: CGFloat = 38
 let iconCellMetrics = SwitcherCellMetrics(
     cellSize: NSSize(width: iconSize, height: iconCellHeight),
-    highlightFrameInCell: iconFrameInCell.insetBy(dx: highlightIconInset, dy: highlightIconInset),
+    highlightFrameInCell: iconCardFrameInCell,
     rowSpacing: iconRowSpacing,
     verticalPadding: iconVerticalPadding,
     hintBandHeight: iconHintBandHeight
@@ -58,12 +62,12 @@ let windowThumbnailFrameInCell = NSRect(
 )
 /// The card framing each window's thumbnail and title, where the highlight also sits.
 let windowCardFrameInCell = NSRect(origin: .zero, size: windowCellSize).insetBy(dx: highlightIconInset, dy: highlightIconInset)
-/// The card's black fill until its darkness slider is moved: enough to keep the title readable on clear glass.
-let defaultWindowCardDarkness: CGFloat = 0.3
-let windowCardBorderColor = NSColor.white.withAlphaComponent(0.18)
-let windowCardBorderWidth: CGFloat = 1
-/// The selected card's border is Mission Control's ring around a hovered window, in the accent colour, so it shows on bright glass too.
-let selectedWindowCardBorderWidth: CGFloat = 3
+/// The cards' black tint until their darkness sliders move.
+let defaultCardDarkness: CGFloat = 0.3
+let cardBorderColor = NSColor.white.withAlphaComponent(0.18)
+let cardBorderWidth: CGFloat = 1
+/// The selected card has an accent-colour ring.
+let selectedCardBorderWidth: CGFloat = 3
 /// Lower than below icons: the rows' wide bottom padding already holds part of the hint tray, which ends about as far below the cards as above
 /// the bottom edge.
 let windowHintBandHeight: CGFloat = 28
