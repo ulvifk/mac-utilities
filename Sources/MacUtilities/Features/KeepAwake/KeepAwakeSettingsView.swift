@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The Keep Awake pane's section: the auto-off timer and whether a closed lid is kept awake too or only idle sleep is held off.
 struct KeepAwakeSettingsView: View {
     @ObservedObject var preferences: KeepAwakePreferences
 
@@ -17,8 +16,13 @@ struct KeepAwakeSettingsView: View {
                 Text("Keep awake with the lid closed")
                 Text("Runs pmset as root through the sudoers line install.sh installs. Off, only idle sleep is held off and the display may still sleep.")
             }
+
+            Toggle(isOn: buildPowerOnlyBinding()) {
+                Text("Only while connected to power")
+                Text("Restores normal sleep on battery. Reconnecting resumes Keep Awake if it is still enabled and its time has not run out.")
+            }
         } footer: {
-            Text("Both apply the next time Keep Awake is turned on. The duration chips in the menu bar popover set Turn off after too.")
+            Text("The duration and lid options apply the next time Keep Awake is turned on. The power option applies immediately. The duration chips in the menu bar popover set Turn off after too.")
         }
     }
 
@@ -33,6 +37,13 @@ struct KeepAwakeSettingsView: View {
         return Binding(
             get: { preferences.keepsAwakeWithLidClosed },
             set: { preferences.setKeepsAwakeWithLidClosed($0) }
+        )
+    }
+
+    private func buildPowerOnlyBinding() -> Binding<Bool> {
+        return Binding(
+            get: { preferences.onlyWhileConnectedToPower },
+            set: { preferences.setOnlyWhileConnectedToPower($0) }
         )
     }
 }
