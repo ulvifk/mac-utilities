@@ -13,6 +13,7 @@ func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int
         selectedIndex: selectedIndex,
         isFiltered: false,
         isFilterEnabled: false,
+        dimHiddenApps: true,
         whitelisted: []
     )
 }
@@ -141,6 +142,28 @@ precondition(getCells(in: appContainer).allSatisfy { $0 is IconCellView }, "New 
 print("PASS new-opening/builds-new-mode-content")
 panel.hide()
 
+var dimmingState = buildState(listingWindows: false, cardGlass: nil)
+dimmingState.apps[0].isHidden = true
+panel.show(state: dimmingState, glassStore: panelGlass)
+let dimmingContainer = (panel.contentView as! NSGlassEffectView).contentView!
+let dimmingCells = getCells(in: dimmingContainer)
+let hiddenCell = dimmingCells[0] as! IconCellView
+let visibleCell = dimmingCells[1] as! IconCellView
+precondition(hiddenCell.icon.alphaValue == 0.4, "Hidden icon did not start dimmed")
+
+for dimHiddenApps in [false, true, false] {
+    dimmingState = SwitcherState(apps: dimmingState.apps, windows: [], thumbnails: [:], isListingWindows: false,
+                                cardGlass: nil, cellsPerRow: 2, selectedIndex: 0, isFiltered: false,
+                                isFilterEnabled: false, dimHiddenApps: dimHiddenApps, whitelisted: ["test.app"])
+    panel.updateGlass(state: dimmingState, glassStore: panelGlass)
+    precondition(hiddenCell.icon.alphaValue == (dimHiddenApps ? 0.4 : 1), "Appearance change did not refresh hidden icon opacity")
+    precondition(visibleCell.icon.alphaValue == 1, "Appearance change dimmed a visible app")
+    precondition(!hiddenCell.dot.isHidden, "Appearance change lost the whitelist marker")
+    expectSameViews(panel: panel, container: dimmingContainer, cells: dimmingCells)
+}
+panel.hide()
+print("PASS appearance/dimming-refreshes-existing-icons")
+
 struct PreviewPlacementScenario {
     let name: String
     let settingsFrame: NSRect
@@ -203,4 +226,31 @@ for listingWindows in [false, true] {
     precondition(!settingsWindow.isVisible, "Placement tests presented a settings window")
     previewPanel.hide()
     print("PASS preview-placement/native-\(listingWindows ? "windows" : "apps")-reuses-views")
+}
+
+let visibleFrame = settingsWindow.screen!.visibleFrame
+for listingWindows in [false, true] {
+    for placement in ["fullscreen", "above"] {
+        let settingsFrame = placement == "fullscreen" ? visibleFrame : NSRect(
+            x: visibleFrame.minX, y: visibleFrame.minY + 100,
+            width: visibleFrame.width, height: visibleFrame.height / 3
+        )
+        settingsWindow.setFrame(settingsFrame, display: false)
+        let previewPanel = SwitcherPanel()
+        previewPanel.show(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 2),
+                          glassStore: GlassStore(), beside: settingsWindow)
+        let frame = previewPanel.frame
+        let container = (previewPanel.contentView as! NSGlassEffectView).contentView!
+        let hintBand = container.subviews.first { $0 is HintBandView }!
+        precondition(container.bounds.contains(hintBand.frame), "Preview did not reserve the hint band before placement")
+
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: hintDelay + hintFadeDuration + 0.1))
+        precondition(previewPanel.frame == frame, "Preview grew after being positioned")
+        precondition(visibleFrame.contains(previewPanel.frame), "Preview hints extended below the visible screen")
+        if placement == "above" {
+            precondition(!previewPanel.frame.intersects(settingsWindow.frame), "Preview hints overlapped settings")
+        }
+        previewPanel.hide()
+        print("PASS preview-placement/\(listingWindows ? "windows" : "apps")-\(placement)-includes-hints")
+    }
 }

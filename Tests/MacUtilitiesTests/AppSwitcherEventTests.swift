@@ -23,13 +23,14 @@ struct AppSwitcherEventTests {
             "Sources/MacUtilities/Features/AppSwitcher/AppSwitcherFeature.swift",
             "Sources/MacUtilities/Features/AppSwitcher/SwitcherState.swift",
             "Sources/MacUtilities/Features/AppSwitcher/SwitcherPreviewStore.swift",
+            "Sources/MacUtilities/Features/AppSwitcher/SwitcherAppearanceStore.swift",
             "Sources/MacUtilities/Core/Feature.swift",
             "Sources/MacUtilities/Core/KeyMatching.swift",
             "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/AppSwitcherFakes.swift",
             "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/main.swift",
         ]
 
-        try runFixture(sources: sources, expectedScenarioCount: 81)
+        try runFixture(sources: sources, expectedScenarioCount: 88)
     }
 
     private func runFixture(sources: [String], expectedScenarioCount: Int) throws {

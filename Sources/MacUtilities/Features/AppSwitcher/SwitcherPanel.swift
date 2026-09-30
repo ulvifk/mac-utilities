@@ -47,10 +47,14 @@ final class SwitcherPanel: NSPanel {
     func show(state: SwitcherState, glassStore: GlassStore, beside settingsWindow: NSWindow? = nil) {
         self.state = state
         isFrosted = glassStore.isFrosted
+        if settingsWindow != nil {
+            isShowingHintBand = true
+        }
         let wasVisible = isVisible
 
         buildContent(glassDarkness: glassStore.darkness)
         if let settingsWindow {
+            hintBand.showHints()
             positionPreview(beside: settingsWindow)
         } else {
             center()
@@ -75,7 +79,6 @@ final class SwitcherPanel: NSPanel {
     }
 
     func updateGlass(state: SwitcherState, glassStore: GlassStore) {
-        self.state = state
         let glass = contentView as! NSGlassEffectView
 
         if isFrosted != glassStore.isFrosted {
@@ -94,6 +97,8 @@ final class SwitcherPanel: NSPanel {
         for cell in cells {
             cell.card.updateGlass(state.cardGlass)
         }
+
+        update(state: state)
     }
 
     func update(state: SwitcherState) {
@@ -250,7 +255,7 @@ final class SwitcherPanel: NSPanel {
         let app = state.apps[index]
         let cell = IconCellView(app: app, cardGlass: state.cardGlass)
 
-        cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+        cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered, dimHiddenApps: state.dimHiddenApps)
         cell.card.showSelected(index == state.selectedIndex)
 
         return cell
@@ -272,7 +277,7 @@ final class SwitcherPanel: NSPanel {
     private func showAppStatus(layout: SwitcherLayout) {
         for (index, app) in state.apps.enumerated() {
             let cell = cells[index] as! IconCellView
-            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered, dimHiddenApps: state.dimHiddenApps)
             cell.card.showSelected(index == state.selectedIndex)
         }
 

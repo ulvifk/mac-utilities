@@ -17,6 +17,7 @@ final class AppSwitcherFeature: Feature {
     private let tracker = RecentAppsTracker()
     private let whitelistStore = WhitelistStore()
     private let batchQuitStore = BatchQuitStore()
+    private let appearanceStore = SwitcherAppearanceStore()
     private let appGlassStore = GlassStore(keyPrefix: "appGlass", defaultDarkness: defaultGlassDarkness)
     private let windowGlassStore = GlassStore(keyPrefix: "windowGlass", defaultDarkness: defaultGlassDarkness)
     private let appCardStore = SwitcherCardStore(key: "appCards")
@@ -61,6 +62,9 @@ final class AppSwitcherFeature: Feature {
         tracker.start()
         observers.append(observeAppTermination())
         observers.append(contentsOf: observeAppHiding())
+        previewChanges.append(observeSettingsFocusChanges())
+        previewChanges.append(observePreviewChanges(of: whitelistStore, reloadList: true))
+        previewChanges.append(observePreviewChanges(of: appearanceStore))
         previewChanges.append(observePreviewChanges(of: appGlassStore))
         previewChanges.append(observePreviewChanges(of: windowGlassStore))
         previewChanges.append(observePreviewChanges(of: appCardStore))
@@ -101,6 +105,7 @@ final class AppSwitcherFeature: Feature {
         return AnyView(AppSwitcherSettingsView(
             whitelistStore: whitelistStore,
             batchQuitStore: batchQuitStore,
+            appearanceStore: appearanceStore,
             appGlassStore: appGlassStore,
             windowGlassStore: windowGlassStore,
             appCardStore: appCardStore,
@@ -172,6 +177,11 @@ final class AppSwitcherFeature: Feature {
             object: nil,
             queue: .main
         ) { notification in
+            if self.previewPanel.isVisible {
+                self.hidePreview()
+                self.refreshPreview()
+                return
+            }
             if !self.panel.isVisible { return }
 
             let app = notification.userInfo![NSWorkspace.applicationUserInfoKey] as! NSRunningApplication
@@ -187,9 +197,12 @@ final class AppSwitcherFeature: Feature {
 
         for name in [NSWorkspace.didHideApplicationNotification, NSWorkspace.didUnhideApplicationNotification] {
             observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
-                if !self.panel.isVisible { return }
-
-                self.panel.update(state: self.buildState())
+                if self.panel.isVisible {
+                    self.panel.update(state: self.buildState())
+                }
+                if self.previewPanel.isVisible {
+                    self.previewPanel.update(state: self.buildState())
+                }
             })
         }
 
@@ -197,12 +210,26 @@ final class AppSwitcherFeature: Feature {
     }
 
     /// The stores announce changes before making them, so the preview reads them on the next main-queue turn.
-    private func observePreviewChanges(of store: some ObservableObject) -> AnyCancellable {
+    private func observePreviewChanges(of store: some ObservableObject, reloadList: Bool = false) -> AnyCancellable {
         return store.objectWillChange
             .map { _ in self.switcherSession }
             .receive(on: DispatchQueue.main)
             .sink { session in
                 if self.switcherSession != session { return }
+
+                if reloadList {
+                    self.hidePreview()
+                }
+                self.refreshPreview()
+            }
+    }
+
+    private func observeSettingsFocusChanges() -> AnyCancellable {
+        return NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
+            .merge(with: NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification))
+            .sink { notification in
+                let window = notification.object as! NSWindow
+                if window !== self.settingsWindow { return }
 
                 self.refreshPreview()
             }
@@ -682,6 +709,7 @@ final class AppSwitcherFeature: Feature {
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,
             isFilterEnabled: whitelistStore.isFilterEnabled,
+            dimHiddenApps: appearanceStore.dimHiddenApps,
             whitelisted: whitelistStore.getWhitelist()
         )
     }
@@ -732,6 +760,10 @@ final class AppSwitcherFeature: Feature {
     /// Reuses the visible preview's list and views until its mode changes or it hides.
     private func refreshPreview() {
         guard let settingsWindow else { return }
+        if !settingsWindow.isKeyWindow {
+            hidePreview()
+            return
+        }
         if !previewStore.isShown {
             hidePreview()
             return
@@ -749,15 +781,12 @@ final class AppSwitcherFeature: Feature {
             if listingWindows {
                 guard let app = getRecentRunningApps().first else { return }
                 loadWindows(of: app)
-                windows = Array(windows.prefix(1))
             } else {
                 loadApps()
-                candidates = Array(candidates.prefix(2))
             }
             if getItemCount() == 0 { return }
 
-            cellsPerRow = listingWindows ? 1 : 2
-            selectedIndex = 0
+            selectedIndex = min(1, getItemCount() - 1)
             previewPanel.show(state: buildState(), glassStore: getGlassStore(), beside: settingsWindow)
             refreshThumbnails(of: windows.map { $0.windowID }, in: previewPanel)
         }
