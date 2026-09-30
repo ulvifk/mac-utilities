@@ -15,6 +15,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     let iconGradient = Gradient(colors: [.orange, .brown])
 
     private let preferences = KeepAwakePreferences()
+    private let powerSource = ExternalPowerSource()
     private let setMenuBarSymbol: (String?) -> Void
 
     @Published private(set) var session: KeepAwakeSession?
@@ -25,10 +26,14 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     private var requestedSession: KeepAwakeSession?
     private var transition: Task<Void, Never>?
     private var deactivation: DispatchWorkItem?
+    private var sleepRestorationRetry: DispatchWorkItem?
+    private var conditionChanges: [AnyCancellable] = []
     private var isTerminating = false
 
     init(setMenuBarSymbol: @escaping (String?) -> Void) {
         self.setMenuBarSymbol = setMenuBarSymbol
+
+        conditionChanges = [observeConditionChanges(of: preferences), observeConditionChanges(of: powerSource)]
     }
 
     func start() {}
@@ -45,6 +50,8 @@ final class KeepAwakeFeature: Feature, ObservableObject {
 
         deactivation?.cancel()
         deactivation = nil
+        sleepRestorationRetry?.cancel()
+        sleepRestorationRetry = nil
     }
 
     func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -56,7 +63,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     }
 
     func buildPopoverTile() -> AnyView? {
-        return AnyView(KeepAwakeTile(feature: self))
+        return AnyView(KeepAwakeTile(feature: self, preferences: preferences))
     }
 
     func toggle() {
@@ -82,11 +89,27 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         updateSession()
     }
 
+    var isWaitingForPower: Bool {
+        if requestedSession == nil { return false }
+        if isRequestedSessionExpired() { return false }
+        return !isPowerAllowed()
+    }
+
     private func updateSession() {
+        objectWillChange.send()
+
         deactivation?.cancel()
         deactivation = nil
+        sleepRestorationRetry?.cancel()
+        sleepRestorationRetry = nil
+
+        if isRequestedSessionExpired() { requestedSession = nil }
+        if let deactivationDate = requestedSession?.deactivationDate {
+            deactivation = scheduleUpdate(at: deactivationDate, turnsOff: true)
+        }
+
         if transition != nil { return }
-        if session === requestedSession { return }
+        if session === getEligibleSession() { return }
 
         transition = Task { @MainActor in
             isChangingSession = true
@@ -97,12 +120,15 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     }
 
     @MainActor private func reconcileSession() async {
-        while session !== requestedSession {
+        while true {
+            let eligibleSession = getEligibleSession()
+            if session === eligibleSession { return }
+
             if let session {
                 let didRestoreSleep = await session.end()
                 if !didRestoreSleep {
                     isSleepRestorationRefused = true
-                    deactivation = scheduleUpdate(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
+                    sleepRestorationRetry = scheduleUpdate(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
                     return
                 }
 
@@ -112,11 +138,11 @@ final class KeepAwakeFeature: Feature, ObservableObject {
                 continue
             }
 
-            let nextSession = requestedSession!
+            let nextSession = eligibleSession!
             let didBegin = await nextSession.begin()
             if !didBegin {
                 isPmsetRefused = true
-                if requestedSession === nextSession { requestedSession = nil }
+                if requestedSession === nextSession { stop() }
                 continue
             }
 
@@ -124,10 +150,31 @@ final class KeepAwakeFeature: Feature, ObservableObject {
             isPmsetRefused = false
             setMenuBarSymbol(keepAwakeSymbolName)
         }
+    }
 
-        if let deactivationDate = session?.deactivationDate {
-            deactivation = scheduleUpdate(at: deactivationDate, turnsOff: true)
-        }
+    private func getEligibleSession() -> KeepAwakeSession? {
+        if isRequestedSessionExpired() { return nil }
+        if !isPowerAllowed() { return nil }
+        return requestedSession
+    }
+
+    private func isRequestedSessionExpired() -> Bool {
+        guard let deactivationDate = requestedSession?.deactivationDate else { return false }
+        return deactivationDate <= Date()
+    }
+
+    private func isPowerAllowed() -> Bool {
+        if !preferences.onlyWhileConnectedToPower { return true }
+        return powerSource.isConnected
+    }
+
+    private func observeConditionChanges(of store: some ObservableObject) -> AnyCancellable {
+        return store.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [unowned self] _ in
+                if self.isTerminating { return }
+                self.updateSession()
+            }
     }
 
     /// Uses wall time so a Mac that slept past its deadline turns off on waking.

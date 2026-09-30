@@ -2,12 +2,13 @@ import SwiftUI
 
 private let keepAwakeTint = Color.orange
 
-/// Keep Awake in the menu bar popover: the round toggle with the time left, and a chip per duration that turns it on for that long from now,
-/// the one in use filled.
 struct KeepAwakeTile: View {
     @ObservedObject var feature: KeepAwakeFeature
+    @ObservedObject var preferences: KeepAwakePreferences
 
     var body: some View {
+        let isActive = feature.session != nil
+
         PopoverTile {
             VStack(alignment: .leading, spacing: tilePadding) {
                 PopoverToggleRow(
@@ -15,7 +16,7 @@ struct KeepAwakeTile: View {
                     subtitle: buildSubtitle(),
                     symbolName: keepAwakeSymbolName,
                     tint: keepAwakeTint,
-                    isOn: feature.session != nil,
+                    isOn: isActive,
                     toggle: feature.toggle
                 )
 
@@ -25,6 +26,17 @@ struct KeepAwakeTile: View {
                     }
                 }
                 .animation(popoverStateAnimation, value: feature.session?.autoOff)
+
+                Toggle(isOn: buildPowerOnlyBinding()) {
+                    Text("Only while connected to power")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .font(secondaryLineFont)
+                .foregroundStyle(isActive ? Color.primary : Color.secondary)
+                .tint(isActive ? keepAwakeTint : .gray)
+                .disabled(!isActive)
             }
         }
     }
@@ -39,6 +51,10 @@ struct KeepAwakeTile: View {
 
         if feature.isChangingSession {
             return Text(feature.session == nil ? "Turning on…" : "Restoring sleep…")
+        }
+
+        if feature.isWaitingForPower {
+            return Text("Waiting for power")
         }
 
         if feature.isPmsetRefused {
@@ -77,5 +93,12 @@ struct KeepAwakeTile: View {
 
     private func isAutoOffInUse(_ autoOff: KeepAwakeAutoOff) -> Bool {
         return feature.session?.autoOff == autoOff
+    }
+
+    private func buildPowerOnlyBinding() -> Binding<Bool> {
+        return Binding(
+            get: { preferences.onlyWhileConnectedToPower },
+            set: { preferences.setOnlyWhileConnectedToPower($0) }
+        )
     }
 }

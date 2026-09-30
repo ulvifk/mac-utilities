@@ -57,15 +57,38 @@ enum KeepAwakeAutoOff: String {
     }
 }
 
-final class KeepAwakePreferences {
+final class KeepAwakePreferences: ObservableObject {
     static var autoOff: KeepAwakeAutoOff = .untilTurnedOff
     static var keepsAwakeWithLidClosed = true
+    static var onlyWhileConnectedToPower = false
+    static var current: KeepAwakePreferences!
+
+    init() {
+        Self.current = self
+    }
 
     var autoOff: KeepAwakeAutoOff { Self.autoOff }
     var keepsAwakeWithLidClosed: Bool { Self.keepsAwakeWithLidClosed }
+    var onlyWhileConnectedToPower: Bool { Self.onlyWhileConnectedToPower }
 
     func setAutoOff(_ autoOff: KeepAwakeAutoOff) {
+        objectWillChange.send()
         Self.autoOff = autoOff
+    }
+
+    func setOnlyWhileConnectedToPower(_ enabled: Bool) {
+        objectWillChange.send()
+        Self.onlyWhileConnectedToPower = enabled
+    }
+}
+
+final class ExternalPowerSource: ObservableObject {
+    static var current: ExternalPowerSource!
+
+    @Published var isConnected = true
+
+    init() {
+        Self.current = self
     }
 }
 
@@ -76,6 +99,7 @@ struct KeepAwakeSettingsView: View {
 
 struct KeepAwakeTile: View {
     let feature: KeepAwakeFeature
+    let preferences: KeepAwakePreferences
     var body: some View { EmptyView() }
 }
 
@@ -350,6 +374,173 @@ func require(_ condition: Bool, _ message: String) {
     require(commandHistory == [true, false], "Termination ran overlapping restoration commands")
 }
 
+@MainActor func testPowerSuspension(_ keepsLidAwake: Bool) async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    KeepAwakePreferences.keepsAwakeWithLidClosed = keepsLidAwake
+    let feature = buildFeature()
+    feature.turnOn(for: .oneHour)
+    if keepsLidAwake { await completeCommand(disabled: true) }
+    await waitUntil { feature.session != nil }
+    let session = feature.session!
+    let deadline = session.deactivationDate
+
+    ExternalPowerSource.current.isConnected = false
+    if keepsLidAwake { await completeCommand(disabled: false) }
+    await waitUntil { feature.session == nil }
+    require(feature.isWaitingForPower, "Unplugging lost the user's enabled session")
+    require(assertionReleaseCount == 1, "Unplugging did not release the power assertion")
+    require(watchdogTerminationCount == (keepsLidAwake ? 1 : 0), "Unplugging did not stop the restored watchdog")
+
+    ExternalPowerSource.current.isConnected = true
+    if keepsLidAwake { await completeCommand(disabled: true) }
+    await waitUntil { feature.session != nil }
+    require(feature.session === session, "Reconnecting replaced the suspended session")
+    require(feature.session!.deactivationDate == deadline, "Reconnecting restarted the deadline")
+    require(!feature.isWaitingForPower, "Reconnecting kept the waiting subtitle")
+
+    feature.stop()
+    if keepsLidAwake { await completeCommand(disabled: false) }
+    await waitUntil { feature.session == nil }
+    require(assertionReleaseCount == 2, "The resumed assertion was not released")
+    if keepsLidAwake {
+        require(commandHistory == [true, false, true, false], "Power changes did not serialize lid commands")
+        return
+    }
+    require(commandHistory.isEmpty, "Idle-sleep power changes ran lid commands")
+}
+
+@MainActor func testBatteryActivation(_ usesDurationChip: Bool) async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    let feature = buildFeature()
+    ExternalPowerSource.current.isConnected = false
+
+    if usesDurationChip {
+        feature.turnOn(for: .oneHour)
+    } else {
+        feature.toggle()
+    }
+    require(feature.isWaitingForPower, "Battery activation did not retain the user's enablement")
+    await Task.yield()
+    require(feature.session == nil, "Keep Awake activated on battery")
+    require(commandHistory.isEmpty, "Battery activation disabled lid sleep")
+    require(watchdogLaunchCount == 0, "Battery activation launched a watchdog")
+
+    ExternalPowerSource.current.isConnected = true
+    await completeCommand(disabled: true)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session != nil, "Reconnecting did not honor battery enablement")
+    if usesDurationChip {
+        require(feature.session!.autoOff == .oneHour, "The battery duration chip lost its duration")
+    }
+}
+
+@MainActor func testPowerManualStop(_ stopsFeature: Bool) async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    let feature = buildFeature()
+    await activate(feature)
+    ExternalPowerSource.current.isConnected = false
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+
+    if stopsFeature {
+        feature.stop()
+        feature.start()
+    } else {
+        feature.toggle()
+    }
+    require(!feature.isWaitingForPower, "Turning off retained suspended enablement")
+    ExternalPowerSource.current.isConnected = true
+    try! await Task.sleep(nanoseconds: 20_000_000)
+    require(feature.session == nil, "Reconnecting enabled a manually disabled session")
+    require(commandHistory == [true, false], "Reconnecting ran commands for a disabled session")
+}
+
+@MainActor func testPowerExpiration() async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    KeepAwakePreferences.autoOff = .thirtyMinutes
+    let feature = buildFeature()
+    await activate(feature)
+    ExternalPowerSource.current.isConnected = false
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    await waitUntil { !feature.isWaitingForPower }
+
+    ExternalPowerSource.current.isConnected = true
+    try! await Task.sleep(nanoseconds: 20_000_000)
+    require(feature.session == nil, "Reconnecting restarted an expired session")
+    require(commandHistory == [true, false], "Reconnecting disabled sleep after expiration")
+}
+
+@MainActor func testPowerSetting() async {
+    let feature = buildFeature()
+    ExternalPowerSource.current.isConnected = false
+    await activate(feature)
+    let session = feature.session!
+
+    KeepAwakePreferences.current.setOnlyWhileConnectedToPower(true)
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session == nil, "Enabling the power option did not restore sleep on battery")
+    require(feature.isWaitingForPower, "Enabling the power option lost user enablement")
+
+    KeepAwakePreferences.current.setOnlyWhileConnectedToPower(false)
+    await completeCommand(disabled: true)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session === session, "Disabling the power option replaced the session")
+    require(!feature.isWaitingForPower, "Disabling the power option left battery gating active")
+}
+
+@MainActor func testPowerPendingActivation() async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    let feature = buildFeature()
+    feature.turnOn(for: .oneHour)
+    await waitUntil { commands.count == 1 }
+
+    ExternalPowerSource.current.isConnected = false
+    await completeCommand(disabled: true)
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session == nil, "Unplugging retained an in-flight activation")
+    require(feature.isWaitingForPower, "Unplugging discarded in-flight enablement")
+    require(commandHistory == [true, false], "Unplugging overlapped activation and restoration")
+    require(assertionReleaseCount == 1, "Unplugging leaked the late activation's assertion")
+    require(watchdogTerminationCount == 1, "Unplugging orphaned the late activation's watchdog")
+}
+
+@MainActor func testPowerPendingRestoration() async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    let feature = buildFeature()
+    await activate(feature)
+    let session = feature.session!
+    ExternalPowerSource.current.isConnected = false
+    await waitUntil { commands.count == 1 }
+
+    ExternalPowerSource.current.isConnected = true
+    await completeCommand(disabled: false)
+    await completeCommand(disabled: true)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session === session, "Reconnecting during restoration lost the enabled session")
+    require(commandHistory == [true, false, true], "Reconnecting during restoration overlapped power commands")
+}
+
+@MainActor func testPowerRestorationRetry() async {
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    let feature = buildFeature()
+    await activate(feature)
+    ExternalPowerSource.current.isConnected = false
+    await completeCommand(disabled: false, succeeds: false)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.isSleepRestorationRefused, "Unplugging hid restoration failure")
+    require(assertionReleaseCount == 0, "Unplugging released an unrestored assertion")
+    require(watchdogTerminationCount == 0, "Unplugging abandoned failed cleanup")
+
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session == nil, "Unplugging did not retry failed cleanup")
+    require(feature.isWaitingForPower, "Cleanup retry discarded suspended enablement")
+    require(commandHistory == [true, false, false], "Cleanup retry activated on battery")
+}
+
 Task { @MainActor in
     switch CommandLine.arguments[1] {
     case "session-retry": await testSessionRetry()
@@ -365,6 +556,17 @@ Task { @MainActor in
     case "termination": await testTermination(false)
     case "termination-refusal": await testTermination(true)
     case "termination-restoring": await testTerminationWhileRestoring()
+    case "power-lid-sleep": await testPowerSuspension(true)
+    case "power-idle-sleep": await testPowerSuspension(false)
+    case "battery-toggle": await testBatteryActivation(false)
+    case "battery-duration": await testBatteryActivation(true)
+    case "power-manual-off": await testPowerManualStop(false)
+    case "power-feature-stop": await testPowerManualStop(true)
+    case "power-expiration": await testPowerExpiration()
+    case "power-setting": await testPowerSetting()
+    case "power-pending-activation": await testPowerPendingActivation()
+    case "power-pending-restoration": await testPowerPendingRestoration()
+    case "power-restoration-retry": await testPowerRestorationRetry()
     default: fatalError("Unknown test scenario")
     }
     exit(0)

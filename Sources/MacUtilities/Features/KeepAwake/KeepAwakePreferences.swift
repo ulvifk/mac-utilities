@@ -1,14 +1,19 @@
 import Combine
 import Foundation
 
-/// The auto-off timer and the lid switch, in UserDefaults; both apply the next time Keep awake is turned on.
+/// Keep Awake settings stored in UserDefaults.
 final class KeepAwakePreferences: ObservableObject {
     private let autoOffKey = "keepAwakeAutoOff"
     private let lidClosedKey = "keepAwakeWithLidClosed"
+    private let powerOnlyKey = "keepAwakeOnlyWhileConnectedToPower"
     private let defaults = UserDefaults.standard
 
     init() {
-        defaults.register(defaults: [autoOffKey: KeepAwakeAutoOff.untilTurnedOff.rawValue, lidClosedKey: true])
+        defaults.register(defaults: [
+            autoOffKey: KeepAwakeAutoOff.untilTurnedOff.rawValue,
+            lidClosedKey: true,
+            powerOnlyKey: false
+        ])
     }
 
     var autoOff: KeepAwakeAutoOff {
@@ -27,5 +32,14 @@ final class KeepAwakePreferences: ObservableObject {
     func setKeepsAwakeWithLidClosed(_ enabled: Bool) {
         objectWillChange.send()
         defaults.set(enabled, forKey: lidClosedKey)
+    }
+
+    var onlyWhileConnectedToPower: Bool {
+        return defaults.bool(forKey: powerOnlyKey)
+    }
+
+    func setOnlyWhileConnectedToPower(_ enabled: Bool) {
+        objectWillChange.send()
+        defaults.set(enabled, forKey: powerOnlyKey)
     }
 }

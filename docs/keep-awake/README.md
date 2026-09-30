@@ -17,11 +17,15 @@ sleep is held off and the display may still sleep.
 - The round toggle turns Keep Awake on for the "Turn off after" time, or off again.
   Its subtitle reads "Off", "Turning on…", "Restoring sleep…", "On, never turns
   off", or counts down the time left second by second, "1:29:05 left".
+  With the power option on, a session paused on battery reads "Waiting for power".
 - Under it, the chips 30 min, 1 hr, 2 hr and ∞ (Never) turn Keep Awake on for that
   long from now; the one in use is filled orange. A chip clicked while it is on starts
   it over for the new time, re-reading both settings. The chip clicked also becomes
   "Turn off after" in the settings pane, so the round toggle and the `toggleKeepAwake`
   hotkey use that time from then on.
+- Below the chips, "Only while connected to power" changes the same saved option
+  as the settings pane and applies immediately. It is grayed out and disabled while
+  Keep Awake is off; its saved value is kept.
 
 A set time ends on a one-shot timer at the deactivation date, on the wall clock, so a
 Mac that slept past it turns Keep Awake off on waking.
@@ -39,8 +43,17 @@ responsive while a command is pending.
   control; the chips set it too.
 - Keep awake with the lid closed: on by default. The line under it says it runs
   `pmset` as root and what is held off without it.
+- Only while connected to power: off by default and saved across launches. With it
+  on, disconnecting external power releases the assertion and restores lid-closed
+  sleep. The session waits on battery; the tile toggle, duration chips and hotkey
+  can enable it, but cannot hold off sleep until external power returns. Reconnecting
+  resumes the enabled session with its original deadline. Turning it off manually,
+  disabling the feature or reaching the deadline clears that session, so reconnecting
+  cannot turn it back on.
 
-Both apply the next time Keep Awake is turned on.
+The duration and lid options apply the next time Keep Awake is turned on. The power
+option applies immediately, including to an active session. Turning it off allows
+an enabled session to resume on battery.
 
 ## What is restored, and when
 
@@ -50,6 +63,8 @@ Both apply the next time Keep Awake is turned on.
   settings pane or the app quits. Quit stops enabled features, then waits for
   outstanding Keep Awake commands before allowing the app to exit, including
   cleanup still owned by a disabled feature;
+- when external power is disconnected with "Only while connected to power" on,
+  including when an activation command is still in flight;
 - when the app dies any other way: activating spawns a child watchdog shell that
   outlives the app and checks for exit every five seconds. After exit it runs
   `sudo -n /usr/bin/pmset -a disablesleep 0`, retrying every five seconds until
@@ -95,8 +110,11 @@ Settings", until the next time it is turned on.
 on the one-shot timer. One transition task processes the latest requested session
 without canceling external commands; the session holds the `PowerAssertion` and,
 with the lid switch on, the watchdog from `LidClosedSleep`; `KeepAwakePreferences` keeps the
-`KeepAwakeAutoOff` choice and the lid switch in UserDefaults for
+`KeepAwakeAutoOff` choice, lid switch and power option in UserDefaults for
 `KeepAwakeSettingsView`, the settings pane's section, and the tile's chips.
+`ExternalPowerSource` watches IOKit power-source changes on the main run loop. The
+feature keeps the requested session while it waits on battery and runs its deadline
+timer independently of sleep-restoration retries.
 
 App-owned Quit and reopening requests use `ApplicationTermination` to enter AppKit
 through its run loop, so queued UI actions finish before deferred Quit waits for

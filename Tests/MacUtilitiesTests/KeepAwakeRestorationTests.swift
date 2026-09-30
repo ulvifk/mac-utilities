@@ -27,10 +27,37 @@ struct KeepAwakeRestorationTests {
             "session-retry", "idle-sleep", "activation-refusal", "toggle-retry",
             "replacement-refusal", "stop-retry", "timer-retry", "pending-activation-stop",
             "rapid-toggles", "rapid-duration-replacement", "termination",
-            "termination-refusal", "termination-restoring"
+            "termination-refusal", "termination-restoring", "power-lid-sleep",
+            "power-idle-sleep", "battery-toggle", "battery-duration", "power-manual-off",
+            "power-feature-stop", "power-expiration", "power-setting",
+            "power-pending-activation", "power-pending-restoration", "power-restoration-retry"
         ]
         for scenario in scenarios {
             let result = try Self.runProcess(harness.path, arguments: [scenario])
+            #expect(result.status == 0, "\(scenario): \(result.output)")
+        }
+    }
+
+    @Test
+    func powerOnlyPreferencePersistsAcrossLaunches() throws {
+        let directory = try Self.createTemporaryDirectory()
+        defer { try! FileManager.default.removeItem(at: directory) }
+        let domain = "com.ulvifk.mac-utilities.tests.\(UUID().uuidString)"
+        defer { UserDefaults(suiteName: domain)!.removePersistentDomain(forName: domain) }
+
+        let harness = directory.appendingPathComponent("preferences-harness")
+        let main = directory.appendingPathComponent("main.swift")
+        try FileManager.default.copyItem(at: Self.fixtures.appendingPathComponent("preferences.swift"), to: main)
+        let compilation = try Self.runProcess("/usr/bin/xcrun", arguments: [
+            "swiftc", main.path,
+            Self.sources.appendingPathComponent("Features/KeepAwake/KeepAwakePreferences.swift").path,
+            Self.sources.appendingPathComponent("Features/KeepAwake/KeepAwakeAutoOff.swift").path,
+            "-o", harness.path
+        ])
+        try #require(compilation.status == 0, "\(compilation.output)")
+
+        for scenario in ["enable", "disable", "verify-disabled"] {
+            let result = try Self.runProcess(harness.path, arguments: [domain, scenario])
             #expect(result.status == 0, "\(scenario): \(result.output)")
         }
     }
