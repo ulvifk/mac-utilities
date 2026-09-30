@@ -44,13 +44,17 @@ final class SwitcherPanel: NSPanel {
     }
 
     /// On the glass as set in the store now; later changes to it show from the next call.
-    func show(state: SwitcherState, glassStore: GlassStore) {
+    func show(state: SwitcherState, glassStore: GlassStore, beside settingsWindow: NSWindow? = nil) {
         self.state = state
         isFrosted = glassStore.isFrosted
         let wasVisible = isVisible
 
         buildContent(glassDarkness: glassStore.darkness)
-        center()
+        if let settingsWindow {
+            positionPreview(beside: settingsWindow)
+        } else {
+            center()
+        }
 
         if wasVisible {
             orderFrontRegardless()
@@ -63,6 +67,11 @@ final class SwitcherPanel: NSPanel {
             context.duration = 0.1
             animator().alphaValue = 1
         }
+    }
+
+    func positionPreview(beside settingsWindow: NSWindow) {
+        setFrame(getPreviewFrame(contentSize: frame.size, settingsFrame: settingsWindow.frame,
+                                 screenFrame: settingsWindow.screen!.visibleFrame), display: true)
     }
 
     func updateGlass(state: SwitcherState, glassStore: GlassStore) {

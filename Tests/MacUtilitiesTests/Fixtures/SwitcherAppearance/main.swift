@@ -1,13 +1,15 @@
 import AppKit
 
-func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int = 0) -> SwitcherState {
+_ = NSApplication.shared.setActivationPolicy(.prohibited)
+
+func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int = 0, itemCount: Int = 2) -> SwitcherState {
     return SwitcherState(
-        apps: listingWindows ? [] : [NSRunningApplication(), NSRunningApplication()],
-        windows: listingWindows ? [AppWindow(windowID: 1), AppWindow(windowID: 2)] : [],
+        apps: listingWindows ? [] : (0..<itemCount).map { _ in NSRunningApplication() },
+        windows: listingWindows ? (0..<itemCount).map { AppWindow(windowID: CGWindowID($0 + 1)) } : [],
         thumbnails: [:],
         isListingWindows: listingWindows,
         cardGlass: cardGlass,
-        cellsPerRow: 2,
+        cellsPerRow: itemCount,
         selectedIndex: selectedIndex,
         isFiltered: false,
         isFilterEnabled: false,
@@ -138,3 +140,67 @@ precondition(appContainer !== container, "New opening reused the old mode's cont
 precondition(getCells(in: appContainer).allSatisfy { $0 is IconCellView }, "New opening kept window cells")
 print("PASS new-opening/builds-new-mode-content")
 panel.hide()
+
+struct PreviewPlacementScenario {
+    let name: String
+    let settingsFrame: NSRect
+    let screenFrame: NSRect
+    let expectedOrigin: NSPoint
+}
+
+let screenFrame = NSRect(x: 0, y: 0, width: 1440, height: 900)
+let placementScenarios = [
+    PreviewPlacementScenario(name: "right", settingsFrame: NSRect(x: 360, y: 180, width: 720, height: 540),
+                             screenFrame: screenFrame, expectedOrigin: NSPoint(x: 1092, y: 400)),
+    PreviewPlacementScenario(name: "left", settingsFrame: NSRect(x: 1000, y: 180, width: 400, height: 540),
+                             screenFrame: screenFrame, expectedOrigin: NSPoint(x: 788, y: 400)),
+    PreviewPlacementScenario(name: "below", settingsFrame: NSRect(x: 100, y: 500, width: 1240, height: 300),
+                             screenFrame: screenFrame, expectedOrigin: NSPoint(x: 620, y: 388)),
+    PreviewPlacementScenario(name: "above", settingsFrame: NSRect(x: 100, y: 100, width: 1240, height: 400),
+                             screenFrame: screenFrame, expectedOrigin: NSPoint(x: 620, y: 512)),
+    PreviewPlacementScenario(name: "clamp-vertical", settingsFrame: NSRect(x: 360, y: 850, width: 720, height: 300),
+                             screenFrame: screenFrame, expectedOrigin: NSPoint(x: 1092, y: 800)),
+    PreviewPlacementScenario(name: "clamp-horizontal", settingsFrame: NSRect(x: -3000, y: 500, width: 4440, height: 300),
+                             screenFrame: screenFrame, expectedOrigin: NSPoint(x: 0, y: 388)),
+    PreviewPlacementScenario(name: "nonzero-screen-origin", settingsFrame: NSRect(x: -1240, y: 380, width: 720, height: 540),
+                             screenFrame: NSRect(x: -1600, y: 200, width: 1440, height: 900), expectedOrigin: NSPoint(x: -508, y: 600)),
+    PreviewPlacementScenario(name: "no-exterior-space", settingsFrame: screenFrame,
+                             screenFrame: screenFrame, expectedOrigin: screenFrame.origin),
+]
+
+for scenario in placementScenarios {
+    let frame = getPreviewFrame(contentSize: NSSize(width: 200, height: 100), settingsFrame: scenario.settingsFrame,
+                                screenFrame: scenario.screenFrame)
+    precondition(frame.origin == scenario.expectedOrigin, "Wrong preview position for \(scenario.name): \(frame)")
+    precondition(scenario.screenFrame.contains(frame), "Preview escaped the visible screen for \(scenario.name)")
+    if scenario.name != "no-exterior-space" {
+        precondition(!frame.intersects(scenario.settingsFrame), "Preview covered settings for \(scenario.name)")
+    }
+    print("PASS preview-placement/\(scenario.name)")
+}
+
+let settingsWindow = NSWindow(contentRect: NSRect(x: 360, y: 180, width: 720, height: 540),
+                              styleMask: .titled, backing: .buffered, defer: false)
+for listingWindows in [false, true] {
+    let previewPanel = SwitcherPanel()
+    let state = buildState(listingWindows: listingWindows, cardGlass: GlassStore(), itemCount: listingWindows ? 1 : 2)
+    previewPanel.show(state: state, glassStore: GlassStore(), beside: settingsWindow)
+    precondition(!previewPanel.frame.intersects(settingsWindow.frame), "Native preview covered settings controls")
+    let previewContainer = (previewPanel.contentView as! NSGlassEffectView).contentView!
+    let cells = getCells(in: previewContainer)
+    let originalSize = previewPanel.frame.size
+
+    settingsWindow.setFrameOrigin(NSPoint(x: 600, y: 100))
+    previewPanel.positionPreview(beside: settingsWindow)
+    let expectedFrame = getPreviewFrame(contentSize: originalSize, settingsFrame: settingsWindow.frame,
+                                        screenFrame: settingsWindow.screen!.visibleFrame)
+    let pixel = 1 / settingsWindow.screen!.backingScaleFactor
+    precondition(abs(previewPanel.frame.minX - expectedFrame.minX) <= pixel, "Native preview did not follow settings horizontally")
+    precondition(abs(previewPanel.frame.minY - expectedFrame.minY) <= pixel, "Native preview did not follow settings vertically")
+    precondition(!previewPanel.frame.intersects(settingsWindow.frame), "Moved native preview covered settings controls")
+    precondition(previewPanel.frame.size == originalSize, "Repositioning changed preview size")
+    expectSameViews(panel: previewPanel, container: previewContainer, cells: cells)
+    precondition(!settingsWindow.isVisible, "Placement tests presented a settings window")
+    previewPanel.hide()
+    print("PASS preview-placement/native-\(listingWindows ? "windows" : "apps")-reuses-views")
+}

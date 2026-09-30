@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 let generalPaneIdentifier = "general"
@@ -11,4 +12,5 @@ struct SettingsPane {
     /// Shown as a badge on the pane's row; nil for none.
     let warning: String?
     let view: AnyView
+    let onWindowChanged: (AppKit.NSWindow?) -> Void
 }

@@ -9,6 +9,9 @@ final class SettingsSplitViewController: NSSplitViewController {
     /// [pane identifier] -> the pane's view
     private let paneViews: [String: NSView]
 
+    private var selectedPaneIdentifier = generalPaneIdentifier
+    private var areSettingsVisible = false
+
     init(panes: [SettingsPane]) {
         self.panes = panes
         sidebar = SettingsSidebarViewController(panes: panes)
@@ -30,13 +33,36 @@ final class SettingsSplitViewController: NSSplitViewController {
         showSelectedPane(paneIdentifier)
     }
 
+    func setSettingsVisible(_ isVisible: Bool) {
+        if areSettingsVisible == isVisible { return }
+
+        areSettingsVisible = isVisible
+        getPane(selectedPaneIdentifier).onWindowChanged(isVisible ? view.window! : nil)
+    }
+
+    func updateVisiblePane() {
+        if !areSettingsVisible { return }
+
+        getPane(selectedPaneIdentifier).onWindowChanged(view.window!)
+    }
+
     /// The pane's title becomes the window's.
     private func showSelectedPane(_ paneIdentifier: String) {
+        if selectedPaneIdentifier != paneIdentifier {
+            getPane(selectedPaneIdentifier).onWindowChanged(nil)
+            selectedPaneIdentifier = paneIdentifier
+            getPane(paneIdentifier).onWindowChanged(areSettingsVisible ? view.window! : nil)
+        }
+
         for (identifier, paneView) in paneViews {
             paneView.isHidden = identifier != paneIdentifier
         }
 
-        view.window!.title = panes.first { $0.identifier == paneIdentifier }!.title
+        view.window!.title = getPane(paneIdentifier).title
+    }
+
+    private func getPane(_ identifier: String) -> SettingsPane {
+        return panes.first { $0.identifier == identifier }!
     }
 
     private func buildSidebarItem() -> NSSplitViewItem {
