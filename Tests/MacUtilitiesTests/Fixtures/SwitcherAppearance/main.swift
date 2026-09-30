@@ -233,11 +233,11 @@ for listingWindows in [false, true] {
     for placement in ["fullscreen", "above"] {
         let settingsFrame = placement == "fullscreen" ? visibleFrame : NSRect(
             x: visibleFrame.minX, y: visibleFrame.minY + 100,
-            width: visibleFrame.width, height: visibleFrame.height / 2
+            width: visibleFrame.width, height: visibleFrame.height / 3
         )
         settingsWindow.setFrame(settingsFrame, display: false)
         let previewPanel = SwitcherPanel()
-        previewPanel.show(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 6),
+        previewPanel.show(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 2),
                           glassStore: GlassStore(), beside: settingsWindow)
         let frame = previewPanel.frame
         let container = (previewPanel.contentView as! NSGlassEffectView).contentView!
