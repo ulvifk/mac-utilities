@@ -15,7 +15,7 @@ struct SwitcherAppearanceTests {
         let executable = temporaryDirectory.appendingPathComponent("switcher-appearance-tests")
         let compilerOutput = temporaryDirectory.appendingPathComponent("compiler-output")
         let sources = [
-            "SwitcherPanel", "SwitcherState", "SwitcherCellView", "IconCellView", "WindowCellView",
+            "SwitcherPanel", "SwitcherState", "SwitcherCellView", "SwitcherCardView", "IconCellView", "WindowCellView",
             "SwitcherContentView", "SwitcherLayout", "SwitcherCellMetrics", "SwitcherMetrics",
             "HintBandView", "ShortcutHint", "SwitcherFeedback", "WhitelistBadgeView", "ResizeHandleView",
         ].map { "Sources/MacUtilities/Features/AppSwitcher/\($0).swift" } + [
@@ -40,7 +40,7 @@ struct SwitcherAppearanceTests {
         let runnerStatus = try run(runner, writingOutputTo: runnerOutput)
         let output = try String(contentsOf: runnerOutput, encoding: .utf8)
         #expect(runnerStatus == 0, "\(output)")
-        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 8, "\(output)")
+        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 13, "\(output)")
     }
 
     private func run(_ process: Process, writingOutputTo output: URL) throws -> Int32 {

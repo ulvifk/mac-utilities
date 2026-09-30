@@ -19,8 +19,10 @@ final class AppSwitcherFeature: Feature {
     private let batchQuitStore = BatchQuitStore()
     private let appGlassStore = GlassStore(keyPrefix: "appGlass", defaultDarkness: defaultGlassDarkness)
     private let windowGlassStore = GlassStore(keyPrefix: "windowGlass", defaultDarkness: defaultGlassDarkness)
-    private let windowCardStore = WindowCardStore()
-    private let windowCardGlassStore = GlassStore(keyPrefix: "windowCardGlass", defaultDarkness: defaultWindowCardDarkness)
+    private let appCardStore = SwitcherCardStore(key: "appCards")
+    private let appCardGlassStore = GlassStore(keyPrefix: "appCardGlass", defaultDarkness: defaultCardDarkness)
+    private let windowCardStore = SwitcherCardStore(key: "windowCards")
+    private let windowCardGlassStore = GlassStore(keyPrefix: "windowCardGlass", defaultDarkness: defaultCardDarkness)
     private let panelWidthStore = PanelWidthStore()
     private var observers: [NSObjectProtocol] = []
     private var lookChanges: [AnyCancellable] = []
@@ -59,6 +61,8 @@ final class AppSwitcherFeature: Feature {
         observers.append(contentsOf: observeAppHiding())
         lookChanges.append(observeLookChanges(of: appGlassStore, listingWindows: false))
         lookChanges.append(observeLookChanges(of: windowGlassStore, listingWindows: true))
+        lookChanges.append(observeLookChanges(of: appCardStore, listingWindows: false))
+        lookChanges.append(observeLookChanges(of: appCardGlassStore, listingWindows: false))
         lookChanges.append(observeLookChanges(of: windowCardStore, listingWindows: true))
         lookChanges.append(observeLookChanges(of: windowCardGlassStore, listingWindows: true))
         runSmokeTestIfRequested()
@@ -95,6 +99,8 @@ final class AppSwitcherFeature: Feature {
             batchQuitStore: batchQuitStore,
             appGlassStore: appGlassStore,
             windowGlassStore: windowGlassStore,
+            appCardStore: appCardStore,
+            appCardGlassStore: appCardGlassStore,
             windowCardStore: windowCardStore,
             windowCardGlassStore: windowCardGlassStore
         ))
@@ -651,13 +657,20 @@ final class AppSwitcherFeature: Feature {
             windows: windows,
             thumbnails: thumbnails,
             isListingWindows: isListingWindows,
-            windowCardGlass: windowCardStore.showsCards ? windowCardGlassStore : nil,
+            cardGlass: getCardGlass(),
             cellsPerRow: cellsPerRow,
             selectedIndex: selectedIndex,
             isFiltered: isFiltered,
             isFilterEnabled: whitelistStore.isFilterEnabled,
             whitelisted: whitelistStore.getWhitelist()
         )
+    }
+
+    private func getCardGlass() -> GlassStore? {
+        let store = isListingWindows ? windowCardStore : appCardStore
+        if !store.showsCards { return nil }
+
+        return isListingWindows ? windowCardGlassStore : appCardGlassStore
     }
 
     /// A window is raised on the next turn of the main queue: its accessibility round trips must stay out of the tap callback releasing Cmd.

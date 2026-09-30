@@ -82,10 +82,8 @@ final class SwitcherPanel: NSPanel {
             glass.tintColor = NSColor.black.withAlphaComponent(glassStore.darkness)
         }
 
-        if !state.isListingWindows { return }
-
         for cell in cells {
-            (cell as! WindowCellView).updateCardGlass(state.windowCardGlass)
+            cell.card.updateGlass(state.cardGlass)
         }
     }
 
@@ -115,6 +113,9 @@ final class SwitcherPanel: NSPanel {
 
         cell.onClick = { _ in }
         for later in cells[index...] { later.index -= 1 }
+        for remaining in cells {
+            remaining.card.showSelected(remaining.index == state.selectedIndex)
+        }
         nameLabel.stringValue = getSelectedName()
         hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
 
@@ -238,18 +239,19 @@ final class SwitcherPanel: NSPanel {
 
     private func buildIconCell(index: Int) -> SwitcherCellView {
         let app = state.apps[index]
-        let cell = IconCellView(app: app)
+        let cell = IconCellView(app: app, cardGlass: state.cardGlass)
 
         cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+        cell.card.showSelected(index == state.selectedIndex)
 
         return cell
     }
 
     private func buildWindowCell(index: Int) -> SwitcherCellView {
         let window = state.windows[index]
-        let cell = WindowCellView(window: window, cardGlass: state.windowCardGlass)
+        let cell = WindowCellView(window: window, cardGlass: state.cardGlass)
 
-        cell.showSelected(index == state.selectedIndex)
+        cell.card.showSelected(index == state.selectedIndex)
         if let thumbnail = state.thumbnails[window.windowID] {
             cell.showThumbnail(thumbnail)
         }
@@ -259,8 +261,10 @@ final class SwitcherPanel: NSPanel {
 
     /// Dims the hidden apps, marks the whitelisted ones and names the selected one.
     private func showAppStatus(layout: SwitcherLayout) {
-        for (cell, app) in zip(cells, state.apps) {
-            (cell as! IconCellView).showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+        for (index, app) in state.apps.enumerated() {
+            let cell = cells[index] as! IconCellView
+            cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.isFiltered)
+            cell.card.showSelected(index == state.selectedIndex)
         }
 
         nameLabel.stringValue = getSelectedName()
@@ -272,7 +276,7 @@ final class SwitcherPanel: NSPanel {
         for (index, window) in state.windows.enumerated() {
             let cell = cells[index] as! WindowCellView
 
-            cell.showSelected(index == state.selectedIndex)
+            cell.card.showSelected(index == state.selectedIndex)
             if let thumbnail = state.thumbnails[window.windowID] {
                 cell.showThumbnail(thumbnail)
             }
@@ -398,7 +402,8 @@ final class SwitcherPanel: NSPanel {
         let highlight = NSView()
 
         highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = highlightCornerRadius
+        highlight.layer?.cornerRadius = state.isListingWindows ? highlightCornerRadius : iconCardCornerRadius
+        highlight.layer?.cornerCurve = state.isListingWindows ? .circular : .continuous
         highlight.layer?.backgroundColor = highlightColor.cgColor
 
         return highlight

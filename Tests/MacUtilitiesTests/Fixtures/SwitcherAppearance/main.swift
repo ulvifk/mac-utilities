@@ -1,14 +1,14 @@
 import AppKit
 
-func buildState(listingWindows: Bool, cardGlass: GlassStore?) -> SwitcherState {
+func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int = 0) -> SwitcherState {
     return SwitcherState(
         apps: listingWindows ? [] : [NSRunningApplication(), NSRunningApplication()],
         windows: listingWindows ? [AppWindow(windowID: 1), AppWindow(windowID: 2)] : [],
         thumbnails: [:],
         isListingWindows: listingWindows,
-        windowCardGlass: cardGlass,
+        cardGlass: cardGlass,
         cellsPerRow: 2,
-        selectedIndex: 0,
+        selectedIndex: selectedIndex,
         isFiltered: false,
         isFilterEnabled: false,
         whitelisted: []
@@ -63,61 +63,74 @@ for listingWindows in [false, true] {
     panel.hide()
 }
 
+for listingWindows in [false, true] {
+    let mode = listingWindows ? "windows" : "apps"
+    let panel = SwitcherPanel()
+    let panelGlass = GlassStore()
+    let cardGlass = GlassStore()
+    let state = buildState(listingWindows: listingWindows, cardGlass: cardGlass)
+    panel.show(state: state, glassStore: panelGlass)
+    let glass = panel.contentView!
+    let container = (glass as! NSGlassEffectView).contentView!
+    let cells = getCells(in: container)
+    let cell = cells[0]
+    let card = cell.card
+    let blur = card.subviews[0] as! NSVisualEffectView
+    let tint = card.subviews[1]
+    let border = card.subviews[2]
+    let imageView = cell.subviews[1] as! NSImageView
+    let image = NSImage(size: NSSize(width: 32, height: 32))
+    imageView.image = image
+    precondition(card.frame == alignToPixels(listingWindows ? windowCardFrameInCell : iconCardFrameInCell), "Card does not frame its content")
+    precondition(border.frame == card.bounds, "Card border did not resize with the card")
+
+    for step in 0..<20 {
+        cardGlass.darkness = CGFloat(step) / 40
+        panel.updateGlass(state: state, glassStore: panelGlass)
+
+        precondition(panel.contentView === glass, "Card darkness replaced panel glass")
+        expectSameViews(panel: panel, container: container, cells: cells)
+        precondition(cell.subviews[0] === card, "Card darkness replaced the card")
+        precondition(card.subviews[1] === tint, "Card darkness replaced the tint")
+        precondition(NSColor(cgColor: tint.layer!.backgroundColor!)!.alphaComponent == cardGlass.darkness, "Card darkness was not applied")
+        precondition(imageView.image === image, "Card darkness lost the image")
+        precondition(border.layer!.borderWidth == selectedCardBorderWidth, "Card darkness lost the selection")
+    }
+    print("PASS \(mode)/card-darkness-reuses-card-and-image")
+
+    for frosted in [true, false, true] {
+        cardGlass.isFrosted = frosted
+        panel.updateGlass(state: state, glassStore: panelGlass)
+
+        precondition(card.subviews[0] === blur, "Card look replaced the blur")
+        precondition(blur.isHidden == !frosted, "Card look did not update the blur")
+        precondition(blur.state == .active, "Card blur lost its active state")
+        precondition(imageView.image === image, "Card look lost the image")
+        expectSameViews(panel: panel, container: container, cells: cells)
+    }
+    print("PASS \(mode)/card-look-reuses-card-and-image")
+
+    panel.updateGlass(state: buildState(listingWindows: listingWindows, cardGlass: nil), glassStore: panelGlass)
+    precondition(card.isHidden, "Cards-off left the card visible")
+    precondition(imageView.image === image, "Cards-off lost the image")
+    panel.updateGlass(state: state, glassStore: panelGlass)
+    precondition(!card.isHidden, "Cards-on did not show the card")
+    precondition(imageView.image === image, "Cards-on lost the image")
+    precondition(border.layer!.borderWidth == selectedCardBorderWidth, "Cards-on lost the selection")
+    expectSameViews(panel: panel, container: container, cells: cells)
+    print("PASS \(mode)/cards-toggle-reuses-cell-and-image")
+
+    panel.update(state: buildState(listingWindows: listingWindows, cardGlass: cardGlass, selectedIndex: 1))
+    precondition(border.layer!.borderWidth == cardBorderWidth, "Previous card kept the selected border")
+    precondition(cells[1].card.subviews[2].layer!.borderWidth == selectedCardBorderWidth, "New selection did not get its border")
+    print("PASS \(mode)/selection-moves-between-cards")
+    panel.hide()
+}
+
 let panel = SwitcherPanel()
 let panelGlass = GlassStore()
-let cardGlass = GlassStore()
-let state = buildState(listingWindows: true, cardGlass: cardGlass)
-panel.show(state: state, glassStore: panelGlass)
-let glass = panel.contentView!
-let container = (glass as! NSGlassEffectView).contentView!
-let cells = getCells(in: container)
-let cell = cells[0] as! WindowCellView
-let card = cell.subviews[0]
-let border = cell.subviews[1]
-let thumbnail = cell.subviews[2] as! NSImageView
-let blur = card.subviews[0] as! NSVisualEffectView
-let tint = card.subviews[1]
-let image = NSImage(size: NSSize(width: 32, height: 32))
-cell.showThumbnail(image)
-
-for step in 0..<20 {
-    cardGlass.darkness = CGFloat(step) / 40
-    panel.updateGlass(state: state, glassStore: panelGlass)
-
-    precondition(panel.contentView === glass, "Card darkness replaced panel glass")
-    expectSameViews(panel: panel, container: container, cells: cells)
-    precondition(cell.subviews[0] === card, "Card darkness replaced the card")
-    precondition(card.subviews[1] === tint, "Card darkness replaced the tint")
-    precondition(NSColor(cgColor: tint.layer!.backgroundColor!)!.alphaComponent == cardGlass.darkness, "Card darkness was not applied")
-    precondition(thumbnail.image === image, "Card darkness lost the captured thumbnail")
-    precondition(border.layer!.borderWidth == selectedWindowCardBorderWidth, "Card darkness lost the selection")
-}
-print("PASS windows/card-darkness-reuses-card-and-thumbnail")
-
-for frosted in [true, false, true] {
-    cardGlass.isFrosted = frosted
-    panel.updateGlass(state: state, glassStore: panelGlass)
-
-    precondition(card.subviews[0] === blur, "Card look replaced the blur")
-    precondition(blur.isHidden == !frosted, "Card look did not update the blur")
-    precondition(blur.state == .active, "Card blur lost its active state")
-    precondition(thumbnail.image === image, "Card look lost the thumbnail")
-    expectSameViews(panel: panel, container: container, cells: cells)
-}
-print("PASS windows/card-look-reuses-card-and-thumbnail")
-
-panel.updateGlass(state: buildState(listingWindows: true, cardGlass: nil), glassStore: panelGlass)
-precondition(card.isHidden, "Cards-off left the fill visible")
-precondition(border.isHidden, "Cards-off left the border visible")
-precondition(thumbnail.image === image, "Cards-off lost the thumbnail")
-panel.updateGlass(state: state, glassStore: panelGlass)
-precondition(!card.isHidden, "Cards-on did not show the fill")
-precondition(!border.isHidden, "Cards-on did not show the border")
-precondition(thumbnail.image === image, "Cards-on lost the thumbnail")
-precondition(border.layer!.borderWidth == selectedWindowCardBorderWidth, "Cards-on lost the selection")
-expectSameViews(panel: panel, container: container, cells: cells)
-print("PASS windows/cards-toggle-reuses-cell-and-thumbnail")
-
+panel.show(state: buildState(listingWindows: true, cardGlass: nil), glassStore: panelGlass)
+let container = (panel.contentView as! NSGlassEffectView).contentView!
 panel.hide()
 panel.show(state: buildState(listingWindows: false, cardGlass: nil), glassStore: panelGlass)
 let appContainer = (panel.contentView as! NSGlassEffectView).contentView!

@@ -1,13 +1,16 @@
 import AppKit
 import CoreImage
 
-/// A clickable icon cell: the whitelist dot above the icon, room for the selected app name below it, the icon centered between them.
+/// An app icon with its card and whitelist marker.
 final class IconCellView: SwitcherCellView {
     let icon = NSImageView()
     let dot = NSView()
 
-    convenience init(app: NSRunningApplication) {
+    convenience init(app: NSRunningApplication, cardGlass: GlassStore?) {
         self.init(frame: .zero)
+
+        card.frame = alignToPixels(iconCardFrameInCell)
+        card.setCorners(radius: iconCardCornerRadius, curve: .continuous)
 
         icon.image = app.icon ?? NSImage()
         icon.image?.size = NSSize(width: iconSize, height: iconSize)
@@ -20,8 +23,11 @@ final class IconCellView: SwitcherCellView {
         dot.layer?.backgroundColor = NSColor.systemGreen.cgColor
         dot.frame = alignToPixels(dotFrameInCell)
 
+        addSubview(card)
         addSubview(icon)
         addSubview(dot)
+
+        card.updateGlass(cardGlass)
     }
 
     /// Hidden apps dim. With the filter off a dot marks the whitelisted apps; with it on every app listed is whitelisted, so the ones taken

@@ -445,18 +445,31 @@ for listingWindows in [false, true] {
     }
 }
 
-runScenario("preview/cards-reuse-window-list") { feature in
-    GlassStore.stores["windowGlass"]!.objectWillChange.send()
-    drainMainQueue()
-    WindowCardStore.store.objectWillChange.send()
-    drainMainQueue()
-    GlassStore.stores["windowCardGlass"]!.objectWillChange.send()
-    drainMainQueue()
+for listingWindows in [false, true] {
+    let mode = listingWindows ? "window" : "app"
+    runScenario("preview/\(mode)-cards-reuse-list") { feature in
+        GlassStore.stores[mode + "Glass"]!.objectWillChange.send()
+        drainMainQueue()
+        let cards = SwitcherCardStore.stores[mode + "Cards"]!
+        cards.objectWillChange.send()
+        cards.showsCards = true
+        drainMainQueue()
+        let glass = GlassStore.stores[mode + "CardGlass"]!
+        glass.objectWillChange.send()
+        drainMainQueue()
 
-    precondition(AppQueries.windows == 1, "Card changes repeated window queries")
-    precondition(SwitcherPanel.shownStates.count == 1, "Card changes rebuilt the panel")
-    precondition(SwitcherPanel.glassUpdatedStates.count == 2, "Card changes lost appearance updates")
-    precondition(ThumbnailRequest.requests.count == 1, "Card changes repeated thumbnail capture")
+        precondition(AppQueries.runningApps == 1, "Card changes repeated app queries")
+        precondition(AppQueries.windows == (listingWindows ? 1 : 0), "Card changes repeated window queries")
+        precondition(SwitcherPanel.shownStates.count == 1, "Card changes rebuilt the panel")
+        precondition(SwitcherPanel.glassUpdatedStates.count == 2, "Card changes lost appearance updates")
+        precondition(SwitcherPanel.glassUpdatedStates.last!.cardGlass === glass, "Cards used the other mode's glass")
+        precondition(ThumbnailRequest.requests.count == (listingWindows ? 1 : 0), "Card changes repeated thumbnail capture")
+
+        cards.objectWillChange.send()
+        cards.showsCards = false
+        drainMainQueue()
+        precondition(SwitcherPanel.glassUpdatedStates.last!.cardGlass == nil, "Cards-off did not clear the mode's card glass")
+    }
 }
 
 runScenario("preview/mode-change-loads-fresh-list") { feature in
