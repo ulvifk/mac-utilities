@@ -147,11 +147,15 @@ final class PanelWidthStore {
 struct AppWindow {
     static var windows: [AppWindow] = []
     static var raisedWindowIDs: [CGWindowID] = []
+    static var onBringToFront: (AppWindow) -> Void = { _ in }
 
     let windowID: CGWindowID
     let title = "Test Window"
 
-    func bringToFront() { Self.raisedWindowIDs.append(windowID) }
+    func bringToFront() {
+        Self.raisedWindowIDs.append(windowID)
+        Self.onBringToFront(self)
+    }
 }
 
 struct AppSwitcherSettingsView: View {

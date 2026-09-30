@@ -29,7 +29,7 @@ struct AppSwitcherEventTests {
             "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/main.swift",
         ]
 
-        try runFixture(sources: sources, expectedScenarioCount: 77)
+        try runFixture(sources: sources, expectedScenarioCount: 81)
     }
 
     private func runFixture(sources: [String], expectedScenarioCount: Int) throws {

@@ -34,6 +34,7 @@ func resetFixtures(itemCount: Int = 3) {
     NSRunningApplication.quitIdentifiers = []
     NSRunningApplication.hiddenIdentifiers = []
     AppWindow.raisedWindowIDs = []
+    AppWindow.onBringToFront = { _ in }
     SwitcherPanel.instances = []
     SwitcherPanel.shownStates = []
     SwitcherPanel.updatedStates = []
@@ -630,6 +631,37 @@ for listingWindows in [false, true] {
         precondition(SwitcherPanel.instances[1].isVisible, "Activation did not restore the checked preview")
         precondition(SwitcherPanel.shownStates.last!.isListingWindows == listingWindows, "Activation restored the wrong preview mode")
         precondition(SwitcherPanel.shownStates.last!.selectedIndex == 0, "Preview kept the switcher's selection")
+    }
+
+    for releaseWhileOpening in [false, true] {
+        let timing = releaseWhileOpening ? "quick" : "visible"
+        runScenario("preview/\(list)-restores-after-\(timing)-window-activation") { feature in
+            showPreview(feature, listingWindows: listingWindows)
+            press(feature, keyCode: graveKeyCode)
+            if !releaseWhileOpening { drainMainQueue() }
+
+            let runningAppQueriesBeforeActivation = AppQueries.runningApps
+            let windowQueriesBeforeActivation = AppQueries.windows + (releaseWhileOpening ? 1 : 0)
+            AppWindow.onBringToFront = { window in
+                precondition(!SwitcherPanel.instances[0].isVisible, "Window activation kept the switcher visible")
+                precondition(!SwitcherPanel.instances[1].isVisible, "Preview restored before window activation")
+                precondition(AppQueries.runningApps == runningAppQueriesBeforeActivation, "Preview queried apps before window activation")
+                precondition(AppQueries.windows == windowQueriesBeforeActivation, "Preview queried windows before window activation")
+
+                AppWindow.windows = [window] + AppWindow.windows.filter { $0.windowID != window.windowID }
+            }
+
+            releaseCommand(feature)
+            drainMainQueue()
+
+            expectActivation(listingWindows: true, selection: 1)
+            precondition(SwitcherPanel.instances[1].isVisible, "Window activation did not restore the checked preview")
+            let restoredPreview = SwitcherPanel.shownStates.last!
+            precondition(restoredPreview.isListingWindows == listingWindows, "Window activation restored the wrong preview mode")
+            if listingWindows {
+                precondition(restoredPreview.windows.map { $0.windowID } == [1], "Restored preview kept the previous frontmost window")
+            }
+        }
     }
 }
 

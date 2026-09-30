@@ -697,14 +697,15 @@ final class AppSwitcherFeature: Feature {
     private func activateSelection() {
         if isListingWindows {
             let window = windows[selectedIndex]
-            dismissSwitcher()
-
             let session = featureSession
             DispatchQueue.main.async {
                 if self.featureSession != session { return }
 
                 window.bringToFront()
             }
+
+            // Dismissal queues preview restoration after the window raise.
+            dismissSwitcher()
             return
         }
 
