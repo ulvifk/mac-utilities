@@ -59,7 +59,7 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   in the Glass section to keep a live preview on screen while the App Switcher
   settings pane has focus. Its Apps / Windows selector previews the full app list
   or all windows of the app used last, using the switcher's width, selection and hints.
-  The preview
+  The preview includes its hints immediately so it is placed at its final size. It
   sits beside settings, moving with the window so its controls stay visible. If settings
   fills the screen, the preview sits in its bottom-left corner. Adjusting either mode's
   settings keeps the selected preview mode; its list, cells and thumbnails are reused

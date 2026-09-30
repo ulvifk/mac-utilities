@@ -227,3 +227,30 @@ for listingWindows in [false, true] {
     previewPanel.hide()
     print("PASS preview-placement/native-\(listingWindows ? "windows" : "apps")-reuses-views")
 }
+
+let visibleFrame = settingsWindow.screen!.visibleFrame
+for listingWindows in [false, true] {
+    for placement in ["fullscreen", "above"] {
+        let settingsFrame = placement == "fullscreen" ? visibleFrame : NSRect(
+            x: visibleFrame.minX, y: visibleFrame.minY + 100,
+            width: visibleFrame.width, height: visibleFrame.height / 2
+        )
+        settingsWindow.setFrame(settingsFrame, display: false)
+        let previewPanel = SwitcherPanel()
+        previewPanel.show(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 6),
+                          glassStore: GlassStore(), beside: settingsWindow)
+        let frame = previewPanel.frame
+        let container = (previewPanel.contentView as! NSGlassEffectView).contentView!
+        let hintBand = container.subviews.first { $0 is HintBandView }!
+        precondition(container.bounds.contains(hintBand.frame), "Preview did not reserve the hint band before placement")
+
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: hintDelay + hintFadeDuration + 0.1))
+        precondition(previewPanel.frame == frame, "Preview grew after being positioned")
+        precondition(visibleFrame.contains(previewPanel.frame), "Preview hints extended below the visible screen")
+        if placement == "above" {
+            precondition(!previewPanel.frame.intersects(settingsWindow.frame), "Preview hints overlapped settings")
+        }
+        previewPanel.hide()
+        print("PASS preview-placement/\(listingWindows ? "windows" : "apps")-\(placement)-includes-hints")
+    }
+}

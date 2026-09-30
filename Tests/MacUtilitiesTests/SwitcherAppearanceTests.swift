@@ -40,7 +40,7 @@ struct SwitcherAppearanceTests {
         let runnerStatus = try run(runner, writingOutputTo: runnerOutput)
         let output = try String(contentsOf: runnerOutput, encoding: .utf8)
         #expect(runnerStatus == 0, "\(output)")
-        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 24, "\(output)")
+        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 28, "\(output)")
     }
 
     private func run(_ process: Process, writingOutputTo output: URL) throws -> Int32 {

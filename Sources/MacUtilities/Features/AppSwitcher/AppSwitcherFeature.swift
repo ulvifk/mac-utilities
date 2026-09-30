@@ -788,7 +788,6 @@ final class AppSwitcherFeature: Feature {
 
             selectedIndex = min(1, getItemCount() - 1)
             previewPanel.show(state: buildState(), glassStore: getGlassStore(), beside: settingsWindow)
-            previewPanel.showHintsAfterDelay()
             refreshThumbnails(of: windows.map { $0.windowID }, in: previewPanel)
         }
     }

@@ -47,10 +47,14 @@ final class SwitcherPanel: NSPanel {
     func show(state: SwitcherState, glassStore: GlassStore, beside settingsWindow: NSWindow? = nil) {
         self.state = state
         isFrosted = glassStore.isFrosted
+        if settingsWindow != nil {
+            isShowingHintBand = true
+        }
         let wasVisible = isVisible
 
         buildContent(glassDarkness: glassStore.darkness)
         if let settingsWindow {
+            hintBand.showHints()
             positionPreview(beside: settingsWindow)
         } else {
             center()
