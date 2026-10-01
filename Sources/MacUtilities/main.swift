@@ -9,6 +9,7 @@ let controller: AppController = AppController(features: [
         if !controller.isFeatureEnabled(keepAwake) { return }
         keepAwake.toggle()
     }),
+    IPhoneMicFeature(),
 ])
 
 application.setActivationPolicy(.accessory)
