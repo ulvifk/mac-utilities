@@ -25,6 +25,9 @@ the full requirements and connection troubleshooting.
 Enabling the feature makes its tile available. It does not switch microphones
 until you turn on the tile or the **Use iPhone microphone** switch in Settings.
 The feature uses the first available Continuity Camera microphone.
+The controls show **Switching microphone…** until macOS confirms each change.
+Disabling or quitting during a pending selection waits for it and then restores
+the previous microphone.
 
 If an iPhone is already the default input, the tile shows it as selected. Its
 toggle is disabled because MacUtilities has no previous microphone to restore.

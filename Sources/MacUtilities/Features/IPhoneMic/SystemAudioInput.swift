@@ -5,6 +5,8 @@ final class SystemAudioInput: AudioInput {
     private static let observedProperties = [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice]
 
     private var listener: AudioObjectPropertyListenerBlock?
+    private var onChange: (() -> Void)?
+    private var inputChange: (deviceUID: String, continuation: CheckedContinuation<OSStatus, Never>)?
 
     deinit {
         stopObserving()
@@ -33,21 +35,51 @@ final class SystemAudioInput: AudioInput {
         return getUInt32Property(kAudioHardwarePropertyDefaultInputDevice, of: AudioObjectID(kAudioObjectSystemObject))!
     }
 
-    func setDefaultInputDevice(_ id: AudioDeviceID) -> OSStatus {
+    @MainActor func setDefaultInputDevice(_ id: AudioDeviceID) async -> OSStatus {
+        guard let deviceUID = getStringProperty(kAudioDevicePropertyDeviceUID, of: id) else {
+            return kAudioHardwareBadDeviceError
+        }
+        startListening()
+
+        let currentDeviceID = getDefaultInputDeviceID()
+        let currentDeviceUID = getStringProperty(kAudioDevicePropertyDeviceUID, of: currentDeviceID)
+        if currentDeviceUID == deviceUID {
+            if onChange == nil { stopListening() }
+            return noErr
+        }
+
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultInputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
         var deviceID = id
-        return AudioObjectSetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil,
-            UInt32(MemoryLayout<AudioDeviceID>.size), &deviceID
-        )
+        return await withCheckedContinuation { continuation in
+            inputChange = (deviceUID, continuation)
+
+            let status = AudioObjectSetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject), &address, 0, nil,
+                UInt32(MemoryLayout<AudioDeviceID>.size), &deviceID
+            )
+            if status != noErr { finishInputChange(status: status) }
+        }
     }
 
     func startObserving(_ onChange: @escaping () -> Void) {
-        let listener: AudioObjectPropertyListenerBlock = { _, _ in onChange() }
+        self.onChange = onChange
+        startListening()
+    }
+
+    func stopObserving() {
+        onChange = nil
+        if inputChange != nil { return }
+        stopListening()
+    }
+
+    private func startListening() {
+        if listener != nil { return }
+
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.inputChanged() }
         self.listener = listener
 
         for selector in Self.observedProperties {
@@ -61,7 +93,7 @@ final class SystemAudioInput: AudioInput {
         }
     }
 
-    func stopObserving() {
+    private func stopListening() {
         guard let listener else { return }
 
         for selector in Self.observedProperties {
@@ -74,6 +106,29 @@ final class SystemAudioInput: AudioInput {
             precondition(status == noErr, "Couldn't stop observing audio inputs: \(status)")
         }
         self.listener = nil
+    }
+
+    private func inputChanged() {
+        if let inputChange {
+            let devices = getInputDevices()
+            let currentDeviceID = getDefaultInputDeviceID()
+            let currentInput = devices.first { $0.id == currentDeviceID }
+
+            if currentInput?.uid == inputChange.deviceUID {
+                finishInputChange(status: noErr)
+            } else if !devices.contains(where: { $0.uid == inputChange.deviceUID }) {
+                finishInputChange(status: kAudioHardwareBadDeviceError)
+            }
+        }
+        onChange?()
+    }
+
+    private func finishInputChange(status: OSStatus) {
+        let continuation = inputChange!.continuation
+        inputChange = nil
+        if onChange == nil { stopListening() }
+
+        continuation.resume(returning: status)
     }
 
     private func getInputDevice(_ id: AudioDeviceID) -> AudioInputDevice? {
