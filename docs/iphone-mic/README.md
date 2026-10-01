@@ -28,6 +28,10 @@ The feature uses the first available Continuity Camera microphone.
 The controls show **Switching microphone…** until macOS confirms each change.
 Disabling or quitting during a pending selection waits for it and then restores
 the previous microphone.
+If a confirmed default-input change selects another microphone instead, the
+pending request ends as interrupted and preserves that selection. A notification
+that confirms the original microphone also ends the request; device-list changes
+alone keep waiting for confirmation.
 
 If an iPhone is already the default input, the tile shows it as selected. Its
 toggle is disabled because MacUtilities has no previous microphone to restore.

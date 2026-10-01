@@ -79,7 +79,11 @@ final class SystemAudioInput: AudioInput {
     private func startListening() {
         if listener != nil { return }
 
-        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.inputChanged() }
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] count, addresses in
+            let properties = UnsafeBufferPointer(start: addresses, count: Int(count))
+            let didChangeDefaultInput = properties.contains { $0.mSelector == kAudioHardwarePropertyDefaultInputDevice }
+            self?.inputChanged(didChangeDefaultInput: didChangeDefaultInput)
+        }
         self.listener = listener
 
         for selector in Self.observedProperties {
@@ -108,7 +112,7 @@ final class SystemAudioInput: AudioInput {
         self.listener = nil
     }
 
-    private func inputChanged() {
+    private func inputChanged(didChangeDefaultInput: Bool) {
         if let inputChange {
             let devices = getInputDevices()
             let currentDeviceID = getDefaultInputDeviceID()
@@ -118,6 +122,8 @@ final class SystemAudioInput: AudioInput {
                 finishInputChange(status: noErr)
             } else if !devices.contains(where: { $0.uid == inputChange.deviceUID }) {
                 finishInputChange(status: kAudioHardwareBadDeviceError)
+            } else if didChangeDefaultInput {
+                finishInputChange(status: kAudioHardwareIllegalOperationError)
             }
         }
         onChange?()
