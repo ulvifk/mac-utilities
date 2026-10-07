@@ -34,9 +34,6 @@ struct KeepAwakeTile: View {
                 .toggleStyle(.switch)
                 .controlSize(.mini)
                 .font(secondaryLineFont)
-                .foregroundStyle(isActive ? Color.primary : Color.secondary)
-                .tint(isActive ? keepAwakeTint : .gray)
-                .disabled(!isActive)
             }
         }
     }

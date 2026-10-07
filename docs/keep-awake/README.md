@@ -24,8 +24,9 @@ sleep is held off and the display may still sleep.
   "Turn off after" in the settings pane, so the round toggle and the `toggleKeepAwake`
   hotkey use that time from then on.
 - Below the chips, "Only while connected to power" changes the same saved option
-  as the settings pane and applies immediately. It is grayed out and disabled while
-  Keep Awake is off; its saved value is kept.
+  as the settings pane. It is always enabled, including while Keep Awake is off.
+  Changes apply immediately to an enabled session; while off, they set the
+  preference for the next session.
 
 A set time ends on a one-shot timer at the deactivation date, on the wall clock, so a
 Mac that slept past it turns Keep Awake off on waking.
