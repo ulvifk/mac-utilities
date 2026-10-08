@@ -3,18 +3,18 @@ import Combine
 import CoreAudio
 import SwiftUI
 
-final class IPhoneMicFeature: Feature, ObservableObject {
-    let identifier = "iphone-mic"
-    let displayName = "iPhone Mic"
-    let summary = "Uses your nearby iPhone as the Mac's default microphone."
+final class MicrophoneFeature: Feature, ObservableObject {
+    let identifier = "microphone"
+    let displayName = "Microphone"
+    let summary = "Chooses the Mac's default microphone from connected audio inputs."
     let iconSymbolName = "mic.fill"
     let iconGradient = Gradient(colors: [.cyan, .blue])
 
     private let audioInput: AudioInput
 
-    @Published private var inputDevices: [AudioInputDevice] = []
+    @Published private(set) var inputDevices: [AudioInputDevice] = []
     @Published private var defaultInputDeviceID = AudioDeviceID(kAudioObjectUnknown)
-    @Published private var session: IPhoneMicSession?
+    @Published private var session: MicrophoneSession?
     @Published private var errorMessage: String?
     @Published private var transition: Task<Void, Never>?
 
@@ -36,7 +36,7 @@ final class IPhoneMicFeature: Feature, ObservableObject {
 
     func stop() {
         isEnabled = false
-        changeInput(useIPhone: false)
+        changeInput(to: nil)
     }
 
     @MainActor func prepareForTermination() async {
@@ -50,53 +50,56 @@ final class IPhoneMicFeature: Feature, ObservableObject {
     }
 
     func buildSettingsSections() -> AnyView {
-        return AnyView(IPhoneMicSettingsView(feature: self))
+        return AnyView(MicrophoneSettingsView(feature: self))
     }
 
     func buildPopoverTile() -> AnyView? {
-        return AnyView(IPhoneMicTile(feature: self))
+        return AnyView(MicrophoneTile(feature: self))
     }
 
-    func toggle() {
-        if isTerminating { return }
-        changeInput(useIPhone: session == nil)
+    func selectInput(_ uid: String) {
+        if !canSelect { return }
+        changeInput(to: uid)
+    }
+
+    func restorePreviousInput() {
+        if !canRestore { return }
+        changeInput(to: nil)
     }
 
     var defaultInput: AudioInputDevice? {
         return inputDevices.first { $0.id == defaultInputDeviceID }
     }
 
-    var isIPhoneSelected: Bool {
-        return defaultInput?.isIPhone == true
+    var isActive: Bool {
+        return session != nil
     }
 
-    var canToggle: Bool {
+    var canSelect: Bool {
+        if !isEnabled { return false }
         if isTerminating { return false }
         if transition != nil { return false }
-        if session != nil { return true }
-        if isIPhoneSelected { return false }
-        return iPhone != nil
+        return !inputDevices.isEmpty
+    }
+
+    var canRestore: Bool {
+        if !canSelect { return false }
+        return isActive
     }
 
     var statusText: String {
         if transition != nil { return "Switching microphone…" }
         if let errorMessage { return errorMessage }
-        if let session { return "Using \(session.iPhone.name)" }
-        if isIPhoneSelected { return "iPhone already selected" }
-        guard let iPhone else { return "No iPhone available" }
-        return "Ready · \(iPhone.name)"
+        guard let defaultInput else { return "No microphone selected" }
+        return "Using \(defaultInput.name)"
     }
 
-    private var iPhone: AudioInputDevice? {
-        return inputDevices.first { $0.isIPhone }
-    }
-
-    private func changeInput(useIPhone: Bool) {
+    private func changeInput(to uid: String?) {
         if transition != nil { return }
 
         transition = Task { @MainActor in
-            if useIPhone {
-                await turnOn()
+            if let uid {
+                await selectInputDevice(uid)
                 if !isEnabled { await turnOff() }
             } else {
                 await turnOff()
@@ -107,21 +110,27 @@ final class IPhoneMicFeature: Feature, ObservableObject {
         }
     }
 
-    @MainActor private func turnOn() async {
+    @MainActor private func selectInputDevice(_ uid: String) async {
         refresh()
         errorMessage = nil
 
-        guard let iPhone else { return }
-        if isIPhoneSelected { return }
+        guard let input = inputDevices.first(where: { $0.uid == uid }) else { return }
+        if defaultInput?.uid == uid { return }
 
-        let previousInputUID = defaultInput?.uid
-        let status = await audioInput.setDefaultInputDevice(iPhone.id)
+        let previousInputUID: String?
+        if let session {
+            previousInputUID = session.previousInputUID
+        } else {
+            previousInputUID = defaultInput?.uid
+        }
+
+        let status = await audioInput.setDefaultInputDevice(input.id)
         if status != noErr {
-            errorMessage = "Couldn't select iPhone microphone (error \(status))."
+            errorMessage = "Couldn't select microphone (error \(status))."
             return
         }
 
-        session = IPhoneMicSession(iPhone: iPhone, previousInputUID: previousInputUID)
+        session = MicrophoneSession(selectedInputUID: uid, previousInputUID: previousInputUID)
         refresh()
     }
 
@@ -131,11 +140,11 @@ final class IPhoneMicFeature: Feature, ObservableObject {
 
         guard let session else { return }
         guard let previousInputUID = session.previousInputUID else {
-            errorMessage = "No previous microphone to restore. Choose another input in Sound settings."
+            errorMessage = "No previous microphone to restore. Choose another input."
             return
         }
         guard let restoredInput = inputDevices.first(where: { $0.uid == previousInputUID }) else {
-            errorMessage = "Previous microphone disconnected. Choose another input in Sound settings."
+            errorMessage = "Previous microphone disconnected. Choose another input."
             return
         }
 
@@ -154,7 +163,7 @@ final class IPhoneMicFeature: Feature, ObservableObject {
         defaultInputDeviceID = audioInput.getDefaultInputDeviceID()
 
         guard let session else { return }
-        if defaultInput?.uid == session.iPhone.uid { return }
+        if defaultInput?.uid == session.selectedInputUID { return }
         self.session = nil
         errorMessage = nil
     }

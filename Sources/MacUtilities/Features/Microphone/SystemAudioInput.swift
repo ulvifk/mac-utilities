@@ -151,18 +151,10 @@ final class SystemAudioInput: AudioInput {
         let isAlive = getUInt32Property(kAudioDevicePropertyDeviceIsAlive, of: id)
         if isAlive != 1 { return nil }
 
-        guard let transport = getUInt32Property(kAudioDevicePropertyTransportType, of: id) else { return nil }
         guard let uid = getStringProperty(kAudioDevicePropertyDeviceUID, of: id) else { return nil }
         guard let name = getStringProperty(kAudioObjectPropertyName, of: id) else { return nil }
 
-        let isIPhone: Bool
-        switch transport {
-        case kAudioDeviceTransportTypeContinuityCaptureWired, kAudioDeviceTransportTypeContinuityCaptureWireless:
-            isIPhone = true
-        default:
-            isIPhone = false
-        }
-        return AudioInputDevice(id: id, uid: uid, name: name, isIPhone: isIPhone)
+        return AudioInputDevice(id: id, uid: uid, name: name)
     }
 
     private func getUInt32Property(_ selector: AudioObjectPropertySelector, of id: AudioObjectID) -> UInt32? {
