@@ -3,6 +3,7 @@ import CoreAudio
 @main
 struct SystemAudioInputChecks {
     @MainActor static func main() async {
+        checkAvailableInputDevices()
         await checkDeviceListNotificationKeepsWaiting()
         await checkInterruptedSelection(currentDeviceID: 30)
         await checkInterruptedSelection(currentDeviceID: 10)
@@ -10,6 +11,20 @@ struct SystemAudioInputChecks {
         await checkStopObservingKeepsPendingListener()
         await checkRejectedSetterCompletesChange()
         await checkAlreadySelectedInputNeedsNoNotification()
+    }
+
+    @MainActor private static func checkAvailableInputDevices() {
+        audioHardware.reset()
+        audioHardware.devices = [10, 20, 30, 40, 50, 60]
+        audioHardware.outputOnlyDeviceIDs = [50]
+        audioHardware.inactiveDeviceIDs = [60]
+        let input = SystemAudioInput()
+
+        let devices = input.getInputDevices()
+        precondition(devices.map { $0.id } == [10, 20, 30, 40])
+        precondition(devices.map { $0.uid } == ["input-10", "input-20", "input-30", "input-40"])
+        precondition(devices.map { $0.name } == ["input-10", "input-20", "input-30", "input-40"])
+        print("PASS adapter/all-live-inputs-without-transport-filter")
     }
 
     @MainActor private static func checkDeviceListNotificationKeepsWaiting() async {

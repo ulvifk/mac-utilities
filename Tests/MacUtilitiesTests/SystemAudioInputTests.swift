@@ -13,9 +13,9 @@ struct SystemAudioInputTests {
         defer { try! FileManager.default.removeItem(at: temporaryDirectory) }
 
         let sources = [
-            "Sources/MacUtilities/Features/IPhoneMic/AudioInput.swift",
-            "Sources/MacUtilities/Features/IPhoneMic/AudioInputDevice.swift",
-            "Sources/MacUtilities/Features/IPhoneMic/SystemAudioInput.swift",
+            "Sources/MacUtilities/Features/Microphone/AudioInput.swift",
+            "Sources/MacUtilities/Features/Microphone/AudioInputDevice.swift",
+            "Sources/MacUtilities/Features/Microphone/SystemAudioInput.swift",
             "Tests/MacUtilitiesTests/Fixtures/SystemAudioInput/FakeAudioHardware.swift",
             "Tests/MacUtilitiesTests/Fixtures/SystemAudioInput/main.swift",
         ]
@@ -38,7 +38,7 @@ struct SystemAudioInputTests {
         let runnerStatus = try run(runner, writingOutputTo: runnerOutput)
         let output = try String(contentsOf: runnerOutput, encoding: .utf8)
         #expect(runnerStatus == 0, "\(output)")
-        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 7, "\(output)")
+        #expect(output.split(separator: "\n").filter { $0.hasPrefix("PASS ") }.count == 8, "\(output)")
     }
 
     private func run(_ process: Process, writingOutputTo output: URL) throws -> Int32 {

@@ -5,6 +5,8 @@ let audioHardware = FakeAudioHardware()
 
 final class FakeAudioHardware {
     var devices: [AudioDeviceID] = [10, 20, 30]
+    var outputOnlyDeviceIDs: [AudioDeviceID] = []
+    var inactiveDeviceIDs: [AudioDeviceID] = []
     var currentDeviceID: AudioDeviceID = 10
     var requestedDeviceID: AudioDeviceID?
     var setterStatus: OSStatus = noErr
@@ -12,6 +14,8 @@ final class FakeAudioHardware {
 
     func reset() {
         devices = [10, 20, 30]
+        outputOnlyDeviceIDs = []
+        inactiveDeviceIDs = []
         currentDeviceID = 10
         requestedDeviceID = nil
         setterStatus = noErr
@@ -36,7 +40,7 @@ func AudioObjectGetPropertyDataSize(
     case kAudioHardwarePropertyDevices:
         size.pointee = UInt32(audioHardware.devices.count * MemoryLayout<AudioDeviceID>.size)
     case kAudioDevicePropertyStreams:
-        size.pointee = UInt32(MemoryLayout<UInt32>.size)
+        size.pointee = audioHardware.outputOnlyDeviceIDs.contains(id) ? 0 : UInt32(MemoryLayout<UInt32>.size)
     default:
         preconditionFailure("Unexpected size query")
     }
@@ -56,10 +60,7 @@ func AudioObjectGetPropertyData(
     case kAudioHardwarePropertyDefaultInputDevice:
         data.assumingMemoryBound(to: UInt32.self).pointee = audioHardware.currentDeviceID
     case kAudioDevicePropertyDeviceIsAlive:
-        data.assumingMemoryBound(to: UInt32.self).pointee = 1
-    case kAudioDevicePropertyTransportType:
-        let transport = id == 20 ? kAudioDeviceTransportTypeContinuityCaptureWireless : kAudioDeviceTransportTypeBuiltIn
-        data.assumingMemoryBound(to: UInt32.self).pointee = transport
+        data.assumingMemoryBound(to: UInt32.self).pointee = audioHardware.inactiveDeviceIDs.contains(id) ? 0 : 1
     case kAudioDevicePropertyDeviceUID, kAudioObjectPropertyName:
         let value = "input-\(id)" as CFString
         data.assumingMemoryBound(to: Unmanaged<CFString>?.self).pointee = .passRetained(value)

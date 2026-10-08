@@ -71,13 +71,14 @@ records combos, shows them as keycaps, picks apps with their icons and warns abo
 taken keys. See [docs/hotkeys](docs/hotkeys/README.md) for the file format and the
 actions.
 
-### iphone-mic
+### microphone
 
-An iPhone Mic tile that selects a nearby iPhone's Continuity Camera microphone as
-the Mac's default audio input over Wi-Fi or USB. Turning it off, disabling the
-feature or quitting restores the previous microphone while it is available.
-Settings shows the current input and connection instructions. See
-[docs/iphone-mic](docs/iphone-mic/README.md) for setup and behavior.
+A Microphone tile and settings selector that choose any connected audio input as
+the Mac's default: built-in, USB, Bluetooth or iPhone. The controls show the current
+microphone and update when devices or the system default change. Restore the
+previous input from the tile or settings; disabling the feature or quitting also
+restores it while it is available. See
+[docs/microphone](docs/microphone/README.md) for selection and restoration behavior.
 
 ## Install
 

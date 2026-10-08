@@ -4,5 +4,4 @@ struct AudioInputDevice: Equatable {
     let id: AudioDeviceID
     let uid: String
     let name: String
-    let isIPhone: Bool
 }
