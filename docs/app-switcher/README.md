@@ -168,36 +168,34 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 ## Code
 
 `Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
-keys and keeps the candidates, the listed windows and the selection;
-its switcher and preview sessions keep delayed opening, filtering, feedback and
-thumbnail deliveries with the panel that requested them;
-`AppSwitcherSettingsView` holds the sections of the settings pane, listing the apps
-`RunningRegularApps` keeps current and drawing the shortcuts with the shared
-`KeycapsView`; `SwitcherPreviewStore` holds the transient preview checkbox and selected
-mode. `SettingsWindow` and `SettingsSplitViewController` report pane visibility through
-`Feature.settingsWindowChanged`, including close, minimize, sidebar and geometry changes;
-`SwitcherPanel` draws the glass panel from a `SwitcherState` using
-`SwitcherLayout`, which places the content of a `SwitcherContentView` from the top down
-so it stays in place while the hint band grows in, `IconCellView` or `WindowCellView`
-(both `SwitcherCellView`s), `WhitelistBadgeView` and `HintBandView`, which shows the
-`ShortcutHint`s and, for a moment after a shortcut, its `SwitcherFeedback`, with the
-sizes and colours in `SwitcherMetrics` and the ones that differ between icon and window
-cells in `SwitcherCellMetrics`;
-`AppWindows.swift` lists an app's windows as `AppWindow`s through the accessibility
-API, which also raises them, and `WindowThumbnails.swift` captures their thumbnails
-with ScreenCaptureKit; one `GlassStore` each for the app and window panels and their
-cards keeps a look and darkness in UserDefaults, each set in a `GlassSettingsRow`.
-`SwitcherCardView` draws the shared card fill and selection border, and
-`SwitcherCardStore` keeps each list's cards switch; `SwitcherAppearanceStore` saves
-the hidden-app dimming preference; `WhitelistStore` keeps the filter switch
-and the whitelist in UserDefaults and publishes changes to the pane; `BatchQuitStore`
-keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
-either list; `BatchQuitTile` is the popover tile, its feedback held in a
-`BatchQuitTileState`; `PanelWidthStore` keeps the dragged panel width,
-`ResizeHandleView` is the strip along each side edge that takes the drag and
+keys and keeps the candidates, the listed windows and the selection; its switcher and
+preview sessions keep delayed opening, filtering, feedback and thumbnail deliveries with
+the panel that requested them; `AppSwitcherSettingsView` holds the sections of the
+settings pane, listing the apps `RunningRegularApps` keeps current and drawing the
+shortcuts with the shared `KeycapsView`; `SwitcherPreviewStore` holds the transient
+preview checkbox and selected mode. `SettingsWindow` and `SettingsSplitViewController`
+report pane visibility through `Feature.settingsWindowChanged`, including close,
+minimize, sidebar and geometry changes; `SwitcherPanel` draws the glass panel from a
+`SwitcherState` using `SwitcherLayout`, which places the content of a
+`SwitcherContentView` from the top down so it stays in place while the hint band grows
+in, `IconCellView` or `WindowCellView` (both `SwitcherCellView`s), `WhitelistBadgeView`
+and `HintBandView`, which shows the `ShortcutHint`s and, for a moment after a shortcut,
+its `SwitcherFeedback`, with the sizes and colours in `SwitcherMetrics` and the ones
+that differ between icon and window cells in `SwitcherCellMetrics`; `AppWindows.swift`
+lists an app's windows as `AppWindow`s through the accessibility API, which also raises
+them, and `WindowThumbnails.swift` captures their thumbnails with ScreenCaptureKit; one
+`GlassStore` each for the app and window panels and their cards keeps a look and
+darkness in UserDefaults, each set in a `GlassSettingsRow`. `SwitcherCardView` draws the
+shared card fill and selection border, and `SwitcherCardStore` keeps each list's cards
+switch; `SwitcherAppearanceStore` saves the hidden-app dimming preference;
+`WhitelistStore` keeps the filter switch and the whitelist in UserDefaults and publishes
+changes to the pane; `BatchQuitStore` keeps the Batch Quit list and its mode the same
+way, and an `AppListPicker` edits either list; `BatchQuitTile` is the popover tile, its
+feedback held in a `BatchQuitTileState`; `PanelWidthStore` keeps the dragged panel
+width, `ResizeHandleView` is the strip along each side edge that takes the drag and
 `BackgroundCursor.swift` lets the panel show the resize cursor while the app is
-inactive; `RecentAppsTracker` and
-`RunningApps` provide the most-recently-used order and the windowed apps.
+inactive; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order and
+the windowed apps.
 
 ## Dev
 

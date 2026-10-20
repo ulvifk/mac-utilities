@@ -12,7 +12,7 @@ let popoverAppIconSize: CGFloat = 42
 let popoverAppIconMargin = (popoverAppIconSize - roundButtonDiameter) / 2
 /// Tile subtitles and the header's status line.
 let secondaryLineFont = Font.system(size: 11)
-/// A toggle filling or a chip being picked.
+/// A round button filling or a chip being picked.
 let popoverStateAnimation = Animation.easeOut(duration: 0.15)
 
 let tileSpacing: CGFloat = 8
