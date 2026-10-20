@@ -17,20 +17,22 @@ func isBatchQuittable(_ app: NSRunningApplication) -> Bool {
 }
 
 /// A normal quit, so an app with unsaved changes shows its dialog and stays running. The switcher itself is an accessory app, never a regular one.
+/// The quit apps' background jobs are removed once they have exited, so none stays in the Dock as running in the background.
 /// Returns how many apps were asked to quit.
 @discardableResult
 func runBatchQuit(_ batchQuitStore: BatchQuitStore) -> Int {
-    var quitCount = 0
+    var quitApps: [NSRunningApplication] = []
 
     for app in getRegularRunningApps() {
         guard let bundleIdentifier = app.bundleIdentifier else { continue }
         if !isBatchQuittable(app) { continue }
         if !batchQuitStore.isBatchQuitTarget(bundleIdentifier) { continue }
         app.terminate()
-        quitCount += 1
+        quitApps.append(app)
     }
 
-    return quitCount
+    removeBackgroundJobs(of: quitApps)
+    return quitApps.count
 }
 
 /// One AX round trip costs 10-20ms, so ask every app at once. Each iteration writes its own index, so no lock is needed.
