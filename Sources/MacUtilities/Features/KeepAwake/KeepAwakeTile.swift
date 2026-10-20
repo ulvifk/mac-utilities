@@ -11,14 +11,15 @@ struct KeepAwakeTile: View {
 
         PopoverTile {
             VStack(alignment: .leading, spacing: tilePadding) {
-                PopoverToggleRow(
+                PopoverRoundButtonRow(
                     title: "Keep Awake",
                     subtitle: buildSubtitle(),
                     symbolName: keepAwakeSymbolName,
                     tint: keepAwakeTint,
-                    isOn: isActive,
-                    toggle: feature.toggle
+                    isFilled: isActive,
+                    action: feature.toggle
                 )
+                .accessibilityAddTraits(.isToggle)
 
                 HStack(spacing: chipSpacing) {
                     ForEach(KeepAwakeAutoOff.allCases, id: \.self) { autoOff in

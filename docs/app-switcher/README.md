@@ -28,8 +28,9 @@ with the shortcuts below show up in each other on the spot.
 
 While the feature is on, the menu bar popover has a Batch Quit tile too, named Quit
 Listed Apps or Quit Unlisted Apps by the mode. Clicking it runs Batch Quit; for 1.2
-seconds its round toggle fills red and its subtitle says Quitting and the number of
-apps asked to quit, or No Apps to Quit, as ⇧⌘Q says it in the switcher.
+seconds its subtitle says Quitting and the number of apps asked to quit, or No Apps
+to Quit, as ⇧⌘Q says it in the switcher, and its round button fills red while some
+were.
 
 Filter off, every running app listed:
 
@@ -92,13 +93,14 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   shrinks out while the others slide together and the panel shrinks around them; the
   highlight stays on the same app, or moves to a neighbour when that was the one quit.
 - Cmd+Shift+Q while the switcher is open runs Batch Quit, the same as the settings
-  button and the popover tile: it quits the running apps on the Batch Quit list, or with Quit set to
-  Unlisted apps every running regular app not on it. Shift held to cycle backward
-  makes a Q press a Batch Quit too, not a Cmd+Q. The list is saved apart from the
-  whitelist, which plays no part: an app can be on both or neither. An empty list
-  quits nothing, or everything in the second mode. Finder is never offered for the
-  list nor quit. Each app gets a normal quit, so one with unsaved changes shows its
-  dialog and stays listed until it has quit; the others leave the list as they quit.
+  button and the popover tile: it quits the running apps on the Batch Quit list, or
+  with Quit set to Unlisted apps every running regular app not on it. Shift held to
+  cycle backward makes a Q press a Batch Quit too, not a Cmd+Q. The list is saved
+  apart from the whitelist, which plays no part: an app can be on both or neither. An
+  empty list quits nothing, or everything in the second mode. Finder is never offered
+  for the list nor quit. Each app gets a normal quit, so one with unsaved changes
+  shows its dialog and stays listed until it has quit; the others leave the list as
+  they quit.
 - Cmd+H while the switcher is open hides the selected app; it stays listed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything, including when pressed before
@@ -191,9 +193,10 @@ the hidden-app dimming preference; `WhitelistStore` keeps the filter switch
 and the whitelist in UserDefaults and publishes changes to the pane; `BatchQuitStore`
 keeps the Batch Quit list and its mode the same way, and an `AppListPicker` edits
 either list; `BatchQuitTile` is the popover tile, its feedback held in a
-`BatchQuitTileState`; `PanelWidthStore` keeps the dragged panel width, `ResizeHandleView` is
-the strip along each side edge that takes the drag and `BackgroundCursor.swift` lets
-the panel show the resize cursor while the app is inactive; `RecentAppsTracker` and
+`BatchQuitTileState`; `PanelWidthStore` keeps the dragged panel width,
+`ResizeHandleView` is the strip along each side edge that takes the drag and
+`BackgroundCursor.swift` lets the panel show the resize cursor while the app is
+inactive; `RecentAppsTracker` and
 `RunningApps` provide the most-recently-used order and the windowed apps.
 
 ## Dev
