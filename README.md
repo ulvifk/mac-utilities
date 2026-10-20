@@ -12,7 +12,8 @@ Liquid Glass. Its header, beside the app icon, says whether the shortcuts are li
 indigo one, or "Shortcuts off — see Settings" by an orange one while the event tap is
 not running. Below it sit rounded tiles, each with a round toggle filled with a colour
 while on: Pause Shortcuts, which lets every key press through untouched until it is
-toggled off again, then the tiles of the enabled features, such as Keep Awake.
+toggled off again, then the tiles of the enabled features, such as Keep Awake or the
+App Switcher's Batch Quit.
 Settings… (Cmd+,) opens the settings window, on General while the shortcuts are off,
 and Quit (Cmd+Q) quits.
 
@@ -177,8 +178,8 @@ stored under), a `displayName`, a one-sentence `summary`, an `iconSymbolName` an
 `iconGradient` for its icon tile in the settings window, `start()`, `stop()`,
 `handle(type:event:) -> Bool`, `buildSettingsSections() -> AnyView`, the sections of
 its settings pane below the header, and `buildPopoverTile() -> AnyView?`, its tile in
-the menu bar popover while it is enabled, nil for most; a tile observes its feature
-and keeps itself current. The popover lists the tiles in the features' order. The
+the menu bar popover while it is enabled, nil for a feature without one; a tile
+observes its feature or the stores it shows and keeps itself current. The popover lists the tiles in the features' order. The
 core tap hands every key press and modifier change to the enabled features in order;
 the first one returning `true` swallows the event. Enabled features are stopped when
 the app quits.

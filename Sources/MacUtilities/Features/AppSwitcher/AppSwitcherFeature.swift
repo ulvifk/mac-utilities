@@ -130,7 +130,7 @@ final class AppSwitcherFeature: Feature {
     }
 
     func buildPopoverTile() -> AnyView? {
-        return nil
+        return AnyView(BatchQuitTile(batchQuitStore: batchQuitStore))
     }
 
     private func runSmokeTestIfRequested() {
