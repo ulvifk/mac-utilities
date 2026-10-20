@@ -27,9 +27,9 @@ struct MenuBarPopoverView: View {
         .frame(width: popoverWidth)
     }
 
-    /// The app icon's body lines up with the round toggles below it, and the title with theirs.
+    /// The app icon's body lines up with the round buttons below it, and the title with theirs.
     private func buildHeader() -> some View {
-        return HStack(spacing: roundToggleSpacing - popoverAppIconMargin) {
+        return HStack(spacing: roundButtonSpacing - popoverAppIconMargin) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .frame(width: popoverAppIconSize, height: popoverAppIconSize)
@@ -51,14 +51,15 @@ struct MenuBarPopoverView: View {
 
     private func buildPauseTile() -> some View {
         return PopoverTile {
-            PopoverToggleRow(
+            PopoverRoundButtonRow(
                 title: "Pause Shortcuts",
                 subtitle: Text(controller.isPaused ? "On" : "Off"),
                 symbolName: "pause.fill",
                 tint: pauseTint,
-                isOn: controller.isPaused,
-                toggle: controller.togglePause
+                isFilled: controller.isPaused,
+                action: controller.togglePause
             )
+            .accessibilityAddTraits(.isToggle)
         }
     }
 

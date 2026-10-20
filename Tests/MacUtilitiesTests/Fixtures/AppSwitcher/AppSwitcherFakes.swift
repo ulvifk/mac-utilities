@@ -183,6 +183,12 @@ struct AppSwitcherSettingsView: View {
     var body: some View { EmptyView() }
 }
 
+struct BatchQuitTile: View {
+    let batchQuitStore: BatchQuitStore
+
+    var body: some View { EmptyView() }
+}
+
 enum AppQueries {
     static var runningApps = 0
     static var appsWithWindows = 0

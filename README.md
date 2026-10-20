@@ -10,9 +10,10 @@ Clicking the menu bar item opens a popover in the style of Control Center, drawn
 Liquid Glass. Its header, beside the app icon, says whether the shortcuts are live:
 "All shortcuts active" by a green dot, "Paused — keys pass through untouched" by an
 indigo one, or "Shortcuts off — see Settings" by an orange one while the event tap is
-not running. Below it sit rounded tiles, each with a round toggle filled with a colour
-while on: Pause Shortcuts, which lets every key press through untouched until it is
-toggled off again, then the tiles of the enabled features, such as Keep Awake.
+not running. Below it sit rounded tiles, most with a round button filled with a colour
+while its tile is on: Pause Shortcuts, which lets every key press through untouched
+until it is toggled off again, then the tiles of the enabled features, such as Keep
+Awake or the App Switcher's Batch Quit.
 Settings… (Cmd+,) opens the settings window, on General while the shortcuts are off,
 and Quit (Cmd+Q) quits.
 
@@ -161,8 +162,8 @@ Sources/MacUtilities/
                       popover, feature lifecycle, pause), the menu bar glyph, EventTap,
                       key matching, Preferences, Accessibility trust, window capture for
                       the smoke tests
-  MenuBar/            the menu bar popover, the tile and round toggle its tiles are
-                      built from, and the menu bar smoke test
+  MenuBar/            the menu bar popover, the tile and round button row its tiles
+                      are built from, and the menu bar smoke test
   Settings/           the settings window: its sidebar, the header and switch opening
                       every feature's pane, the General pane, the icon tiles and
                       keycaps the panes share, and the settings smoke test
@@ -177,11 +178,11 @@ stored under), a `displayName`, a one-sentence `summary`, an `iconSymbolName` an
 `iconGradient` for its icon tile in the settings window, `start()`, `stop()`,
 `handle(type:event:) -> Bool`, `buildSettingsSections() -> AnyView`, the sections of
 its settings pane below the header, and `buildPopoverTile() -> AnyView?`, its tile in
-the menu bar popover while it is enabled, nil for most; a tile observes its feature
-and keeps itself current. The popover lists the tiles in the features' order. The
-core tap hands every key press and modifier change to the enabled features in order;
-the first one returning `true` swallows the event. Enabled features are stopped when
-the app quits.
+the menu bar popover while it is enabled, nil for a feature without one; a tile
+observes its feature or the stores it shows and keeps itself current. The popover
+lists the tiles in the features' order. The core tap hands every key press and
+modifier change to the enabled features in order; the first one returning `true`
+swallows the event. Enabled features are stopped when the app quits.
 Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
 feature runs until it is switched off, new ones included. New features are
 registered in `main.swift`.

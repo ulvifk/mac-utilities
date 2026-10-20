@@ -22,7 +22,7 @@ protocol Feature {
     /// The sections of the feature's settings pane, below the header with its name and switch.
     func buildSettingsSections() -> AnyView
     func settingsWindowChanged(_ window: AppKit.NSWindow?)
-    /// The feature's tile in the menu bar popover while it is enabled; nil for most. The tile keeps itself current.
+    /// The feature's tile in the menu bar popover while it is enabled; nil for a feature without one. The tile keeps itself current.
     func buildPopoverTile() -> AnyView?
 }
 

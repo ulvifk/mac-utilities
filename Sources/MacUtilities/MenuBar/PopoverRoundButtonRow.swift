@@ -1,23 +1,24 @@
 import SwiftUI
 
-/// A round toggle filled with the tint while on, beside a title and a subtitle, as Control Center draws its modules. The whole row toggles.
-struct PopoverToggleRow: View {
+/// A round symbol filled with the tint while highlighted, beside a title and a subtitle, as Control Center draws its modules. The whole row is
+/// one button; a row that toggles something adds the toggle trait where it is used.
+struct PopoverRoundButtonRow: View {
     let title: String
     /// Secondary unless it brings a colour of its own.
     let subtitle: Text
     let symbolName: String
     let tint: Color
-    let isOn: Bool
-    let toggle: () -> Void
+    let isFilled: Bool
+    let action: () -> Void
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: roundToggleSpacing) {
+        Button(action: action) {
+            HStack(spacing: roundButtonSpacing) {
                 Image(systemName: symbolName)
-                    .font(roundToggleSymbolFont)
-                    .foregroundStyle(isOn ? Color.white : Color.primary)
-                    .frame(width: roundToggleDiameter, height: roundToggleDiameter)
-                    .background(Circle().fill(isOn ? tint : roundToggleOffFill))
+                    .font(roundButtonSymbolFont)
+                    .foregroundStyle(isFilled ? Color.white : Color.primary)
+                    .frame(width: roundButtonDiameter, height: roundButtonDiameter)
+                    .background(Circle().fill(isFilled ? tint : roundButtonUnfilledFill))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
@@ -36,7 +37,6 @@ struct PopoverToggleRow: View {
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityValue(subtitle)
-        .accessibilityAddTraits(.isToggle)
-        .animation(popoverStateAnimation, value: isOn)
+        .animation(popoverStateAnimation, value: isFilled)
     }
 }
