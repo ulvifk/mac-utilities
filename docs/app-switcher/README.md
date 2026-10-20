@@ -100,7 +100,15 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   empty list quits nothing, or everything in the second mode. Finder is never offered
   for the list nor quit. Each app gets a normal quit, so one with unsaved changes
   shows its dialog and stays listed until it has quit; the others leave the list as
-  they quit.
+  they quit. An app that submitted launchd jobs of its own, like an updater, would
+  stay in the Dock as running in the background after it quits. So once it has quit,
+  Batch Quit removes those jobs, the ones the Dock's Stop Running in Background
+  removes, but only after each has finished on its own: stopped, with exit status 0.
+  A job that failed may be about to be relaunched to retry, as an updater does
+  mid-install, so it is left alone. That way an update installed right after the quit
+  still finishes. It checks once a second and gives up after two minutes, so an app
+  kept open at its unsaved-changes dialog, or a job that keeps running or failing,
+  stays as it is.
 - Cmd+H while the switcher is open hides the selected app; it stays listed, and
   a second press does nothing.
 - Esc closes the switcher without activating anything, including when pressed before
@@ -195,7 +203,8 @@ feedback held in a `BatchQuitTileState`; `PanelWidthStore` keeps the dragged pan
 width, `ResizeHandleView` is the strip along each side edge that takes the drag and
 `BackgroundCursor.swift` lets the panel show the resize cursor while the app is
 inactive; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order and
-the windowed apps.
+the windowed apps, and `BackgroundJobs.swift` removes the quit apps' own launchd jobs
+after a Batch Quit, finding them with `lsappinfo` and removing them with `launchctl`.
 
 ## Dev
 
