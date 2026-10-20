@@ -32,6 +32,7 @@ func runBatchQuit(_ batchQuitStore: BatchQuitStore) -> Int {
     }
 
     removeBackgroundJobs(of: quitApps)
+
     return quitApps.count
 }
 

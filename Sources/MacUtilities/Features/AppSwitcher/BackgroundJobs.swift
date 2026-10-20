@@ -9,8 +9,9 @@ private let checkCount = 120
 /// exited app that still owns such a job in the Dock as running in the background, with Stop Running in Background in its menu.
 /// That Dock item removes the same jobs and kills the running ones; this waits instead, so an update that starts installing right
 /// after the quit finishes first:
-/// - once a second on a background queue, an app is handled once it has exited, and each of its jobs once it is not running
-/// - gives up after two minutes, leaving an app still open at its unsaved-changes dialog, or a job that keeps running, as it is
+/// - once a second on a background queue, an app is handled once it has exited, and each of its jobs once it has finished
+/// - gives up after two minutes, leaving an app still open at its unsaved-changes dialog, or a job that keeps running or failing,
+///   as it is
 func removeBackgroundJobs(of apps: [NSRunningApplication]) {
     let processIdentifiers = apps.map { $0.processIdentifier }
 
@@ -18,16 +19,15 @@ func removeBackgroundJobs(of apps: [NSRunningApplication]) {
         var waitingProcessIdentifiers = processIdentifiers
         for _ in 0..<checkCount {
             Thread.sleep(forTimeInterval: checkInterval)
-            waitingProcessIdentifiers = removeStoppedJobs(of: waitingProcessIdentifiers)
+            waitingProcessIdentifiers = removeFinishedJobs(of: waitingProcessIdentifiers)
             if waitingProcessIdentifiers.isEmpty { return }
         }
     }
 }
 
-/// Removes the jobs of the exited apps that are not running. Returns the apps to check again: the ones still running, and the ones
-/// with a job still running.
-private func removeStoppedJobs(of processIdentifiers: [pid_t]) -> [pid_t] {
-    let runningJobLabels = getRunningJobLabels()
+/// Removes the finished jobs of the exited apps. Returns the apps to check again: the ones still running, and the ones with a job
+/// not finished yet.
+private func removeFinishedJobs(of processIdentifiers: [pid_t]) -> [pid_t] {
     var waitingProcessIdentifiers: [pid_t] = []
 
     for processIdentifier in processIdentifiers {
@@ -37,10 +37,20 @@ private func removeStoppedJobs(of processIdentifiers: [pid_t]) -> [pid_t] {
         }
 
         let jobLabels = getSubmittedJobLabels(of: processIdentifier)
-        for label in jobLabels where !runningJobLabels.contains(label) {
+        if jobLabels.isEmpty { continue }
+
+        let finishedJobLabels = getFinishedJobLabels()
+        var hasUnfinishedJob = false
+
+        for label in jobLabels {
+            if !finishedJobLabels.contains(label) {
+                hasUnfinishedJob = true
+                continue
+            }
             runTool(launchctlPath, ["remove", label])
         }
-        if jobLabels.contains(where: runningJobLabels.contains) { waitingProcessIdentifiers.append(processIdentifier) }
+
+        if hasUnfinishedJob { waitingProcessIdentifiers.append(processIdentifier) }
     }
 
     return waitingProcessIdentifiers
@@ -61,14 +71,16 @@ private func getSubmittedJobLabels(of processIdentifier: pid_t) -> [String] {
     return stride(from: 1, to: quotedParts.count, by: 2).map { String(quotedParts[$0]) }
 }
 
-/// The labels of the user's launchd jobs that have a process, from launchctl list's "PID Status Label" rows, where a job
-/// without a process shows "-" as its PID.
-private func getRunningJobLabels() -> Set<String> {
+/// The labels of the user's launchd jobs that have no process and last exited with status 0, from launchctl list's
+/// "PID Status Label" rows: "-  0  notion.id.ShipIt" counts. A job with a process is still working, and one that exited nonzero
+/// may be about to be relaunched by KeepAlive to retry, as ShipIt does mid-install.
+private func getFinishedJobLabels() -> Set<String> {
     var labels = Set<String>()
 
     for row in runTool(launchctlPath, ["list"]).split(separator: "\n").dropFirst() {
         let columns = row.split(separator: "\t")
-        if columns[0] == "-" { continue }
+        if columns[0] != "-" { continue }
+        if columns[1] != "0" { continue }
         labels.insert(String(columns[2]))
     }
 
