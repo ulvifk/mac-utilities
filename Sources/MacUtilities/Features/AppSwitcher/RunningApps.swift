@@ -36,21 +36,32 @@ func runBatchQuit(_ batchQuitStore: BatchQuitStore) -> Int {
     return quitApps.count
 }
 
-/// One AX round trip costs 10-20ms, so ask every app at once. Each iteration writes its own index, so no lock is needed.
+/// The apps with a window on any Space, so the list is the same on every Space, as with the native switcher. One AX round trip costs
+/// 10-20ms, so ask every app at once. Each iteration writes its own index, so no lock is needed.
 func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication] {
+    let processesWithOpenWindows = getProcessesWithOpenWindowsOnAnySpace()
     var windowed = [Bool](repeating: false, count: apps.count)
 
     windowed.withUnsafeMutableBufferPointer { answers in
         DispatchQueue.concurrentPerform(iterations: apps.count) { index in
-            answers[index] = hasWindows(apps[index])
+            answers[index] = hasWindows(apps[index], processesWithOpenWindows: processesWithOpenWindows)
         }
     }
 
     return zip(apps, windowed).filter { $0.1 }.map { $0.0 }
 }
 
-/// Minimized windows count. The short messaging timeout keeps a hung app from stalling the event tap.
-func hasWindows(_ app: NSRunningApplication) -> Bool {
+/// An app without an open window may still have a minimized or hidden one, which only the accessibility API lists; that slower call is
+/// skipped when the window server already found one.
+private func hasWindows(_ app: NSRunningApplication, processesWithOpenWindows: Set<pid_t>) -> Bool {
+    if processesWithOpenWindows.contains(app.processIdentifier) { return true }
+
+    return hasAccessibilityWindows(app)
+}
+
+/// Whether the accessibility API lists a window: one on the current Space, or a minimized or hidden one on any Space. The short messaging
+/// timeout keeps a hung app from stalling the event tap.
+private func hasAccessibilityWindows(_ app: NSRunningApplication) -> Bool {
     let element = AXUIElementCreateApplication(app.processIdentifier)
     AXUIElementSetMessagingTimeout(element, 0.1)
 

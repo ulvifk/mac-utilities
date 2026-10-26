@@ -48,7 +48,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Up / Down arrow move the selection to the icon drawn nearest above or below it,
   wrapping between the top and bottom rows; of two equally near icons, the left one.
 - Click an icon to switch to it.
-- Apps without open windows are left out.
+- Apps without open windows are left out. Windows on every Space count, other displays'
+  and full-screen ones included, so the list is the same on every Space, as with the
+  native switcher. Switching to an app whose windows are all on another Space moves
+  there, as macOS does.
 - Hidden apps stay listed, whether they were hidden with Cmd+H here or anywhere else;
   releasing Cmd on one unhides and activates it. "Dim hidden apps" in settings defaults
   to on and gives hidden icons 40% opacity. Turn it off for normal opacity; the choice
@@ -203,8 +206,10 @@ feedback held in a `BatchQuitTileState`; `PanelWidthStore` keeps the dragged pan
 width, `ResizeHandleView` is the strip along each side edge that takes the drag and
 `BackgroundCursor.swift` lets the panel show the resize cursor while the app is
 inactive; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order and
-the windowed apps, and `BackgroundJobs.swift` removes the quit apps' own launchd jobs
-after a Batch Quit, finding them with `lsappinfo` and removing them with `launchctl`.
+the windowed apps, with `SpaceWindows.swift` asking the window server for the open
+windows on other Spaces, which the accessibility API does not see; `BackgroundJobs.swift`
+removes the quit apps' own launchd jobs after a Batch Quit, finding them with `lsappinfo`
+and removing them with `launchctl`.
 
 ## Dev
 
