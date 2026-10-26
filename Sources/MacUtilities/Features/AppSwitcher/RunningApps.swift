@@ -51,8 +51,8 @@ func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication
     return zip(apps, windowed).filter { $0.1 }.map { $0.0 }
 }
 
-/// The accessibility API also lists minimized windows and hidden apps' windows, which the window server misses, so it is asked only for an app
-/// without an open window.
+/// An app without an open window may still have a minimized or hidden one, which only the accessibility API lists; that slower call is
+/// skipped when the window server already found one.
 private func hasWindows(_ app: NSRunningApplication, processesWithOpenWindows: Set<pid_t>) -> Bool {
     if processesWithOpenWindows.contains(app.processIdentifier) { return true }
 
