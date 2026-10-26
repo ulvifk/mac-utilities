@@ -51,16 +51,16 @@ func getAppsWithWindows(_ apps: [NSRunningApplication]) -> [NSRunningApplication
     return zip(apps, windowed).filter { $0.1 }.map { $0.0 }
 }
 
-/// Minimized windows and hidden apps' windows count too. The window server misses those; the accessibility API lists them on every Space,
-/// so it is asked only for an app without an open window.
+/// The accessibility API also lists minimized windows and hidden apps' windows, which the window server misses, so it is asked only for an app
+/// without an open window.
 private func hasWindows(_ app: NSRunningApplication, processesWithOpenWindows: Set<pid_t>) -> Bool {
     if processesWithOpenWindows.contains(app.processIdentifier) { return true }
 
     return hasAccessibilityWindows(app)
 }
 
-/// The windows on the current Space, and minimized windows and hidden apps' windows on any Space. The short messaging timeout keeps a hung
-/// app from stalling the event tap.
+/// Whether the accessibility API lists a window: one on the current Space, or a minimized or hidden one on any Space. The short messaging
+/// timeout keeps a hung app from stalling the event tap.
 private func hasAccessibilityWindows(_ app: NSRunningApplication) -> Bool {
     let element = AXUIElementCreateApplication(app.processIdentifier)
     AXUIElementSetMessagingTimeout(element, 0.1)
