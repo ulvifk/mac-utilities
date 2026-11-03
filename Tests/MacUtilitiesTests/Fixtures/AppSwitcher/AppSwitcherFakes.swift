@@ -92,10 +92,11 @@ final class SwitcherPanel {
 }
 
 final class RecentAppsTracker {
-    static var apps: [NSRunningApplication] = []
+    static var apps: [NSRunningApplication] = [] // the running apps, returned by getRegularRunningApps
+    static var bundleIdentifiers: [String] = []
 
     var bundleIdentifiers: [String] {
-        return Self.apps.map { $0.bundleIdentifier! }
+        return Self.bundleIdentifiers
     }
 
     func start() {}

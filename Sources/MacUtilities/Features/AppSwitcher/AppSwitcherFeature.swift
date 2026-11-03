@@ -576,13 +576,17 @@ final class AppSwitcherFeature: Feature {
         return candidates.contains { whitelist.contains($0.bundleIdentifier!) }
     }
 
-    /// Regular running apps, most recently activated first.
+    /// Regular running apps with a window: the ones activated since the switcher started, most recent first, then the rest in the
+    /// order NSWorkspace lists them, so an app launched in the background is listed too. E.g. running [A, B, C], activated [C, A]
+    /// -> [C, A, B].
     private func getRecentRunningApps() -> [NSRunningApplication] {
         var appsByIdentifier: [String: NSRunningApplication] = [:]
+        var runningApps: [NSRunningApplication] = []
 
         for app in getRegularRunningApps() {
             guard let bundleIdentifier = app.bundleIdentifier else { continue }
             appsByIdentifier[bundleIdentifier] = app
+            runningApps.append(app)
         }
 
         var recentApps: [NSRunningApplication] = []
@@ -591,7 +595,10 @@ final class AppSwitcherFeature: Feature {
             recentApps.append(app)
         }
 
-        return getAppsWithWindows(recentApps)
+        let recentIdentifiers = Set(tracker.bundleIdentifiers)
+        let neverActivatedApps = runningApps.filter { !recentIdentifiers.contains($0.bundleIdentifier!) }
+
+        return getAppsWithWindows(recentApps + neverActivatedApps)
     }
 
     /// Remembers the dragged width and re-wraps the icons to it on the spot. A drag outliving the panel, Cmd released mid-drag, is ignored.
