@@ -71,6 +71,18 @@ an enabled session to resume on battery.
   `sudo -n /usr/bin/pmset -a disablesleep 0`, retrying every five seconds until
   successful. Deactivation stops the watchdog only after restoration succeeds.
 
+macOS decides whether a closed lid sleeps the Mac only on lid, power-source and
+display changes. When one of those ends a lid-closed session, such as unplugging
+with "Only while connected to power" on, macOS decides while `disablesleep` is still
+`1`, and restoring it does not make it decide again. So once restoring succeeds, and
+no session that keeps the lid awake follows it, the app reads `AppleClamshellState`
+from `IOPMrootDomain`. If the lid is closed and no external display is online, it
+sleeps the Mac with `IOPMSleepSystem`, as macOS would have without Keep Awake. This
+covers toggling off, the auto-off timer, unplugging and switching the feature off.
+With an external display connected, the app does not sleep the Mac; macOS keeps it in
+closed-display mode and decides again when the display is unplugged. Quit never
+sleeps the Mac, so a log out, restart or shut down cannot turn into a sleep.
+
 The power assertion, watchdog, session and coffee-cup icon remain active when
 restoration fails. The app keeps retrying even after the feature is switched off;
 if restoring sleep still fails during Quit, the watchdog takes over after exit.

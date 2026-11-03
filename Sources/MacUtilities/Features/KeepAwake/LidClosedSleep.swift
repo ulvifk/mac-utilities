@@ -1,4 +1,6 @@
+import CoreGraphics
 import Foundation
+import IOKit.pwr_mgt
 
 private let pmsetPath = "/usr/bin/pmset"
 
@@ -26,4 +28,32 @@ func launchLidClosedSleepWatchdog() -> Process {
 
     try! watchdog.run()
     return watchdog
+}
+
+/// True when macOS would sleep the Mac for its lid: the lid is closed and no external display keeps the Mac in closed-display mode.
+func isLidClosedWithoutExternalDisplay() -> Bool {
+    if !isLidClosed() { return false }
+    return !isExternalDisplayConnected()
+}
+
+func sleepMac() {
+    let powerManagement = IOPMFindPowerManagement(kIOMainPortDefault)
+    IOPMSleepSystem(powerManagement)
+    IOServiceClose(powerManagement)
+}
+
+private func isLidClosed() -> Bool {
+    let rootDomain = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+    let clamshellState = IORegistryEntryCreateCFProperty(rootDomain, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)
+    IOObjectRelease(rootDomain)
+    return clamshellState?.takeRetainedValue() as? Bool == true // Macs without a lid have no clamshell state
+}
+
+/// True when any online display is not the built-in panel, AirPlay and Sidecar displays included.
+private func isExternalDisplayConnected() -> Bool {
+    var displayCount: UInt32 = 0
+    CGGetOnlineDisplayList(0, nil, &displayCount)
+    var displays = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
+    CGGetOnlineDisplayList(displayCount, &displays, &displayCount)
+    return displays.contains { CGDisplayIsBuiltin($0) == 0 }
 }

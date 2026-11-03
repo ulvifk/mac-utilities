@@ -7,8 +7,8 @@ final class KeepAwakeSession {
     let autoOff: KeepAwakeAutoOff
     /// nil when the session runs until turned off.
     let deactivationDate: Date?
+    let keepsAwakeWithLidClosed: Bool
 
-    private let keepsAwakeWithLidClosed: Bool
     private var assertion: PowerAssertion!
     private var lidClosedSleepWatchdog: Process?
 
