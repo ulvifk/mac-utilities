@@ -81,10 +81,13 @@ least one modifier are recorded; a bare function key can still be set in the fil
 While recording, no binding fires, so a combo that is already bound can be recorded
 again; the duplicate then shows through the warning.
 
-The target is an app picker (every `.app` in `/Applications`, `/System/Applications`,
-`~/Applications` and their `Utilities` folders, with icons) for the app actions, a
-text field for the command, nothing for keep-awake. Changing the action clears the
-target.
+The target is an app picker for the app actions, a text field for the command,
+nothing for keep-awake. Changing the action clears the target. The app picker shows
+the chosen app with its icon ("Choose App" until one is chosen); clicking it opens a
+search over every `.app` in `/Applications`, `/System/Applications`,
+`~/Applications` and their `Utilities` folders. Typing narrows the list to the apps
+whose name contains the text, ignoring case; click an app, or press Return for the
+first one, to choose it.
 
 The warning says another binding has the same key ("Same shortcut as another
 hotkey", on both rows), or names the macOS use of a reserved combo: Cmd+Space
