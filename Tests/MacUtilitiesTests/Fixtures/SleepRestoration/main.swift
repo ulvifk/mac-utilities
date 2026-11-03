@@ -8,6 +8,8 @@ var watchdogLaunchCount = 0
 var watchdogTerminationCount = 0
 var commands: [PendingSleepCommand] = []
 var commandHistory: [Bool] = []
+var lidClosedWithoutExternalDisplay = false
+var sleepCount = 0
 
 final class PendingSleepCommand {
     let disabled: Bool
@@ -38,6 +40,14 @@ final class PowerAssertion {
         commandHistory.append(disabled)
         commands.append(PendingSleepCommand(disabled: disabled, continuation: continuation))
     }
+}
+
+func isLidClosedWithoutExternalDisplay() -> Bool {
+    return lidClosedWithoutExternalDisplay
+}
+
+func sleepMac() {
+    sleepCount += 1
 }
 
 func launchLidClosedSleepWatchdog() -> Process {
@@ -579,6 +589,95 @@ func require(_ condition: Bool, _ message: String) {
     require(commandHistory == [true, false], "An eligible session retried obsolete restoration")
 }
 
+@MainActor func testClosedLidSleep(lidClosedWithoutExternalDisplay closed: Bool) async {
+    lidClosedWithoutExternalDisplay = closed
+    let feature = buildFeature()
+    await activate(feature)
+    require(sleepCount == 0, "Turning on slept the Mac")
+
+    feature.toggle()
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(sleepCount == (closed ? 1 : 0), closed ? "Turning off left a closed lid awake" : "Turning off slept a Mac that macOS keeps awake")
+}
+
+@MainActor func testClosedLidSleepAfterPowerLoss() async {
+    lidClosedWithoutExternalDisplay = true
+    KeepAwakePreferences.onlyWhileConnectedToPower = true
+    let feature = buildFeature()
+    await activate(feature)
+
+    ExternalPowerSource.current.isConnected = false
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(sleepCount == 1, "Unplugging left a closed lid awake")
+}
+
+@MainActor func testClosedLidSleepAfterExpiration() async {
+    lidClosedWithoutExternalDisplay = true
+    KeepAwakePreferences.autoOff = .thirtyMinutes
+    let feature = buildFeature()
+    await activate(feature)
+
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(sleepCount == 1, "Expiring left a closed lid awake")
+}
+
+@MainActor func testClosedLidSleepAfterRestorationRetry() async {
+    lidClosedWithoutExternalDisplay = true
+    let feature = buildFeature()
+    await activate(feature)
+
+    feature.toggle()
+    await completeCommand(disabled: false, succeeds: false)
+    await waitUntil { !feature.isChangingSession }
+    require(sleepCount == 0, "A failed restoration slept the Mac with sleep still disabled")
+
+    feature.toggle()
+    await completeCommand(disabled: false)
+    await waitUntil { !feature.isChangingSession }
+    require(sleepCount == 1, "A successful retry left a closed lid awake")
+}
+
+@MainActor func testClosedLidReplacement(keepsLidAwake: Bool) async {
+    lidClosedWithoutExternalDisplay = true
+    let feature = buildFeature()
+    await activate(feature)
+
+    KeepAwakePreferences.keepsAwakeWithLidClosed = keepsLidAwake
+    feature.turnOn(for: .oneHour)
+    await completeCommand(disabled: false)
+    if keepsLidAwake { await completeCommand(disabled: true) }
+    await waitUntil { !feature.isChangingSession }
+    require(feature.session?.autoOff == .oneHour, "The replacement session did not begin")
+    require(sleepCount == (keepsLidAwake ? 0 : 1), keepsLidAwake ? "A replacement that keeps the lid awake slept the Mac" : "A replacement without the lid option left a closed lid awake")
+}
+
+@MainActor func testClosedLidIdleSleepSession() async {
+    lidClosedWithoutExternalDisplay = true
+    KeepAwakePreferences.keepsAwakeWithLidClosed = false
+    let feature = buildFeature()
+    feature.toggle()
+    await waitUntil { feature.session != nil }
+
+    feature.toggle()
+    await waitUntil { feature.session == nil && !feature.isChangingSession }
+    require(sleepCount == 0, "Ending a session that never held the lid awake slept the Mac")
+}
+
+@MainActor func testClosedLidTermination() async {
+    lidClosedWithoutExternalDisplay = true
+    let feature = buildFeature()
+    await activate(feature)
+
+    let termination = Task { await feature.prepareForTermination() }
+    await completeCommand(disabled: false)
+    await termination.value
+    require(feature.session == nil, "Termination did not restore sleep")
+    require(sleepCount == 0, "Termination slept the Mac")
+}
+
 Task { @MainActor in
     switch CommandLine.arguments[1] {
     case "session-retry": await testSessionRetry()
@@ -609,6 +708,15 @@ Task { @MainActor in
     case "power-reconnect-during-failure": await testPowerRestorationFailureRecovery(reconnectsPower: true, beforeRestoreCompletes: true)
     case "power-setting-after-failure": await testPowerRestorationFailureRecovery(reconnectsPower: false, beforeRestoreCompletes: false)
     case "power-setting-during-failure": await testPowerRestorationFailureRecovery(reconnectsPower: false, beforeRestoreCompletes: true)
+    case "closed-lid-stop": await testClosedLidSleep(lidClosedWithoutExternalDisplay: true)
+    case "open-lid-stop": await testClosedLidSleep(lidClosedWithoutExternalDisplay: false)
+    case "closed-lid-power-loss": await testClosedLidSleepAfterPowerLoss()
+    case "closed-lid-expiration": await testClosedLidSleepAfterExpiration()
+    case "closed-lid-restoration-retry": await testClosedLidSleepAfterRestorationRetry()
+    case "closed-lid-replacement": await testClosedLidReplacement(keepsLidAwake: true)
+    case "closed-lid-idle-sleep-replacement": await testClosedLidReplacement(keepsLidAwake: false)
+    case "closed-lid-idle-sleep": await testClosedLidIdleSleepSession()
+    case "closed-lid-termination": await testClosedLidTermination()
     default: fatalError("Unknown test scenario")
     }
     exit(0)
