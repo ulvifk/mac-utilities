@@ -48,6 +48,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Up / Down arrow move the selection to the icon drawn nearest above or below it,
   wrapping between the top and bottom rows; of two equally near icons, the left one.
 - Click an icon to switch to it.
+- Apps are listed most recently activated first. Apps not activated since the switcher
+  started, such as ones launched in the background or as login items, follow them.
 - Apps without open windows are left out. Windows on every Space count, other displays'
   and full-screen ones included, so the list is the same on every Space, as with the
   native switcher. Switching to an app whose windows are all on another Space moves

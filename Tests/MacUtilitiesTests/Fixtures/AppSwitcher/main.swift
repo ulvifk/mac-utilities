@@ -30,6 +30,7 @@ let scenarios = [
 func resetFixtures(itemCount: Int = 3) {
     settingsWindow.hasFocus = true
     RecentAppsTracker.apps = (0..<itemCount).map { NSRunningApplication(index: $0) }
+    RecentAppsTracker.bundleIdentifiers = RecentAppsTracker.apps.map { $0.bundleIdentifier! }
     AppWindow.windows = (0..<itemCount).map { AppWindow(windowID: CGWindowID($0)) }
     NSRunningApplication.activatedIdentifiers = []
     NSRunningApplication.quitIdentifiers = []
@@ -759,6 +760,15 @@ runScenario("preview/hide-and-unhide-refresh-icons") { feature in
         NSWorkspace.shared.notificationCenter.post(name: name, object: nil)
     }
     precondition(SwitcherPanel.updatedStates.count == 2, "Preview missed hide or unhide notification")
+}
+
+runScenario("apps/never-activated-apps-follow-recent-ones") { feature in
+    RecentAppsTracker.bundleIdentifiers = ["test.app.2", "test.app.0"]
+    press(feature, keyCode: tabKeyCode)
+    drainMainQueue()
+
+    let listed = SwitcherPanel.shownStates.last!.apps.map { $0.bundleIdentifier! }
+    precondition(listed == ["test.app.2", "test.app.0", "test.app.1"], "Expected recent apps, then never-activated ones, got \(listed)")
 }
 
 runScenario("preview/filter-changes-refresh-list") { feature in

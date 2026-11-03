@@ -1,13 +1,12 @@
 import AppKit
 
-/// Most-recently-activated bundle identifiers, front of the array is the most recent.
+/// Bundle identifiers of the apps activated since start, the frontmost one at start included; front of the array is the most recent.
+/// Apps that quit stay listed, as the switcher only reads the ones still running.
 final class RecentAppsTracker {
     private(set) var bundleIdentifiers: [String] = []
     private var observer: NSObjectProtocol?
 
     func start() {
-        bundleIdentifiers = getRegularRunningApps().compactMap { $0.bundleIdentifier }
-
         if let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
             moveToFront(frontmost)
         }
