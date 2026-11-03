@@ -45,3 +45,11 @@ private func getInstalledApps(in directory: String) -> [InstalledApp] {
 
     return apps
 }
+
+/// The apps whose name contains the search text anywhere, ignoring case, in their given order; all of them while the search text is empty.
+/// e.g. "code" over [Xcode, Visual Studio Code, Safari] -> [Xcode, Visual Studio Code]
+func getApps(in apps: [InstalledApp], withNameContaining searchText: String) -> [InstalledApp] {
+    if searchText.isEmpty { return apps }
+
+    return apps.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+}
