@@ -1,9 +1,9 @@
-import CoreGraphics
 import Foundation
-import IOKit.graphics
 import IOKit.pwr_mgt
+import os
 
 private let pmsetPath = "/usr/bin/pmset"
+private let logger = Logger(subsystem: "com.ulvifk.mac-utilities", category: "keep-awake")
 
 /// `pmset -a disablesleep`, through the sudoers line install.sh installs, so a closed lid does not sleep the machine. False when sudo refuses it.
 @discardableResult
@@ -31,36 +31,26 @@ func launchLidClosedSleepWatchdog() -> Process {
     return watchdog
 }
 
-/// True when macOS would sleep the Mac for its lid: the lid is closed and no external display keeps the Mac in closed-display mode.
-func isLidClosedWithoutExternalDisplay() -> Bool {
-    if !isLidClosed() { return false }
-    return !isExternalDisplayConnected()
+/// True when the lid is closed and macOS's own rule, AppleClamshellCausesSleep, says a closed lid sleeps the Mac. That rule is false while an external display keeps the Mac in closed-display mode on AC power or another process holds clamshell sleep off; the placeholder display WindowServer brings online when no real display is left does not count.
+func isClosedLidCausingSleep() -> Bool {
+    if !readRootDomainFlag("AppleClamshellState") { return false }
+    return readRootDomainFlag("AppleClamshellCausesSleep")
 }
 
 func sleepMac() {
     let powerManagement = IOPMFindPowerManagement(kIOMainPortDefault)
-    IOPMSleepSystem(powerManagement)
+    let result = IOPMSleepSystem(powerManagement)
     IOServiceClose(powerManagement)
+
+    if result != kIOReturnSuccess {
+        logger.error("IOPMSleepSystem failed: \(result, privacy: .public)")
+    }
 }
 
-private func isLidClosed() -> Bool {
+/// False when the property is missing, as AppleClamshellState is on Macs without a lid.
+private func readRootDomainFlag(_ key: String) -> Bool {
     let rootDomain = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
-    let clamshellState = IORegistryEntryCreateCFProperty(rootDomain, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)
+    let value = IORegistryEntryCreateCFProperty(rootDomain, key as CFString, kCFAllocatorDefault, 0)
     IOObjectRelease(rootDomain)
-    return clamshellState?.takeRetainedValue() as? Bool == true // Macs without a lid have no clamshell state
-}
-
-/// True when any online display is not the built-in panel, AirPlay and Sidecar displays included.
-private func isExternalDisplayConnected() -> Bool {
-    var displayCount: UInt32 = 0
-    CGGetOnlineDisplayList(0, nil, &displayCount)
-    var displays = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
-    CGGetOnlineDisplayList(displayCount, &displays, &displayCount)
-    return displays.contains(where: isExternalDisplay)
-}
-
-/// Skips the placeholder display WindowServer brings online when no real display is left, as with the lid closed and nothing plugged in; it is not built in and has an unknown vendor.
-private func isExternalDisplay(_ display: CGDirectDisplayID) -> Bool {
-    if CGDisplayIsBuiltin(display) != 0 { return false }
-    return CGDisplayVendorNumber(display) != kDisplayVendorIDUnknown
+    return value?.takeRetainedValue() as? Bool == true
 }

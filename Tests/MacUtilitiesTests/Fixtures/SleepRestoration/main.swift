@@ -8,7 +8,7 @@ var watchdogLaunchCount = 0
 var watchdogTerminationCount = 0
 var commands: [PendingSleepCommand] = []
 var commandHistory: [Bool] = []
-var lidClosedWithoutExternalDisplay = false
+var closedLidCausesSleep = false
 var sleepCount = 0
 
 final class PendingSleepCommand {
@@ -42,8 +42,8 @@ final class PowerAssertion {
     }
 }
 
-func isLidClosedWithoutExternalDisplay() -> Bool {
-    return lidClosedWithoutExternalDisplay
+func isClosedLidCausingSleep() -> Bool {
+    return closedLidCausesSleep
 }
 
 func sleepMac() {
@@ -589,8 +589,8 @@ func require(_ condition: Bool, _ message: String) {
     require(commandHistory == [true, false], "An eligible session retried obsolete restoration")
 }
 
-@MainActor func testClosedLidSleep(lidClosedWithoutExternalDisplay closed: Bool) async {
-    lidClosedWithoutExternalDisplay = closed
+@MainActor func testClosedLidSleep(closedLidCausesSleep closed: Bool) async {
+    closedLidCausesSleep = closed
     let feature = buildFeature()
     await activate(feature)
     require(sleepCount == 0, "Turning on slept the Mac")
@@ -602,7 +602,7 @@ func require(_ condition: Bool, _ message: String) {
 }
 
 @MainActor func testClosedLidSleepAfterPowerLoss() async {
-    lidClosedWithoutExternalDisplay = true
+    closedLidCausesSleep = true
     KeepAwakePreferences.onlyWhileConnectedToPower = true
     let feature = buildFeature()
     await activate(feature)
@@ -614,7 +614,7 @@ func require(_ condition: Bool, _ message: String) {
 }
 
 @MainActor func testClosedLidSleepAfterExpiration() async {
-    lidClosedWithoutExternalDisplay = true
+    closedLidCausesSleep = true
     KeepAwakePreferences.autoOff = .thirtyMinutes
     let feature = buildFeature()
     await activate(feature)
@@ -625,7 +625,7 @@ func require(_ condition: Bool, _ message: String) {
 }
 
 @MainActor func testClosedLidSleepAfterRestorationRetry() async {
-    lidClosedWithoutExternalDisplay = true
+    closedLidCausesSleep = true
     let feature = buildFeature()
     await activate(feature)
 
@@ -641,7 +641,7 @@ func require(_ condition: Bool, _ message: String) {
 }
 
 @MainActor func testClosedLidReplacement(keepsLidAwake: Bool) async {
-    lidClosedWithoutExternalDisplay = true
+    closedLidCausesSleep = true
     let feature = buildFeature()
     await activate(feature)
 
@@ -655,7 +655,7 @@ func require(_ condition: Bool, _ message: String) {
 }
 
 @MainActor func testClosedLidIdleSleepSession() async {
-    lidClosedWithoutExternalDisplay = true
+    closedLidCausesSleep = true
     KeepAwakePreferences.keepsAwakeWithLidClosed = false
     let feature = buildFeature()
     feature.toggle()
@@ -667,7 +667,7 @@ func require(_ condition: Bool, _ message: String) {
 }
 
 @MainActor func testClosedLidTermination() async {
-    lidClosedWithoutExternalDisplay = true
+    closedLidCausesSleep = true
     let feature = buildFeature()
     await activate(feature)
 
@@ -708,8 +708,8 @@ Task { @MainActor in
     case "power-reconnect-during-failure": await testPowerRestorationFailureRecovery(reconnectsPower: true, beforeRestoreCompletes: true)
     case "power-setting-after-failure": await testPowerRestorationFailureRecovery(reconnectsPower: false, beforeRestoreCompletes: false)
     case "power-setting-during-failure": await testPowerRestorationFailureRecovery(reconnectsPower: false, beforeRestoreCompletes: true)
-    case "closed-lid-stop": await testClosedLidSleep(lidClosedWithoutExternalDisplay: true)
-    case "open-lid-stop": await testClosedLidSleep(lidClosedWithoutExternalDisplay: false)
+    case "closed-lid-stop": await testClosedLidSleep(closedLidCausesSleep: true)
+    case "open-lid-stop": await testClosedLidSleep(closedLidCausesSleep: false)
     case "closed-lid-power-loss": await testClosedLidSleepAfterPowerLoss()
     case "closed-lid-expiration": await testClosedLidSleepAfterExpiration()
     case "closed-lid-restoration-retry": await testClosedLidSleepAfterRestorationRetry()
