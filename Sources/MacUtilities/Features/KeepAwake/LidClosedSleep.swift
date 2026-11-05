@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import IOKit.graphics
 import IOKit.pwr_mgt
 
 private let pmsetPath = "/usr/bin/pmset"
@@ -55,5 +56,11 @@ private func isExternalDisplayConnected() -> Bool {
     CGGetOnlineDisplayList(0, nil, &displayCount)
     var displays = [CGDirectDisplayID](repeating: 0, count: Int(displayCount))
     CGGetOnlineDisplayList(displayCount, &displays, &displayCount)
-    return displays.contains { CGDisplayIsBuiltin($0) == 0 }
+    return displays.contains(where: isExternalDisplay)
+}
+
+/// Skips the placeholder display WindowServer brings online when no real display is left, as with the lid closed and nothing plugged in; it is not built in and has an unknown vendor.
+private func isExternalDisplay(_ display: CGDirectDisplayID) -> Bool {
+    if CGDisplayIsBuiltin(display) != 0 { return false }
+    return CGDisplayVendorNumber(display) != kDisplayVendorIDUnknown
 }

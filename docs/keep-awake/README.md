@@ -80,7 +80,9 @@ from `IOPMrootDomain`. If the lid is closed and no external display is online, i
 sleeps the Mac with `IOPMSleepSystem`, as macOS would have without Keep Awake. This
 covers toggling off, the auto-off timer, unplugging and switching the feature off.
 With an external display connected, the app does not sleep the Mac; macOS keeps it in
-closed-display mode and decides again when the display is unplugged. Quit never
+closed-display mode and decides again when the display is unplugged. The placeholder
+display WindowServer brings online when no real display is left (vendor `unkn`) does
+not count as external. Quit never
 sleeps the Mac, so a log out, restart or shut down cannot turn into a sleep.
 
 The power assertion, watchdog, session and coffee-cup icon remain active when
