@@ -166,12 +166,12 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     /// Sleeps the Mac the way macOS would have once a session stops holding a closed lid awake.
     ///
     /// - macOS decides whether a closed lid sleeps the Mac only on lid, power-source and display changes. When one of those ends the session, for example unplugging with "Only while connected to power" on, macOS decides while sleep is still disabled, and restoring sleep does not make it decide again.
-    /// - Skipped when an external display is connected, because macOS keeps the Mac awake in closed-display mode and decides again when the display is unplugged.
+    /// - Skipped when macOS's own rule keeps a closed lid awake, such as an external display on AC power; macOS then decides again on the next display or power change.
     /// - Skipped on Quit, so a log out, restart or shut down is never turned into a sleep.
     @MainActor private func sleepIfClosedLidIsLeftAwake() {
         if isTerminating { return }
         if session?.keepsAwakeWithLidClosed == true { return }
-        if !isLidClosedWithoutExternalDisplay() { return }
+        if !isClosedLidCausingSleep() { return }
 
         sleepMac()
     }

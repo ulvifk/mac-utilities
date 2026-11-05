@@ -76,11 +76,14 @@ display changes. When one of those ends a lid-closed session, such as unplugging
 with "Only while connected to power" on, macOS decides while `disablesleep` is still
 `1`, and restoring it does not make it decide again. So once restoring succeeds, and
 no session that keeps the lid awake follows it, the app reads `AppleClamshellState`
-from `IOPMrootDomain`. If the lid is closed and no external display is online, it
-sleeps the Mac with `IOPMSleepSystem`, as macOS would have without Keep Awake. This
-covers toggling off, the auto-off timer, unplugging and switching the feature off.
-With an external display connected, the app does not sleep the Mac; macOS keeps it in
-closed-display mode and decides again when the display is unplugged. Quit never
+and `AppleClamshellCausesSleep`, macOS's own verdict on whether a closed lid sleeps,
+from `IOPMrootDomain`. If the lid is closed and that verdict is yes, it sleeps the Mac
+with `IOPMSleepSystem`, as macOS would have without Keep Awake, and logs a failed call.
+This covers toggling off, the auto-off timer, unplugging and switching the feature off.
+The verdict is no while an external display is connected on AC power; macOS keeps
+the Mac in closed-display mode and decides again on the next display or power change.
+An external display on battery does not keep the lid awake, and neither does the
+placeholder display WindowServer brings online when no real display is left. Quit never
 sleeps the Mac, so a log out, restart or shut down cannot turn into a sleep.
 
 The power assertion, watchdog, session and coffee-cup icon remain active when
