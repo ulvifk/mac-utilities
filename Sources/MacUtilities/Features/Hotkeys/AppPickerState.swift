@@ -45,8 +45,7 @@ final class AppPickerState: ObservableObject {
         isShown = true
     }
 
-    /// The pointer location, here and for Up and Down, is the pointer's screen location while the key is pressed. An unchanged text, which
-    /// the field writes back when Return commits it, records it too but keeps the highlight.
+    /// The pointer location, here and for Up and Down, is the pointer's screen location while the key is pressed.
     func changeSearchText(to newSearchText: String, pointerLocation: CGPoint) {
         pointerLocationAtKeyPress = pointerLocation
         let isSameSearch = getTrimmed(newSearchText) == getTrimmed(searchText)

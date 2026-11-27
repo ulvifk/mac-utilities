@@ -59,7 +59,10 @@ struct AppPicker: View {
     /// move the highlight, scrolling it into view, and Return chooses the highlighted app.
     private func buildSearch() -> some View {
         return VStack(spacing: 0) {
-            TextField("Search Apps", text: Binding(get: { state.searchText }, set: { state.changeSearchText(to: $0, pointerLocation: NSEvent.mouseLocation) }))
+            TextField("Search Apps", text: Binding(
+                get: { state.searchText },
+                set: { state.changeSearchText(to: $0, pointerLocation: NSEvent.mouseLocation) }
+            ))
                 .textFieldStyle(.roundedBorder)
                 .focused($isSearchFieldFocused)
                 .onKeyPress(.upArrow) {

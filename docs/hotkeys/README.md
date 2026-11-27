@@ -91,15 +91,17 @@ case and the spaces around it; text that is only spaces lists every app. While t
 text narrows the list to at least one app, one result is highlighted, the first one
 each time the text changes other than in the spaces around it. Up and Down move the
 highlight, stopping at the first and last result and scrolling it into view, and
-moving the pointer onto a row highlights it. Typing and the arrow keys put the
-highlight in the keyboard's hands until the pointer moves: a row that slides under
-the still pointer, as the keys scroll the list or the typed text changes it, does
-not take the highlight. Once the pointer moves it leads, and scrolling with the
-wheel or trackpad highlights each row that comes under it, until the next key. The
-highlight stays where the keys or the pointer last put it. Click an app, or press
-Return for the highlighted one, to choose it. With no text,
-nothing is highlighted until Down, Up or the pointer highlights a row, so Return
-does nothing until then.
+moving the pointer onto a row highlights it. Typing, Up and Down put the highlight
+in the keyboard's hands until the pointer moves onto another row: a row that slides
+under the still pointer, as the keys scroll the list or the typed text changes it,
+does not take the highlight, and neither does the pointer moving within the row it
+rests on. Scrolling with the wheel or trackpad before the pointer has moved leaves
+the highlight with the keys, even when that row scrolls out of view. Once the
+pointer moves onto another row it leads, and scrolling then highlights each row that
+comes under it, until you type or press Up or Down. The highlight stays where the
+keys or the pointer last put it. Click an app, or press Return for the highlighted
+one, to choose it. With no text, nothing is highlighted until Down, Up or the
+pointer highlights a row, so Return does nothing until then.
 
 The warning says another binding has the same key ("Same shortcut as another
 hotkey", on both rows), or names the macOS use of a reserved combo: Cmd+Space

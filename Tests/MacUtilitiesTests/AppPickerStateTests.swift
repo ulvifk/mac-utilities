@@ -173,8 +173,9 @@ struct AppPickerStateTests {
         state.show()
         state.highlightHoveredResult(at: 2, pointerLocation: CGPoint(x: 10, y: 60))
         state.moveHighlightUp(pointerLocation: restingPointer)
-        state.highlightHoveredResult(at: 2, pointerLocation: restingPointer)
-        #expect(state.highlightedIndex == 1)
+        state.moveHighlightUp(pointerLocation: restingPointer)
+        state.highlightHoveredResult(at: 1, pointerLocation: restingPointer)
+        #expect(state.highlightedIndex == 0)
     }
 
     /// As in the app: the pointer enters row 2 at its edge and comes to rest further in without a report, typing changes the results, and the
@@ -229,6 +230,23 @@ struct AppPickerStateTests {
         state.highlightHoveredResult(at: 1, pointerLocation: CGPoint(x: 10, y: 30))
         state.changeSearchText(to: "a", pointerLocation: CGPoint(x: 10, y: 30))
         #expect(state.getHighlightedApp()?.name == "Visual Studio Code")
+    }
+
+    @Test
+    func testHoverAfterThePointerMovedSidewaysHighlightsTheHoveredResult() {
+        state.show()
+        state.moveHighlightDown(pointerLocation: restingPointer)
+        state.highlightHoveredResult(at: 2, pointerLocation: CGPoint(x: 40, y: restingPointer.y))
+        #expect(state.highlightedIndex == 2)
+    }
+
+    @Test
+    func testWritingBackUnchangedTextRecordsTheRestingPointer() {
+        state.changeSearchText(to: "a", pointerLocation: restingPointer)
+        state.highlightHoveredResult(at: 1, pointerLocation: CGPoint(x: 10, y: 30))
+        state.changeSearchText(to: "a", pointerLocation: CGPoint(x: 25, y: 70))
+        state.highlightHoveredResult(at: 0, pointerLocation: CGPoint(x: 25, y: 70))
+        #expect(state.highlightedIndex == 1)
     }
 
     @Test
