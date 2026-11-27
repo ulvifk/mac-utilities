@@ -6,7 +6,7 @@ final class WindowCellView: SwitcherCellView {
     private let title = NSTextField(labelWithString: "")
 
     /// Without a card glass, cards are off.
-    convenience init(window: AppWindow, cardGlass: GlassStore?) {
+    convenience init(window: SwitcherWindow, cardGlass: GlassStore?) {
         self.init(frame: .zero)
 
         card.frame = alignToPixels(windowCardFrameInCell)

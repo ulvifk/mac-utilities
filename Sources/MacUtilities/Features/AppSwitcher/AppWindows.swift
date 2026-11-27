@@ -8,7 +8,7 @@ private let switchableSubroles: Set<String> = [kAXStandardWindowSubrole, kAXDial
 
 /// The app's windows on the current Space, minimized ones included, frontmost first as the accessibility API lists them. A timeout only
 /// holds for the element it is set on, so the app and each window get the short one: a hung app then stalls neither the listing nor the raise.
-func getWindows(of app: NSRunningApplication) -> [AppWindow] {
+func getWindows(of app: RunningApp) -> [AppWindow] {
     let element = AXUIElementCreateApplication(app.processIdentifier)
     AXUIElementSetMessagingTimeout(element, 0.1)
 
@@ -19,7 +19,7 @@ func getWindows(of app: NSRunningApplication) -> [AppWindow] {
         AXUIElementSetMessagingTimeout(windowElement, 0.1)
         if !isSwitchable(windowElement) { continue }
 
-        windows.append(AppWindow(app: app, element: windowElement, windowID: getWindowID(windowElement), title: getTitle(windowElement, app: app)))
+        windows.append(AppWindow(runningApp: app, element: windowElement, windowID: getWindowID(windowElement), title: getTitle(windowElement, app: app)))
     }
 
     return windows
@@ -31,9 +31,9 @@ private func isSwitchable(_ window: AXUIElement) -> Bool {
     return switchableSubroles.contains(subrole)
 }
 
-private func getTitle(_ window: AXUIElement, app: NSRunningApplication) -> String {
+private func getTitle(_ window: AXUIElement, app: RunningApp) -> String {
     let title = getAttribute(window, kAXTitleAttribute) as? String ?? ""
-    if title.isEmpty { return getAppName(app) }
+    if title.isEmpty { return app.name }
 
     return title
 }
