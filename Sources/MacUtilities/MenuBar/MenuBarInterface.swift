@@ -48,6 +48,11 @@ final class MenuBarInterface: NSObject, AppInterface {
         menuBarPopover.close()
     }
 
+    func openGeneralSettings() {
+        settingsWindow.showPane(generalPaneIdentifier)
+        settingsWindow.open()
+    }
+
     @objc private func toggleMenuBarPopover() {
         menuBarPopover.toggle()
     }

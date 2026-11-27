@@ -22,6 +22,8 @@ import Testing
             features: [enabled, disabled],
             preferences: buildPreferences(disabledFeatures: [disabled.identifier]),
             eventTap: eventTap,
+            loginItem: FakeLoginItem(),
+            isInstalled: false,
             interface: FakeAppInterface()
         )
     }

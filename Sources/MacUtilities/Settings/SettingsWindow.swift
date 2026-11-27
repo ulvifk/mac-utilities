@@ -57,7 +57,8 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
 
     /// General, then one pane per feature.
     private func buildPanes(controller: AppController) -> [SettingsPane] {
-        let generalView = GeneralSettingsView(controller: controller) { [unowned self] paneIdentifier in self.showPane(paneIdentifier) }
+        let generalState = GeneralSettingsState(loginItem: controller.loginItem)
+        let generalView = GeneralSettingsView(controller: controller, state: generalState) { [unowned self] paneIdentifier in self.showPane(paneIdentifier) }
         let general = SettingsPane(
             identifier: generalPaneIdentifier,
             title: "General",

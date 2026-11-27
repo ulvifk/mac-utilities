@@ -1,7 +1,7 @@
 import ServiceManagement
 import SwiftUI
 
-/// Registers the app as a login item through SMAppService; macOS lists it under General > Login Items and may hold it there for approval.
+/// Switches the app's login item on or off; macOS may hold it under Login Items for approval, which shows here with a button there.
 struct LaunchAtLoginToggle: View {
     @ObservedObject var state: GeneralSettingsState
 
@@ -19,14 +19,8 @@ struct LaunchAtLoginToggle: View {
 
     private func buildLaunchesAtLoginBinding() -> Binding<Bool> {
         return Binding(
-            get: { isLaunchingAtLogin() },
+            get: { state.loginItemStatus.isRegistered },
             set: { state.setLaunchesAtLogin($0) }
         )
-    }
-
-    private func isLaunchingAtLogin() -> Bool {
-        if state.loginItemStatus == .enabled { return true }
-        if state.loginItemStatus == .requiresApproval { return true }
-        return false
     }
 }

@@ -3,4 +3,7 @@
 /// then.
 protocol AppInterface {
     func launch(controller: AppController)
+
+    /// Brings the settings window to the front on the General pane, for something the user must act on there.
+    func openGeneralSettings()
 }

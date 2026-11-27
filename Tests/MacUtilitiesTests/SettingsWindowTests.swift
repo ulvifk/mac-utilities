@@ -11,7 +11,14 @@ struct SettingsWindowTests {
     func featurePaneReportsTheWindowToItsFeature() {
         _ = NSApplication.shared.setActivationPolicy(.prohibited)
         let feature = WindowRecordingFeature()
-        let controller = AppController(features: [feature], preferences: buildPreferences(disabledFeatures: []), eventTap: FakeEventTap(), interface: FakeAppInterface())
+        let controller = AppController(
+            features: [feature],
+            preferences: buildPreferences(disabledFeatures: []),
+            eventTap: FakeEventTap(),
+            loginItem: FakeLoginItem(),
+            isInstalled: false,
+            interface: FakeAppInterface()
+        )
         let window = SettingsWindow(controller: controller)
 
         window.showPane(feature.identifier)

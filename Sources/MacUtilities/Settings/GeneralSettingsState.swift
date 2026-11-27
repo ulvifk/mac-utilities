@@ -5,21 +5,27 @@ import ServiceManagement
 /// What the General pane shows besides the features: the Accessibility grant and the login item, both granted outside the app and so re-read on demand.
 final class GeneralSettingsState: ObservableObject {
     @Published private(set) var isAccessibilityTrusted = AXIsProcessTrusted()
-    @Published private(set) var loginItemStatus = SMAppService.mainApp.status
+    @Published private(set) var loginItemStatus: SMAppService.Status
+
+    private let loginItem: LoginItem
+
+    init(loginItem: LoginItem) {
+        self.loginItem = loginItem
+        loginItemStatus = loginItem.status
+    }
 
     func refresh() {
         isAccessibilityTrusted = AXIsProcessTrusted()
-        loginItemStatus = SMAppService.mainApp.status
+        loginItemStatus = loginItem.status
     }
 
-    /// Registering a self-signed app lands on requiresApproval until the user allows it under Login Items.
     func setLaunchesAtLogin(_ enabled: Bool) {
         if enabled {
-            try! SMAppService.mainApp.register()
+            try! loginItem.register()
         } else {
-            try! SMAppService.mainApp.unregister()
+            try! loginItem.unregister()
         }
 
-        loginItemStatus = SMAppService.mainApp.status
+        loginItemStatus = loginItem.status
     }
 }

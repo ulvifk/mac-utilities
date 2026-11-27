@@ -30,4 +30,3 @@ open "$APPS_DIR/$APP"
 
 echo "installed $APPS_DIR/$APP and $SUDOERS_FILE"
 echo "Grant Accessibility once in System Settings > Privacy & Security > Accessibility (first install only)."
-echo "Switch on 'Launch at login' in the app's Settings > General to start it at login."

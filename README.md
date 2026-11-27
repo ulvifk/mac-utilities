@@ -35,7 +35,8 @@ off across launches; the rest of its pane is faded and disabled until it is back
 
 General opens with the app's card: how many features are on, and each feature's
 icon, faded while it is off, which opens its pane when clicked. Below it are a
-"Launch at login" switch and the Accessibility grant. The event tap every shortcut
+"Launch at login" switch, on from the first launch and off for good once switched
+off, and the Accessibility grant. The event tap every shortcut
 depends on needs the grant and is only created at launch, so until it runs a warning
 card sits above them and the General row in the sidebar carries a warning badge. While
 the grant is missing, the card says no shortcut works without it and has a button to
@@ -89,12 +90,22 @@ restores it while it is available. See
 
 Builds the app, copies it to `~/Applications` and launches it. It also asks for your
 password once to install `/etc/sudoers.d/mac-utilities-pmset`, the line that lets
-keep-awake run `pmset -a disablesleep` without a prompt. Switch on "Launch at login"
-in Settings > General to have it start at login; that registers the app as a login
-item through `SMAppService`, listed under System Settings > General > Login Items.
+keep-awake run `pmset -a disablesleep` without a prompt. The app asks for
+Accessibility once on first launch.
+
+The first launch from `~/Applications` or `/Applications` also registers the app as a
+login item through `SMAppService`, listed under System Settings > General > Login
+Items. macOS holds a self-signed app there until it is allowed, so if it asks, the
+app opens Settings > General, which says "Waiting for approval under Login Items" with
+a button to that pane. The app registers itself only on that one launch: switching
+"Launch at login" off in Settings > General stays off. An install from before this
+behavior has no record of a first launch, so its next launch counts as the first one
+and registers the login item unless it is already on; switch it off once to keep it
+off. A build run from anywhere else, such as the repository folder for the smoke
+tests, never registers itself and does not count as the first launch.
 `./uninstall.sh` stops the app, restores normal sleep and removes the copy and the
 sudoers line; switch the login item off first, or remove the stale entry from Login
-Items afterwards. The app asks for Accessibility once on first launch.
+Items afterwards.
 
 ## Build
 
@@ -160,9 +171,10 @@ Sources/MacUtilities/
   main.swift          assembles the app: the preferences, the menu bar interface, the
                       features and the controller that hosts them
   Core/               the host: the Feature protocol, AppController (feature lifecycle,
-                      pause, event dispatch), the EventTap and AppInterface boundaries,
-                      the CoreGraphics tap, key matching, Preferences, Accessibility
-                      trust, window capture for the smoke tests
+                      pause, event dispatch, the first launch's login item), the
+                      EventTap, AppInterface and LoginItem boundaries, the CoreGraphics
+                      tap, key matching, Preferences, Accessibility trust, window
+                      capture for the smoke tests
   MenuBar/            the menu bar item and glyph, its popover, the tile and round
                       button row its tiles are built from, and the menu bar smoke test
   Settings/           the settings window: its sidebar, the pane selection that tells
@@ -197,7 +209,8 @@ registered in `main.swift`.
 
 The app writes to the unified log under the subsystem `com.ulvifk.mac-utilities`, with
 one category per feature: `keep-awake`, `hotkeys`, `app-switcher`, `microphone`, plus
-`core` for launch, Accessibility, the event tap and features starting and stopping.
+`core` for launch, Accessibility, the event tap, features starting and stopping and the
+first launch's login item registration.
 State changes and their causes are logged at notice level, so macOS keeps them on disk;
 failures at error level. To read the last hour:
 
@@ -228,7 +241,7 @@ compiler's default plugin path, so plain `swift test` fails to build the tests w
 Xcode; the script passes the path when it is there.
 
 The tests follow one convention: whatever reaches the operating system, such as
-CoreAudio, the event tap, UserDefaults or the menu bar, sits behind a protocol or a
+CoreAudio, the event tap, UserDefaults, the login item or the menu bar, sits behind a protocol or a
 parameter that the code receives, and `main.swift` passes the real ones. Tests build
 the code in-process with `@testable import MacUtilities` and fakes from `Tests`, so
 they never change the Mac's settings, show a window or write the app's defaults.
