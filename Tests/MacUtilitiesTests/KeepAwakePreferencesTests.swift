@@ -2,8 +2,11 @@ import Foundation
 import Testing
 @testable import MacUtilities
 
-/// Each test reads back through a second KeepAwakePreferences on its own UserDefaults instance, as the next launch would.
+/// Each test reads back through a second KeepAwakePreferences on its own UserDefaults instance, as the next launch would, and from the plist
+/// on disk under the key the app has always used.
 struct KeepAwakePreferencesTests {
+    private let powerOnlyKey = "keepAwakeOnlyWhileConnectedToPower"
+
     @Test
     func powerOptionDefaultsToOff() {
         withTestDefaults { defaults in
@@ -17,6 +20,7 @@ struct KeepAwakePreferencesTests {
             buildPreferences(defaults).setOnlyWhileConnectedToPower(true)
 
             #expect(buildPreferences(defaults).onlyWhileConnectedToPower, "A new launch did not load the enabled power option")
+            #expect(defaults.readStoredValues()[powerOnlyKey] as? Bool == true, "The enabled power option did not reach the disk")
         }
     }
 
@@ -27,6 +31,7 @@ struct KeepAwakePreferencesTests {
             buildPreferences(defaults).setOnlyWhileConnectedToPower(false)
 
             #expect(!buildPreferences(defaults).onlyWhileConnectedToPower, "A new launch did not load the disabled power option")
+            #expect(defaults.readStoredValues()[powerOnlyKey] as? Bool == false, "The disabled power option did not reach the disk")
         }
     }
 

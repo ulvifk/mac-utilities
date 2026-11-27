@@ -3,8 +3,11 @@ import Testing
 @testable import MacUtilities
 
 /// Launches the app with an enabled and a disabled feature, quits from the given context once launched, and checks both features as AppKit
-/// is about to end the process.
+/// is about to end the process, then ends it itself with checkedExitCode.
 @MainActor final class TerminationScenario: NSObject {
+    /// The process exits with this once the checks ran, so a quit that skipped them, which AppKit ends with 0, fails the test.
+    nonisolated static let checkedExitCode: Int32 = 42
+
     private let context: TerminationContext
     private let eventTap = FakeEventTap()
     private let enabled: CleanupRecordingFeature
@@ -53,6 +56,8 @@ import Testing
         #expect(disabled.didFinishCleanup, "Quit did not wait for disabled cleanup")
         #expect(enabled.eventCount == 1, "The stopped feature received events during Quit")
         #expect(disabled.eventCount == 0, "The disabled feature received events during Quit")
+
+        exit(Self.checkedExitCode)
     }
 
     private func quit() {

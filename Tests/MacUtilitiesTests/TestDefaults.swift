@@ -15,6 +15,12 @@ final class TestDefaults {
         return UserDefaults(suiteName: directory.appendingPathComponent("preferences").path)!
     }
 
+    /// What the domain holds on disk, which is what the next launch of the app would load.
+    func readStoredValues() -> [String: Any] {
+        buildUserDefaults().synchronize()
+        return NSDictionary(contentsOf: directory.appendingPathComponent("preferences.plist")) as! [String: Any]
+    }
+
     func remove() {
         try! FileManager.default.removeItem(at: directory)
     }
