@@ -23,19 +23,18 @@ final class AppSwitcherFeature: Feature {
 
     private weak var settingsWindow: NSWindow?
 
-    /// The open panel's list; nil while it is closed or opening.
-    private var switcherList: SwitcherList?
+    private var phase = SwitcherPhase.closed
     /// The shown preview's list; nil while it is hidden.
     private var previewList: SwitcherList?
     /// [window id] -> the window's latest thumbnail, kept until another app's windows are listed so reopening shows it at once
     private var thumbnails: [CGWindowID: NSImage] = [:]
 
-    private var isOpening = false
-    private var commandReleasedWhileOpening = false
-    private var pendingAdvance = 0
-    private var featureSession = 0
-    private var switcherSession = 0
-    private var previewSession = 0
+    /// Renewed when the feature stops.
+    private let featureSession = SwitcherSession()
+    /// Renewed when an opening starts and when the switcher closes.
+    private let switcherSession = SwitcherSession()
+    /// Renewed when the preview hides.
+    private let previewSession = SwitcherSession()
 
     init(workspace: SwitcherWorkspace, screen: SwitcherScreen, settings: SwitcherSettings, listLoader: SwitcherListLoader, panel: SwitcherPanel,
          previewPanel: SwitcherPanel, smokeTest: AppSwitcherSmokeTest?) {
@@ -70,7 +69,7 @@ final class AppSwitcherFeature: Feature {
     }
 
     func stop() {
-        featureSession += 1
+        featureSession.renew()
 
         workspace.stopObserving()
         previewChanges = []
@@ -85,7 +84,7 @@ final class AppSwitcherFeature: Feature {
         }
 
         if type == .flagsChanged {
-            handleFlagsChanged(event)
+            handleModifiersChanged(event.flags)
         }
 
         return false
@@ -121,17 +120,17 @@ final class AppSwitcherFeature: Feature {
             refreshPreview()
             return
         }
-        guard let switcherList else { return }
-        guard case .apps(let apps, _) = switcherList.items else { return }
+        guard case .open(let list) = phase else { return }
+        guard case .apps(let apps, _) = list.items else { return }
         guard let index = apps.firstIndex(where: { $0.processIdentifier == processIdentifier }) else { return }
 
-        removeApp(at: index, from: switcherList)
+        removeApp(at: index, from: list)
     }
 
     /// Redraws the dimming once the app is really hidden or shown, whether it was our Cmd+H or done elsewhere.
     private func redrawHiddenApps() {
-        if let switcherList {
-            panel.update(state: buildState(switcherList))
+        if case .open(let list) = phase {
+            panel.update(state: buildState(list))
         }
         if let previewList {
             previewPanel.update(state: buildState(previewList))
@@ -141,16 +140,16 @@ final class AppSwitcherFeature: Feature {
     /// The stores announce changes before making them, so the preview reads them on the next main-queue turn.
     private func observePreviewChanges(of store: some ObservableObject, reloadList: Bool = false) -> AnyCancellable {
         return store.objectWillChange
-            .map { _ in self.switcherSession }
-            .receive(on: DispatchQueue.main)
-            .sink { session in
-                if self.switcherSession != session { return }
-
-                if reloadList {
-                    self.hidePreview()
+            .map { _ in
+                self.switcherSession.guarding {
+                    if reloadList {
+                        self.hidePreview()
+                    }
+                    self.refreshPreview()
                 }
-                self.refreshPreview()
             }
+            .receive(on: DispatchQueue.main)
+            .sink { refresh in refresh() }
     }
 
     private func observeSettingsFocusChanges() -> AnyCancellable {
@@ -170,15 +169,18 @@ final class AppSwitcherFeature: Feature {
     private func handleKeyDown(_ shortcut: SwitcherShortcut?) -> Bool {
         guard let shortcut else { return false }
 
-        if let switcherList {
-            return handleShortcutWhileOpen(shortcut, list: switcherList)
+        switch phase {
+        case .closed:
+            return handleShortcutWhileClosed(shortcut)
+        case .opening(let opening):
+            return handleShortcutWhileOpening(shortcut, opening: opening)
+        case .open(let list):
+            return handleShortcutWhileOpen(shortcut, list: list)
         }
+    }
 
+    private func handleShortcutWhileClosed(_ shortcut: SwitcherShortcut) -> Bool {
         switch shortcut {
-        case .cancel:
-            if !isOpening { return false }
-            dismissSwitcher()
-            return true
         case .switchApps(let backward):
             requestOpening(listingWindows: false, backward: backward)
             return true
@@ -191,40 +193,41 @@ final class AppSwitcherFeature: Feature {
     }
 
     /// Presses arriving before the panel is up only advance the selection it opens with.
-    private func requestOpening(listingWindows: Bool, backward: Bool) {
-        let step = backward ? -1 : 1
-
-        if isOpening {
-            pendingAdvance += step
-            return
-        }
-
-        isOpening = true
-        commandReleasedWhileOpening = false
-        pendingAdvance = step
-        switcherSession += 1
-        hidePreview()
-
-        let session = switcherSession
-        DispatchQueue.main.async {
-            if self.switcherSession != session { return }
-
-            self.openSwitcher(listingWindows: listingWindows)
+    private func handleShortcutWhileOpening(_ shortcut: SwitcherShortcut, opening: SwitcherOpening) -> Bool {
+        switch shortcut {
+        case .cancel:
+            dismissSwitcher()
+            return true
+        case .switchApps(let backward), .switchWindows(let backward):
+            opening.addPress(backward: backward)
+            return true
+        default:
+            return false
         }
     }
 
-    /// The windows are the frontmost app's.
-    private func openSwitcher(listingWindows: Bool) {
-        let list = listingWindows ? loadWindowList(of: workspace.getFrontmostApp()) : listLoader.loadAppList()
-        isOpening = false
+    /// Loads the list on the next turn of the main queue.
+    private func requestOpening(listingWindows: Bool, backward: Bool) {
+        let opening = SwitcherOpening(listsWindows: listingWindows)
 
+        opening.addPress(backward: backward)
+        phase = .opening(opening)
+        switcherSession.renew()
+        hidePreview()
+
+        switcherSession.runOnNextTurn { self.open(opening) }
+    }
+
+    /// The windows are the frontmost app's.
+    private func open(_ opening: SwitcherOpening) {
+        let list = opening.listsWindows ? loadWindowList(of: workspace.getFrontmostApp()) : listLoader.loadAppList()
         if list.isEmpty {
             dismissSwitcher()
             return
         }
 
-        let selectedList = list.advancing(by: pendingAdvance)
-        if commandReleasedWhileOpening {
+        let selectedList = list.advancing(by: opening.pendingAdvance)
+        if opening.isCommandReleased {
             activateSelection(of: selectedList)
             return
         }
@@ -267,23 +270,9 @@ final class AppSwitcherFeature: Feature {
             panel.update(state: buildState(list))
             showFeedback(listed ? .addedToWhitelist : .removedFromWhitelist)
         case .toggleFilter:
-            let session = switcherSession
-            DispatchQueue.main.async {
-                if self.switcherSession != session { return }
-
-                self.toggleFilter()
-            }
+            switcherSession.runOnNextTurn { self.toggleFilter() }
         case .batchQuit:
-            let session = switcherSession
-            let activeFeatureSession = featureSession
-            DispatchQueue.main.async {
-                if self.featureSession != activeFeatureSession { return }
-
-                let quitCount = self.workspace.runBatchQuit()
-                if self.switcherSession != session { return }
-
-                self.panel.showFeedback(.quittingApps(count: quitCount))
-            }
+            runBatchQuit()
         case .quit:
             let app = list.selectedApp
             app.terminate()
@@ -304,28 +293,31 @@ final class AppSwitcherFeature: Feature {
         showFeedback(.hidden)
     }
 
+    /// On the next turn of the main queue, the quit running even if the switcher closes meanwhile; its feedback only while the switcher stays
+    /// open.
+    private func runBatchQuit() {
+        let showQuitCount = switcherSession.guarding { (quitCount: Int) in self.panel.showFeedback(.quittingApps(count: quitCount)) }
+
+        featureSession.runOnNextTurn { showQuitCount(self.workspace.runBatchQuit()) }
+    }
+
     /// On the next turn of the main queue: showing it can grow the panel, an animation the tap callback must not wait on.
     private func showFeedback(_ feedback: SwitcherFeedback) {
-        let session = switcherSession
-        DispatchQueue.main.async {
-            if self.switcherSession != session { return }
-
-            self.panel.showFeedback(feedback)
-        }
+        switcherSession.runOnNextTurn { self.panel.showFeedback(feedback) }
     }
 
     /// Releasing Cmd activates the selection; the release itself always reaches the focused app.
-    private func handleFlagsChanged(_ event: CGEvent) {
-        if event.flags.contains(.maskCommand) { return }
+    private func handleModifiersChanged(_ modifiers: CGEventFlags) {
+        if modifiers.contains(.maskCommand) { return }
 
-        if isOpening {
-            commandReleasedWhileOpening = true
+        switch phase {
+        case .closed:
             return
+        case .opening(let opening):
+            opening.releaseCommand()
+        case .open(let list):
+            activateSelection(of: list)
         }
-
-        guard let switcherList else { return }
-
-        activateSelection(of: switcherList)
     }
 
     // MARK: switching
@@ -340,21 +332,23 @@ final class AppSwitcherFeature: Feature {
     }
 
     private func activateClickedCell(_ index: Int) {
-        activateSelection(of: switcherList!.selecting(index))
+        guard case .open(let list) = phase else { return }
+
+        activateSelection(of: list.selecting(index))
     }
 
     /// Remembers the dragged width and re-wraps the cells to it on the spot. A drag outliving the panel, Cmd released mid-drag, is ignored.
     private func resizePanel(toWidth width: CGFloat) {
-        guard let switcherList else { return }
+        guard case .open(let list) = phase else { return }
 
         settings.panelWidthStore.setWidth(width)
-        let resizedList = switcherList.rewrapping(cellsPerRow: listLoader.getCellsPerRow(for: switcherList.items))
-        self.switcherList = resizedList
+        let resizedList = list.rewrapping(cellsPerRow: listLoader.getCellsPerRow(for: list.items))
+        phase = .open(resizedList)
         panel.resize(state: buildState(resizedList))
     }
 
     private func showSelection(_ list: SwitcherList) {
-        switcherList = list
+        phase = .open(list)
         panel.update(state: buildState(list))
     }
 
@@ -366,13 +360,15 @@ final class AppSwitcherFeature: Feature {
             return
         }
 
-        switcherList = remainingList
+        phase = .open(remainingList)
         panel.removeApp(at: index, state: buildState(remainingList))
     }
 
     /// Keeps the selected app selected when it is still listed.
     private func toggleFilter() {
-        let selectedIdentifier = switcherList!.selectedApp.bundleIdentifier
+        guard case .open(let openList) = phase else { return }
+
+        let selectedIdentifier = openList.selectedApp.bundleIdentifier
         let whitelistStore = settings.whitelistStore
 
         whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
@@ -383,7 +379,7 @@ final class AppSwitcherFeature: Feature {
         }
 
         let selectedList = list.selectingApp(bundleIdentifier: selectedIdentifier)
-        switcherList = selectedList
+        phase = .open(selectedList)
         panel.show(state: buildState(selectedList), glassStore: settings.getGlassStore(listingWindows: false))
         panel.showFeedback(getFilterFeedback(selectedList))
     }
@@ -397,7 +393,7 @@ final class AppSwitcherFeature: Feature {
 
     /// Windows show their last thumbnail, or their app's icon, until a fresh one comes in.
     private func showSwitcher(_ list: SwitcherList) {
-        switcherList = list
+        phase = .open(list)
         panel.show(state: buildState(list), glassStore: settings.getGlassStore(listingWindows: list.isListingWindows))
         panel.showHintsAfterDelay()
         refreshThumbnails(of: list, inPreview: false)
@@ -408,17 +404,18 @@ final class AppSwitcherFeature: Feature {
         guard case .windows(let windows) = list.items else { return }
 
         let session = inPreview ? previewSession : switcherSession
-        screen.captureThumbnails(of: windows.map { $0.windowID }) { windowID, thumbnail in
-            let currentSession = inPreview ? self.previewSession : self.switcherSession
-            if currentSession != session { return }
-
+        let showThumbnail = session.guarding { (windowID: CGWindowID, thumbnail: NSImage) in
             self.thumbnails[windowID] = thumbnail
             if inPreview {
                 self.previewPanel.update(state: self.buildState(self.previewList!))
-            } else {
-                self.panel.update(state: self.buildState(self.switcherList!))
+                return
             }
+            guard case .open(let list) = self.phase else { return }
+
+            self.panel.update(state: self.buildState(list))
         }
+
+        screen.captureThumbnails(of: windows.map { $0.windowID }) { windowID, thumbnail in showThumbnail((windowID, thumbnail)) }
     }
 
     private func buildState(_ list: SwitcherList) -> SwitcherState {
@@ -430,12 +427,7 @@ final class AppSwitcherFeature: Feature {
         switch list.items {
         case .windows(let windows):
             let window = windows[list.selectedIndex]
-            let session = featureSession
-            DispatchQueue.main.async {
-                if self.featureSession != session { return }
-
-                window.bringToFront()
-            }
+            featureSession.runOnNextTurn { window.bringToFront() }
 
             // Dismissal queues preview restoration after the window raise.
             dismissSwitcher()
@@ -445,18 +437,13 @@ final class AppSwitcherFeature: Feature {
         }
     }
 
+    /// Queues the preview's return.
     private func dismissSwitcher() {
-        switcherSession += 1
-        isOpening = false
-        switcherList = nil
+        switcherSession.renew()
+        phase = .closed
         panel.hide()
 
-        let session = switcherSession
-        DispatchQueue.main.async {
-            if self.switcherSession != session { return }
-
-            self.refreshPreview()
-        }
+        switcherSession.runOnNextTurn { self.refreshPreview() }
     }
 
     // MARK: preview
@@ -472,8 +459,7 @@ final class AppSwitcherFeature: Feature {
             hidePreview()
             return
         }
-        if switcherList != nil { return }
-        if isOpening { return }
+        guard case .closed = phase else { return }
 
         let listingWindows = settings.previewStore.isListingWindows
 
@@ -501,7 +487,7 @@ final class AppSwitcherFeature: Feature {
     }
 
     private func hidePreview() {
-        previewSession += 1
+        previewSession.renew()
         previewList = nil
         previewPanel.hide()
     }
