@@ -21,7 +21,7 @@ final class MicrophoneFeature: Feature, ObservableObject {
     private var isEnabled = false
     private var isTerminating = false
 
-    init(audioInput: AudioInput = SystemAudioInput()) {
+    init(audioInput: AudioInput) {
         self.audioInput = audioInput
     }
 

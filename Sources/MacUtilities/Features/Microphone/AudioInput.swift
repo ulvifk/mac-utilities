@@ -1,5 +1,6 @@
 import CoreAudio
 
+/// The Mac's audio inputs and its default input, as MicrophoneFeature uses them.
 protocol AudioInput {
     func getInputDevices() -> [AudioInputDevice]
     func getDefaultInputDeviceID() -> AudioDeviceID

@@ -9,7 +9,7 @@ let controller: AppController = AppController(features: [
         if !controller.isFeatureEnabled(keepAwake) { return }
         keepAwake.toggle()
     }),
-    MicrophoneFeature(),
+    MicrophoneFeature(audioInput: SystemAudioInput(hardware: SystemAudioHardware())),
 ])
 
 application.setActivationPolicy(.accessory)
