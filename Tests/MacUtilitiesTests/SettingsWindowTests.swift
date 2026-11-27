@@ -11,15 +11,16 @@ struct SettingsWindowTests {
     func featurePaneReportsTheWindowToItsFeature() {
         _ = NSApplication.shared.setActivationPolicy(.prohibited)
         let feature = WindowRecordingFeature()
+        let loginItem = FakeLoginItem()
         let controller = AppController(
             features: [feature],
             preferences: buildPreferences(disabledFeatures: []),
             eventTap: FakeEventTap(),
-            loginItem: FakeLoginItem(),
+            loginItem: loginItem,
             isInstalled: false,
-            interface: FakeAppInterface()
+            interface: FakeAppInterface(loginItem: loginItem)
         )
-        let window = SettingsWindow(controller: controller)
+        let window = SettingsWindow(controller: controller, loginItem: loginItem)
 
         window.showPane(feature.identifier)
         #expect(window.title == feature.displayName, "The window's title did not follow the selected pane")

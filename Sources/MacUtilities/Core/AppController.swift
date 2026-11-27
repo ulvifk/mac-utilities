@@ -7,10 +7,10 @@ import os
 /// item.
 final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
-    let loginItem: LoginItem
 
     private let preferences: Preferences
     private let eventTap: EventTap
+    private let loginItem: LoginItem
     private let interface: AppInterface
     private let isInstalled: Bool // in an Applications folder; a development build never registers itself as a login item
 
@@ -33,10 +33,10 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         startEnabledFeatures()
         eventTap.start { [unowned self] type, event in self.handle(type: type, event: event) }
-        let registeredLoginItem = registerLoginItemOnFirstLaunch()
+        let didRegisterLoginItem = registerLoginItemOnFirstLaunch()
         interface.launch(controller: self)
 
-        if registeredLoginItem {
+        if didRegisterLoginItem {
             openGeneralSettingsIfLoginItemAwaitsApproval()
         }
     }
@@ -121,8 +121,8 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         return true
     }
 
-    /// Until the user approves the registration just made under Login Items the app does not start at login, so General, which says so and
-    /// links there, opens.
+    /// A registration just made does not start the app at login until the user approves it under Login Items, so General, which says so
+    /// and links there, opens.
     private func openGeneralSettingsIfLoginItemAwaitsApproval() {
         if loginItem.status != .requiresApproval { return }
 

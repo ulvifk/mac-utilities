@@ -7,10 +7,10 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
     private var paneSelection: SettingsPaneSelection!
     private var splitViewController: SettingsSplitViewController!
 
-    init(controller: AppController) {
+    init(controller: AppController, loginItem: LoginItem) {
         super.init(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
 
-        let panes = buildPanes(controller: controller)
+        let panes = buildPanes(controller: controller, loginItem: loginItem)
         paneSelection = SettingsPaneSelection(panes: panes, window: self)
         splitViewController = SettingsSplitViewController(panes: panes, paneSelection: paneSelection)
         isReleasedWhenClosed = false
@@ -56,8 +56,8 @@ final class SettingsWindow: NSWindow, NSToolbarDelegate {
     }
 
     /// General, then one pane per feature.
-    private func buildPanes(controller: AppController) -> [SettingsPane] {
-        let generalState = GeneralSettingsState(loginItem: controller.loginItem)
+    private func buildPanes(controller: AppController, loginItem: LoginItem) -> [SettingsPane] {
+        let generalState = GeneralSettingsState(loginItem: loginItem)
         let generalView = GeneralSettingsView(controller: controller, state: generalState) { [unowned self] paneIdentifier in self.showPane(paneIdentifier) }
         let general = SettingsPane(
             identifier: generalPaneIdentifier,

@@ -10,6 +10,7 @@ import Testing
 
     private let context: TerminationContext
     private let eventTap = FakeEventTap()
+    private let loginItem = FakeLoginItem()
     private let enabled: CleanupRecordingFeature
     private let disabled: CleanupRecordingFeature
     private let controller: AppController
@@ -22,9 +23,9 @@ import Testing
             features: [enabled, disabled],
             preferences: buildPreferences(disabledFeatures: [disabled.identifier]),
             eventTap: eventTap,
-            loginItem: FakeLoginItem(),
+            loginItem: loginItem,
             isInstalled: false,
-            interface: FakeAppInterface()
+            interface: FakeAppInterface(loginItem: loginItem)
         )
     }
 

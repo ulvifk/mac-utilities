@@ -4,7 +4,8 @@ import os
 
 let application = NSApplication.shared
 let preferences = Preferences(defaults: .standard)
-let interface = MenuBarInterfaceFactory.buildInterface()
+let loginItem = SMAppService.mainApp
+let interface = MenuBarInterfaceFactory.buildInterface(loginItem: loginItem)
 
 let keepAwake = KeepAwakeFeatureFactory.buildFeature(setMenuBarSymbol: interface.setMenuBarSymbol)
 let hotkeys = HotkeysFeature(toggleKeepAwake: {
@@ -21,7 +22,7 @@ let controller = AppController(
     features: features,
     preferences: preferences,
     eventTap: SystemEventTap(),
-    loginItem: SMAppService.mainApp,
+    loginItem: loginItem,
     isInstalled: isInApplicationsFolder(bundleURL: Bundle.main.bundleURL),
     interface: interface
 )
