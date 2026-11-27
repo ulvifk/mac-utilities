@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import os
 
 private typealias GetWindowID = @convention(c) (AXUIElement, UnsafeMutablePointer<CGWindowID>) -> AXError
 
@@ -12,7 +13,13 @@ func getWindows(of app: RunningApp) -> [AppWindow] {
     let element = AXUIElementCreateApplication(app.processIdentifier)
     AXUIElementSetMessagingTimeout(element, 0.1)
 
-    guard let windowElements = getAttribute(element, kAXWindowsAttribute) as? [AXUIElement] else { return [] }
+    var value: CFTypeRef?
+    let result = AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value)
+    if result != .success {
+        Logger.appSwitcher.error("Windows of \(app.name, privacy: .public) (\(app.bundleIdentifier, privacy: .public)) not listed: AXError \(result.rawValue, privacy: .public)")
+        return []
+    }
+    guard let windowElements = value as? [AXUIElement] else { return [] }
 
     var windows: [AppWindow] = []
     for windowElement in windowElements {

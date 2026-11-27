@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 
 /// Reads, writes, and watches hotkeys.json in the config directory.
 final class HotkeyBindingsStore: ObservableObject {
@@ -53,12 +54,14 @@ final class HotkeyBindingsStore: ObservableObject {
 
         try! encoder.encode(updated).write(to: URL(fileURLWithPath: path))
         bindings = updated
+        Logger.hotkeys.notice("Saved \(updated.count, privacy: .public) hotkey bindings to \(self.path, privacy: .public)")
     }
 
     /// A file that does not parse, half-typed in an editor for instance, leaves the current bindings in place.
     private func load() {
         loadError = nil
         guard let data = FileManager.default.contents(atPath: path) else {
+            Logger.hotkeys.notice("No hotkey bindings: \(self.path, privacy: .public) does not exist")
             bindings = []
             return
         }
@@ -67,9 +70,10 @@ final class HotkeyBindingsStore: ObservableObject {
             let loaded = try JSONDecoder().decode([HotkeyBinding].self, from: data)
             if loaded == bindings { return }
             bindings = loaded
+            Logger.hotkeys.notice("Loaded \(loaded.count, privacy: .public) hotkey bindings from \(self.path, privacy: .public)")
         } catch {
             loadError = "\(error)"
-            print("hotkeys: \(path) not loaded, keeping the current bindings: \(error)")
+            Logger.hotkeys.error("\(self.path, privacy: .public) not loaded, keeping the current bindings: \(String(describing: error), privacy: .public)")
         }
     }
 

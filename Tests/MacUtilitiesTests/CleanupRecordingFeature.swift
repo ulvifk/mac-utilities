@@ -23,7 +23,7 @@ final class CleanupRecordingFeature: Feature {
         self.eventTap = eventTap
     }
 
-    func stop() {
+    func stop(because cause: FeatureStopCause) {
         stopCount += 1
     }
 

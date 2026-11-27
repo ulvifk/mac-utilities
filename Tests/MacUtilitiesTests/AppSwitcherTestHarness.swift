@@ -36,7 +36,7 @@ final class AppSwitcherTestHarness {
 
     /// Stops the feature, lets its queued work run out and drops the defaults domain.
     func finish() async {
-        feature.stop()
+        feature.stop(because: .switchedOff)
         await drainMainQueue()
         defaults.remove()
     }

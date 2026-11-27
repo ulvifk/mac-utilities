@@ -91,7 +91,7 @@ struct AppSwitcherFeatureTests {
         let keyCode = Self.getSwitchingKeyCode(listingWindows: listingWindows)
 
         harness.press(keyCode)
-        harness.feature.stop()
+        harness.feature.stop(because: .switchedOff)
         await harness.drainMainQueue()
         #expect(harness.log.shownStates.isEmpty, "Disabled feature showed a panel")
 
@@ -201,7 +201,7 @@ struct AppSwitcherFeatureTests {
         harness.press(tabKeyCode)
         await harness.drainMainQueue()
         harness.press(fKeyCode)
-        harness.feature.stop()
+        harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(tabKeyCode)
         await harness.drainMainQueue()
@@ -278,7 +278,7 @@ struct AppSwitcherFeatureTests {
         harness.press(tabKeyCode)
         await harness.drainMainQueue()
         harness.press(qKeyCode, modifiers: [.maskCommand, .maskShift])
-        harness.feature.stop()
+        harness.feature.stop(because: .switchedOff)
         await harness.drainMainQueue()
 
         #expect(harness.workspace.batchQuitCount == 0, "Disabled feature ran batch quit")
@@ -295,7 +295,7 @@ struct AppSwitcherFeatureTests {
         harness.press(graveKeyCode)
         await harness.drainMainQueue()
         harness.releaseCommand()
-        harness.feature.stop()
+        harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(tabKeyCode)
         await harness.drainMainQueue()
@@ -367,7 +367,7 @@ struct AppSwitcherFeatureTests {
         harness.press(graveKeyCode)
         await harness.drainMainQueue()
         let oldCapture = harness.screen.thumbnailRequests[0]
-        harness.feature.stop()
+        harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(graveKeyCode)
         await harness.drainMainQueue()

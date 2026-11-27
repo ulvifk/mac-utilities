@@ -53,7 +53,7 @@ struct MicrophoneFeatureTests {
         feature.selectInput(iPhone.uid)
         await waitForInputChange(feature)
 
-        feature.stop()
+        feature.stop(because: .switchedOff)
         await waitForInputChange(feature)
 
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
@@ -69,7 +69,7 @@ struct MicrophoneFeatureTests {
         feature.selectInput(iPhone.uid)
         await waitForInputChange(feature)
         audioInput.selectionStatus = kAudioHardwareUnspecifiedError
-        feature.stop()
+        feature.stop(because: .switchedOff)
         await waitForInputChange(feature)
         #expect(feature.isActive)
 
@@ -90,7 +90,7 @@ struct MicrophoneFeatureTests {
 
         audioInput.defaultInputDeviceID = headset.id
         audioInput.onChange!()
-        feature.stop()
+        feature.stop(because: .switchedOff)
         await waitForInputChange(feature)
 
         #expect(!feature.isActive)
@@ -274,7 +274,7 @@ struct MicrophoneFeatureTests {
         feature.selectInput(iPhone.uid)
         await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
 
-        feature.stop()
+        feature.stop(because: .switchedOff)
         #expect(audioInput.onChange != nil)
         audioInput.completeSelection()
         await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
@@ -359,7 +359,7 @@ struct MicrophoneFeatureTests {
         audioInput.defaultInputDeviceID = reassignedHeadset.id
         audioInput.onChange!()
 
-        feature.stop()
+        feature.stop(because: .switchedOff)
         await waitForInputChange(feature)
         #expect(audioInput.defaultInputDeviceID == reassignedHeadset.id)
         #expect(audioInput.selectedDeviceIDs == [iPhone.id])

@@ -17,7 +17,7 @@ struct KeepAwakeTile: View {
                     symbolName: keepAwakeSymbolName,
                     tint: keepAwakeTint,
                     isFilled: isActive,
-                    action: feature.toggle
+                    action: { feature.toggle(from: .popoverToggle) }
                 )
                 .accessibilityAddTraits(.isToggle)
 

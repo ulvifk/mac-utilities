@@ -1,4 +1,5 @@
 import CoreGraphics
+import os
 
 /// The session-wide CoreGraphics tap. Starting it first asks for Accessibility, which the tap needs. macOS disables a tap whose callback is
 /// slow; this one re-enables itself when that happens.
@@ -25,7 +26,7 @@ final class SystemEventTap: EventTap {
         )
 
         guard let tap else {
-            print("Could not create the event tap: every feature is off until Accessibility permission is granted.")
+            Logger.core.error("Event tap not created: every shortcut is off until Accessibility permission is granted and the app is relaunched")
             return
         }
 
@@ -33,12 +34,13 @@ final class SystemEventTap: EventTap {
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        Logger.core.notice("Event tap created")
     }
 
     fileprivate func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if isTapDisabled(type) {
             CGEvent.tapEnable(tap: tap!, enable: true)
-            print("event tap re-enabled after \(type)")
+            Logger.core.notice("Event tap disabled by the system (\(String(describing: type), privacy: .public)), re-enabled")
             return Unmanaged.passUnretained(event)
         }
 

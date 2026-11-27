@@ -13,7 +13,7 @@ struct KeepAwakeFeatureTests {
         let power = harness.power
         let feature = harness.buildFeature()
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: true, succeeds: false)
         try await harness.waitUntil { !feature.isChangingSession }
 
@@ -33,14 +33,14 @@ struct KeepAwakeFeatureTests {
         try await harness.activate(feature)
         let session = feature.session
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: false, succeeds: false)
         try await harness.waitUntil { !feature.isChangingSession }
         #expect(feature.session === session, "Failed toggle discarded the active session")
         #expect(feature.isSleepRestorationRefused, "Failed toggle did not expose restoration failure")
         #expect(harness.menuBarSymbol == keepAwakeSymbolName, "Failed toggle reported an off icon")
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: false)
         try await harness.waitUntil { !feature.isChangingSession }
         #expect(feature.session == nil, "A successful retry did not clear the session")
@@ -85,7 +85,7 @@ struct KeepAwakeFeatureTests {
         try await harness.activate(feature)
         let session = feature.session
 
-        feature.stop()
+        feature.stop(because: .switchedOff)
         try await harness.completeCommand(disabled: false, succeeds: false)
         try await harness.waitUntil { !feature.isChangingSession }
         #expect(feature.session === session, "Stopping the feature discarded failed cleanup")
@@ -129,7 +129,7 @@ struct KeepAwakeFeatureTests {
         let power = harness.power
         let feature = harness.buildFeature()
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
         #expect(feature.session == nil, "An unfinished activation was presented as active")
         #expect(feature.isChangingSession, "Pending activation did not expose progress")
@@ -140,7 +140,7 @@ struct KeepAwakeFeatureTests {
         try await harness.waitUntil { mainQueueProgressed }
         #expect(power.pendingCommands.count == 1, "Main loop progress completed an unfinished power command")
 
-        feature.stop()
+        feature.stop(because: .switchedOff)
         try await harness.completeCommand(disabled: true)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
         #expect(feature.session != nil, "Stopping dropped a successful in-flight disable")
@@ -158,23 +158,23 @@ struct KeepAwakeFeatureTests {
         let power = harness.power
         let feature = harness.buildFeature()
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
-        feature.toggle()
-        feature.toggle()
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
+        feature.toggle(from: .popoverToggle)
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: true)
         try await harness.completeCommand(disabled: false)
         try await harness.waitUntil { !feature.isChangingSession }
         #expect(feature.session == nil, "The final off intent was lost")
         #expect(power.commandHistory == [true, false], "Rapid toggles ran overlapping or redundant commands")
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: true)
         try await harness.waitUntil { !feature.isChangingSession }
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: false)
         try await harness.completeCommand(disabled: true)
         try await harness.waitUntil { !feature.isChangingSession }
@@ -209,7 +209,7 @@ struct KeepAwakeFeatureTests {
         let power = harness.power
         let feature = harness.buildFeature()
 
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
         var didFinishTermination = false
         Task { @MainActor in
@@ -220,7 +220,7 @@ struct KeepAwakeFeatureTests {
         #expect(!didFinishTermination, "Termination abandoned an in-flight activation")
 
         feature.turnOn(for: .oneHour)
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: true)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
         #expect(!didFinishTermination, "Termination finished before restoration completed")
@@ -250,7 +250,7 @@ struct KeepAwakeFeatureTests {
         let feature = harness.buildFeature()
         try await harness.activate(feature)
 
-        feature.stop()
+        feature.stop(because: .quit)
         try await harness.waitUntil { power.pendingCommands.count == 1 }
         var didFinishTermination = false
         Task { @MainActor in

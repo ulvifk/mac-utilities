@@ -35,7 +35,7 @@ struct KeepAwakePowerTests {
         #expect(feature.session?.deactivationDate == deadline, "Reconnecting restarted the deadline")
         #expect(!feature.isWaitingForPower, "Reconnecting kept the waiting subtitle")
 
-        feature.stop()
+        feature.stop(because: .switchedOff)
         if keepsLidAwake { try await harness.completeCommand(disabled: false) }
         try await harness.waitUntil { feature.session == nil }
         #expect(power.assertionReleaseCount == 2, "The resumed assertion was not released")
@@ -57,7 +57,7 @@ struct KeepAwakePowerTests {
         if usesDurationChip {
             feature.turnOn(for: .oneHour)
         } else {
-            feature.toggle()
+            feature.toggle(from: .popoverToggle)
         }
         #expect(feature.isWaitingForPower, "Battery activation did not retain the user's enablement")
         await Task.yield()
@@ -86,10 +86,10 @@ struct KeepAwakePowerTests {
         try await harness.waitUntil { !feature.isChangingSession }
 
         if stopsFeature {
-            feature.stop()
+            feature.stop(because: .switchedOff)
             feature.start()
         } else {
-            feature.toggle()
+            feature.toggle(from: .popoverToggle)
         }
         #expect(!feature.isWaitingForPower, "Turning off retained suspended enablement")
 

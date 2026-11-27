@@ -24,10 +24,10 @@ struct KeepAwakeLidClosedSleepCommandsTests {
 
         var didFinish = false
         let command = Task { @MainActor in
-            let didSucceed = await runProcess(process)
+            let status = await runProcess(process)
             dispatchPrecondition(condition: .onQueue(.main)) // the command must return on the main thread
             didFinish = true
-            return didSucceed
+            return status
         }
         while !process.isRunning { await Task.yield() }
 
@@ -37,7 +37,7 @@ struct KeepAwakeLidClosedSleepCommandsTests {
         #expect(!didFinish, "The power command finished before its process terminated")
 
         input.fileHandleForWriting.write("\(exitStatus)\n".data(using: .utf8)!)
-        #expect(await command.value == (exitStatus == 0), "The command ignored its termination status")
+        #expect(await command.value == exitStatus, "The command ignored its termination status")
     }
 
     /// Runs the watchdog's own process against an app that has already exited, with a sudo that fails twice before succeeding.
