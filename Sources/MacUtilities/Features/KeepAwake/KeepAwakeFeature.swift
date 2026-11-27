@@ -60,8 +60,6 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         beginTerminating()
         await transition?.value
 
-        deactivation?.cancel()
-        deactivation = nil
         sleepRestorationRetry?.cancel()
         sleepRestorationRetry = nil
     }

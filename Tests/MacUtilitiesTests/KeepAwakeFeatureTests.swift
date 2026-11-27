@@ -280,7 +280,13 @@ struct KeepAwakeFeatureTests {
         #expect(feature.session == nil, "A toggle during Quit started a session")
         #expect(!feature.isChangingSession, "A toggle during Quit started a transition")
 
-        await Task { await feature.prepareForTermination() }.value
+        // Cleanup would wait forever on a command nobody completes, so the wait also ends when one appears.
+        var didFinishCleanup = false
+        Task { @MainActor in
+            await feature.prepareForTermination()
+            didFinishCleanup = true
+        }
+        try await harness.waitUntil { didFinishCleanup || !power.pendingCommands.isEmpty }
         #expect(power.commandHistory.isEmpty, "Quit ran a power command")
     }
 }
