@@ -83,7 +83,8 @@ final class AppSwitcherFeature: Feature {
     // MARK: workspace changes
 
     /// The open switcher's app list loses the app, and a window list of the app closes; a shown preview loads afresh. An opening has no
-    /// list yet: it loads one on the next turn, from the apps still running.
+    /// list yet and loads one on the next turn; on windows, the frontmost app then may still be the one that quit, whose empty list closes
+    /// the switcher without showing it.
     private func handleAppTermination(_ processIdentifier: pid_t) {
         preview.reloadIfShown()
         guard case .open(let list) = phase else { return }

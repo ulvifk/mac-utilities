@@ -2,7 +2,7 @@
 enum SwitcherItems {
     /// With whitelistOnly, only whitelisted apps are listed; it is false while the filter is on but none of them has a window, so every app is.
     case apps([SwitcherApp], whitelistOnly: Bool)
-    /// The app is the one whose windows are listed, kept with them so the list knows it even with no window left to ask.
+    /// The app is the one whose windows are listed, held once for the list rather than on each window.
     case windows([SwitcherWindow], of: SwitcherApp)
 
     var count: Int {
