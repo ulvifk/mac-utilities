@@ -193,6 +193,27 @@ Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
 feature runs until it is switched off, new ones included. New features are
 registered in `main.swift`.
 
+## Reading the log
+
+The app writes to the unified log under the subsystem `com.ulvifk.mac-utilities`, with
+one category per feature: `keep-awake`, `hotkeys`, `app-switcher`, `microphone`, plus
+`core` for launch, Accessibility, the event tap and features starting and stopping.
+State changes and their causes are logged at notice level, so macOS keeps them on disk;
+failures at error level. To read the last hour:
+
+```sh
+log show --last 1h --predicate 'subsystem == "com.ulvifk.mac-utilities"'
+```
+
+For live output, `log stream` takes the same predicate:
+
+```sh
+log stream --predicate 'subsystem == "com.ulvifk.mac-utilities"'
+```
+
+Add `and category == "keep-awake"` to the predicate for one feature. A hotkey's shell
+command is logged as private and shows as `<private>`.
+
 ## Development
 
 Run the tests with:

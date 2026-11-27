@@ -78,7 +78,8 @@ with "Only while connected to power" on, macOS decides while `disablesleep` is s
 no session that keeps the lid awake follows it, the app reads `AppleClamshellState`
 and `AppleClamshellCausesSleep`, macOS's own verdict on whether a closed lid sleeps,
 from `IOPMrootDomain`. If the lid is closed and that verdict is yes, it sleeps the Mac
-with `IOPMSleepSystem`, as macOS would have without Keep Awake, and logs a failed call.
+with `IOPMSleepSystem`, as macOS would have without Keep Awake. The log shows both values
+and the decision, and a failed call.
 This covers toggling off, the auto-off timer, unplugging and switching the feature off.
 The verdict is no while an external display is connected on AC power; macOS keeps
 the Mac in closed-display mode and decides again on the next display or power change.
@@ -103,6 +104,24 @@ so `disablesleep` stays `1` until Keep Awake is toggled again or `uninstall.sh` 
 
 `uninstall.sh` runs `pmset -a disablesleep 0` once more before removing the sudoers
 line, in case the app was killed while active.
+
+## The log
+
+Keep Awake logs under the category `keep-awake`, so when it turned on and off, and why,
+can be read without `pmset -g log`:
+
+```sh
+log show --last 1h --predicate 'subsystem == "com.ulvifk.mac-utilities" and category == "keep-awake"'
+```
+
+It records each request with where it came from (the popover toggle, a duration chip
+or a hotkey) and its auto-off, lid and power options; the session beginning or being
+refused; the session ending with its cause (toggled off, deadline reached, not
+connected to power, replaced by a new session, feature switched off, quit); entering
+and leaving "Waiting for power"; each `pmset -a disablesleep` with sudo's exit status;
+each refused restoration and retry; the power assertions and the watchdog's pid; power
+source changes; and after a lid-closed session, `AppleClamshellState`,
+`AppleClamshellCausesSleep` and whether the Mac was put to sleep.
 
 ## The sudoers line
 
