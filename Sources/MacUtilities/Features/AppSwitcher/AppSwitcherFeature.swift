@@ -307,7 +307,7 @@ final class AppSwitcherFeature: Feature {
     private func toggleFilter() {
         guard case .open(let openList) = phase else { return }
 
-        let selectedIdentifier = openList.selectedApp.bundleIdentifier
+        let selectedProcessIdentifier = openList.selectedApp.processIdentifier
         let whitelistStore = settings.whitelistStore
 
         whitelistStore.setFilterEnabled(!whitelistStore.isFilterEnabled)
@@ -317,7 +317,7 @@ final class AppSwitcherFeature: Feature {
             return
         }
 
-        let selectedList = list.selectingApp(bundleIdentifier: selectedIdentifier)
+        let selectedList = list.selectingApp(processIdentifier: selectedProcessIdentifier)
         phase = .open(selectedList)
         panel.show(state: buildState(selectedList), glassStore: settings.getGlassStore(listingWindows: false))
         panel.showFeedback(getFilterFeedback(selectedList))

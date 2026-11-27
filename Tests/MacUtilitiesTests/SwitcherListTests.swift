@@ -51,8 +51,8 @@ final class SwitcherListTests {
     func selectingAppFallsBackToTheFirst() {
         let list = buildAppList(cellsPerRow: 5)
 
-        #expect(list.selectingApp(bundleIdentifier: "test.app.3").selectedIndex == 3)
-        #expect(list.selecting(2).selectingApp(bundleIdentifier: "gone").selectedIndex == 0)
+        #expect(list.selectingApp(processIdentifier: 3).selectedIndex == 3)
+        #expect(list.selecting(2).selectingApp(processIdentifier: 99).selectedIndex == 0)
     }
 
     @Test

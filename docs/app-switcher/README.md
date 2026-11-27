@@ -48,11 +48,12 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Up / Down arrow move the selection to the icon drawn nearest above or below it,
   wrapping between the top and bottom rows; of two equally near icons, the left one.
 - Click an icon to switch to it.
-- Apps are listed most recently used first: the app frontmost when the switcher started
-  counts as used then, and each app activated since as used when it was activated. Apps
-  not used since the switcher started, such as ones launched in the background or as
-  login items, follow them in the order macOS lists them; so does an app that quit and
-  was opened again without being activated. Each running instance of an app is listed
+- Apps are listed most recently used first: the app frontmost when the switcher was
+  last switched on counts as used then, and each app activated since as used when it was
+  activated. Switching the App Switcher off and on again starts over from the frontmost
+  app. Apps not used since then, such as ones launched in the background or as login
+  items, follow them in the order macOS lists them; so does an app that quit and was
+  opened again without being activated. Each running instance of an app is listed
   in its own place, so a quick Cmd+Tab goes to the app used before, even when the
   frontmost app has a second instance.
 - Apps without open windows are left out, each instance by its own windows. Windows on

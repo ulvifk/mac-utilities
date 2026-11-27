@@ -211,6 +211,25 @@ struct AppSwitcherFeatureTests {
         await harness.finish()
     }
 
+    /// Running and tracked [test.app.0 #0, test.app.1 #1, test.app.0 #2], #2 selected.
+    @Test
+    func filterKeepsTheSelectedInstance() async {
+        let harness = AppSwitcherTestHarness(itemCount: 2)
+        let secondInstance = harness.workspace.buildApp(index: 2)
+        secondInstance.bundleIdentifier = "test.app.0"
+        harness.workspace.runningApps.append(secondInstance)
+        harness.workspace.recentProcessIdentifiers = [0, 1, 2]
+
+        harness.press(tabKeyCode)
+        harness.press(tabKeyCode)
+        await harness.drainMainQueue()
+        harness.press(fKeyCode)
+        await harness.drainMainQueue()
+
+        #expect(harness.log.shownStates.last!.list.selectedApp.processIdentifier == 2, "Filter moved the selection to another instance")
+        await harness.finish()
+    }
+
     @Test
     func stoppedFilterAndRestart() async {
         let harness = AppSwitcherTestHarness()
