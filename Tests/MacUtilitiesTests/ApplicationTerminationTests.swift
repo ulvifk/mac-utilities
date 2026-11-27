@@ -1,46 +1,22 @@
-import Foundation
+import AppKit
 import Testing
 
+/// Quitting must not deadlock when it starts inside a main-queue job or a Task: AppKit's deferred termination runs a nested run loop that
+/// waits for the features' cleanup, and that cleanup needs the main queue. Terminating ends the process, so each scenario runs the real
+/// NSApplication in an exit test, a child process of the test runner. AppKit starts from a run loop block, so the main thread is inside a
+/// main-queue job only when the scenario puts it there.
 struct ApplicationTerminationTests {
-    private static let repository = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    private static let sources = repository.appendingPathComponent("Sources/MacUtilities")
+    @Test(arguments: TerminationContext.allCases)
+    func quitFinishesEveryFeaturesCleanup(context: TerminationContext) async {
+        await #expect(processExitsWith: .success) { [context = context as TerminationContext] in
+            CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue) {
+                MainActor.assumeIsolated { TerminationScenario(context: context).run() }
+            }
+            CFRunLoopWakeUp(CFRunLoopGetMain())
 
-    @Test
-    func appKitTerminationFinishesCleanupFromQueuedAndNativeRequests() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try! FileManager.default.removeItem(at: directory) }
-
-        let harness = directory.appendingPathComponent("termination-harness")
-        let compilation = try Self.runProcess("/usr/bin/xcrun", arguments: [
-            "swiftc", Self.repository.appendingPathComponent("Tests/MacUtilitiesTests/Fixtures/ApplicationTermination/main.swift").path,
-            Self.sources.appendingPathComponent("Core/AppController.swift").path,
-            Self.sources.appendingPathComponent("Core/ApplicationTermination.swift").path,
-            Self.sources.appendingPathComponent("Core/Feature.swift").path,
-            "-o", harness.path
-        ])
-        try #require(compilation.status == 0, "\(compilation.output)")
-
-        for context in ["dispatch", "task", "native"] {
-            let result = try Self.runProcess(harness.path, arguments: [context])
-            #expect(result.status == 0, "\(context): \(result.output)")
-            #expect(result.output.components(separatedBy: "PASS \(context)").count == 2, "\(result.output)")
+            try await Task.sleep(for: .seconds(3))
+            Issue.record("Timed out waiting for AppKit termination")
+            exit(3)
         }
-    }
-
-    private static func runProcess(_ executable: String, arguments: [String]) throws -> (status: Int32, output: String) {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = output
-        process.standardError = output
-
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        return (process.terminationStatus, String(data: data, encoding: .utf8)!)
     }
 }

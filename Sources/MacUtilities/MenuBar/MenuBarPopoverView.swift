@@ -9,6 +9,7 @@ private let statusDotSize: CGFloat = 8
 /// Settings and Quit.
 struct MenuBarPopoverView: View {
     @ObservedObject var controller: AppController
+    let openSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: popoverSectionSpacing) {
@@ -65,7 +66,7 @@ struct MenuBarPopoverView: View {
 
     private func buildFooter() -> some View {
         return HStack {
-            Button { controller.openSettings() } label: {
+            Button { openSettings() } label: {
                 Label("Settings…", systemImage: "gearshape")
             }
             .keyboardShortcut(",")

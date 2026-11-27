@@ -55,10 +55,11 @@ the supported devices, full requirements and connection troubleshooting.
 
 ## Verification
 
-`swift test` checks selection across multiple input types, device-list refresh,
+`./scripts/test.sh` checks selection across multiple input types, device-list refresh,
 external default changes, disconnect and reconnect, restoration across device ID
 changes, failed changes, and disabling or quitting during pending changes.
-CoreAudio adapter tests use simulated hardware and do not change the Mac's input.
+The CoreAudio adapter tests run against a fake `AudioHardware` and do not change the
+Mac's input.
 
 For a hardware check, connect at least two microphones and select each from the
 tile and settings. Confirm the same default in System Settings > Sound > Input.

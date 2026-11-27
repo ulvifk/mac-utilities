@@ -157,32 +157,60 @@ Run `./create-signing-cert.sh` once. It creates a self-signed "mac-utilities" ce
 
 ```
 Sources/MacUtilities/
-  main.swift          starts the app with the list of features
-  Core/               the host: Feature protocol, AppController (menu bar item and its
-                      popover, feature lifecycle, pause), the menu bar glyph, EventTap,
-                      key matching, Preferences, Accessibility trust, window capture for
-                      the smoke tests
-  MenuBar/            the menu bar popover, the tile and round button row its tiles
-                      are built from, and the menu bar smoke test
-  Settings/           the settings window: its sidebar, the header and switch opening
-                      every feature's pane, the General pane, the icon tiles and
-                      keycaps the panes share, and the settings smoke test
+  main.swift          assembles the app: the preferences, the menu bar interface, the
+                      features and the controller that hosts them
+  Core/               the host: the Feature protocol, AppController (feature lifecycle,
+                      pause, event dispatch), the EventTap and AppInterface boundaries,
+                      the CoreGraphics tap, key matching, Preferences, Accessibility
+                      trust, window capture for the smoke tests
+  MenuBar/            the menu bar item and glyph, its popover, the tile and round
+                      button row its tiles are built from, and the menu bar smoke test
+  Settings/           the settings window: its sidebar, the pane selection that tells
+                      features when their pane is visible, the header and switch opening
+                      every feature's pane, the General pane, the icon tiles and keycaps
+                      the panes share, and the settings smoke test
   Features/<Name>/    one folder per feature
-scripts/              render-app-icon.swift, which draws the app icon
+scripts/              test.sh, which runs the tests, and render-app-icon.swift, which
+                      draws the app icon
 Resources/            AppIcon.icns, the rendered app icon that build.sh bundles
 docs/<name>/          the feature's README and screenshots
 ```
 
 A feature implements `Feature`: a stable `identifier` (the key its enabled state is
 stored under), a `displayName`, a one-sentence `summary`, an `iconSymbolName` and
-`iconGradient` for its icon tile in the settings window, `start()`, `stop()`,
-`handle(type:event:) -> Bool`, `buildSettingsSections() -> AnyView`, the sections of
-its settings pane below the header, and `buildPopoverTile() -> AnyView?`, its tile in
-the menu bar popover while it is enabled, nil for a feature without one; a tile
-observes its feature or the stores it shows and keeps itself current. The popover
-lists the tiles in the features' order. The core tap hands every key press and
-modifier change to the enabled features in order; the first one returning `true`
+`iconGradient` for its icon tile in the settings window, and
+`buildSettingsSections() -> AnyView`, the sections of its settings pane below the
+header. The rest have defaults that do nothing, so a feature implements only what it
+needs: `start()` and `stop()`, `handle(type:event:) -> Bool`, which swallows the event
+when it returns `true`, `prepareForTermination()` for cleanup Quit waits on,
+`settingsWindowChanged(_:)`, the settings window while it shows the feature's pane,
+and `buildPopoverTile() -> AnyView?`, its tile in the menu bar popover while it is
+enabled; a tile observes its feature or the stores it shows and keeps itself current.
+The popover lists the tiles in the features' order. The core tap hands every key press
+and modifier change to the enabled features in order; the first one returning `true`
 swallows the event. Enabled features are stopped when the app quits.
 Switched-off features are stored in UserDefaults under `disabledFeatures`, so a
 feature runs until it is switched off, new ones included. New features are
 registered in `main.swift`.
+
+## Development
+
+Run the tests with:
+
+```sh
+./scripts/test.sh
+```
+
+Arguments go on to `swift test`, such as `--filter SystemAudioInputTests`. The script
+exists because the Command Line Tools keep the Swift Testing macro plugin outside the
+compiler's default plugin path, so plain `swift test` fails to build the tests without
+Xcode; the script passes the path when it is there.
+
+The tests follow one convention: whatever reaches the operating system, such as
+CoreAudio, the event tap, UserDefaults or the menu bar, sits behind a protocol or a
+parameter that the code receives, and `main.swift` passes the real ones. Tests build
+the code in-process with `@testable import MacUtilities` and fakes from `Tests`, so
+they never change the Mac's settings, show a window or write the app's defaults.
+Nothing compiles sources by hand. Quitting ends the process, so the termination tests
+run the real `NSApplication` in Swift Testing exit tests, child processes of the test
+runner.

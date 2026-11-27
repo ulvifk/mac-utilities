@@ -3,7 +3,12 @@ import Foundation
 /// Which features are switched off, in UserDefaults. A feature the store has never heard of runs, so new features start enabled.
 final class Preferences {
     private let disabledFeaturesKey = "disabledFeatures"
-    private let defaults = UserDefaults.standard
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
 
     func isFeatureEnabled(_ identifier: String) -> Bool {
         return !getDisabledFeatures().contains(identifier)
