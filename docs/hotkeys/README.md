@@ -89,12 +89,12 @@ search over every `.app` in `/Applications`, `/System/Applications`,
 field. Typing narrows the list to the apps whose name contains the text, ignoring
 case and the spaces around it; text that is only spaces lists every app. While the
 text narrows the list to at least one app, one result is highlighted, the first one
-each time the text changes. Up and Down move the highlight, stopping at the first
-and last result and scrolling it into view, and the pointer highlights the row it
-rests on; the highlight stays where the keys or the pointer last put it. Click an
-app, or press Return for the highlighted one, to choose it. With no text, nothing is
-highlighted until Down, Up or the pointer highlights a row, so Return does nothing
-until then.
+each time the text changes other than in the spaces around it. Up and Down move the
+highlight, stopping at the first and last result and scrolling it into view, and the
+pointer highlights the row it rests on; the highlight stays where the keys or the
+pointer last put it. Click an app, or press Return for the highlighted one, to
+choose it. With no text, nothing is highlighted until Down, Up or the pointer
+highlights a row, so Return does nothing until then.
 
 The warning says another binding has the same key ("Same shortcut as another
 hotkey", on both rows), or names the macOS use of a reserved combo: Cmd+Space

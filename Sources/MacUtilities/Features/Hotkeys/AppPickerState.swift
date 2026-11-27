@@ -5,7 +5,8 @@ import Combine
 /// A class held as a state object, since the command-line toolchain has no plugin for the @State macro.
 ///
 /// - Each change of the search text highlights the first result, since the old position now points at a different app; a blank search, or
-///   one without results, highlights nothing.
+///   one without results, highlights nothing. Text that differs only in its surrounding whitespace lists the same results, so it keeps the
+///   highlight; the search field writes its unchanged text back when Return commits it, just before Return picks the highlighted app.
 /// - Up and Down move the highlight one result and stop at either end; from no highlight, either one highlights the first result.
 /// - Hovering a row highlights it and the highlight stays there when the pointer leaves, so the pointer and the keys share one highlight.
 /// The apps are fixed for the picker's life, so the highlighted index always points into the results.
@@ -30,14 +31,18 @@ final class AppPickerState: ObservableObject {
         return apps.filter { $0.name.localizedCaseInsensitiveContains(trimmedSearchText) }
     }
 
-    /// Opens the popover on an empty search.
+    /// Opens the popover on an empty search with nothing highlighted.
     func show() {
-        changeSearchText(to: "")
+        searchText = ""
+        highlightedIndex = nil
         isShown = true
     }
 
     func changeSearchText(to newSearchText: String) {
+        let isSameSearch = getTrimmed(newSearchText) == getTrimmedSearchText()
         searchText = newSearchText
+        if isSameSearch { return }
+
         highlightedIndex = nil
         if getTrimmedSearchText().isEmpty { return }
 
@@ -74,6 +79,10 @@ final class AppPickerState: ObservableObject {
     }
 
     private func getTrimmedSearchText() -> String {
-        return searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return getTrimmed(searchText)
+    }
+
+    private func getTrimmed(_ text: String) -> String {
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

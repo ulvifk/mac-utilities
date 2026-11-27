@@ -105,6 +105,31 @@ struct AppPickerStateTests {
     }
 
     @Test
+    func testSettingTheSameSearchTextKeepsTheHighlight() {
+        state.changeSearchText(to: "a")
+        state.moveHighlightDown()
+        state.changeSearchText(to: "a")
+        #expect(state.getHighlightedApp()?.name == "Visual Studio Code")
+    }
+
+    @Test
+    func testChangingOnlyTheSurroundingWhitespaceKeepsTheHighlight() {
+        state.changeSearchText(to: "a")
+        state.moveHighlightDown()
+        state.changeSearchText(to: " a ")
+        #expect(state.getHighlightedApp()?.name == "Visual Studio Code")
+    }
+
+    @Test
+    func testSettingTheSameBlankSearchKeepsTheHighlight() {
+        state.changeSearchText(to: "")
+        state.moveHighlightDown()
+        state.moveHighlightDown()
+        state.changeSearchText(to: "")
+        #expect(state.getHighlightedApp()?.name == "Visual Studio Code")
+    }
+
+    @Test
     func testHoverHighlightsTheHoveredResult() {
         state.changeSearchText(to: "")
         state.highlightResult(at: 2)
@@ -117,6 +142,14 @@ struct AppPickerStateTests {
         state.show()
         #expect(state.isShown)
         #expect(state.searchText == "")
+        #expect(state.getHighlightedApp() == nil)
+    }
+
+    @Test
+    func testShowingAfterBrowsingABlankSearchClearsTheHighlight() {
+        state.changeSearchText(to: "")
+        state.moveHighlightDown()
+        state.show()
         #expect(state.getHighlightedApp() == nil)
     }
 }
