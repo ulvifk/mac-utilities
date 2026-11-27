@@ -10,13 +10,15 @@ struct AppSwitcherFeatureFactory {
             panel: GlassSwitcherPanel(), settings: settings, listLoader: listLoader, workspace: workspace, screen: screen, environment: environment
         )
 
+        let thumbnailCache = WindowThumbnailCache(screen: screen)
+
         return AppSwitcherFeature(
             workspace: workspace,
-            screen: screen,
             settings: settings,
             listLoader: listLoader,
+            thumbnailCache: thumbnailCache,
             panel: panel,
-            previewPanel: previewPanel,
+            preview: SwitcherPreview(panel: previewPanel, settings: settings, listLoader: listLoader, thumbnailCache: thumbnailCache),
             smokeTest: smokeTest
         )
     }
