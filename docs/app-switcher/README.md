@@ -48,8 +48,11 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Up / Down arrow move the selection to the icon drawn nearest above or below it,
   wrapping between the top and bottom rows; of two equally near icons, the left one.
 - Click an icon to switch to it.
-- Apps are listed most recently activated first. Apps not activated since the switcher
-  started, such as ones launched in the background or as login items, follow them.
+- Apps are listed most recently used first: the app frontmost when the switcher started
+  counts as used then, and each app activated since as used when it was activated. Apps
+  not used since the switcher started, such as ones launched in the background or as
+  login items, follow them in the order macOS lists them. An app with several running
+  instances lists each of them.
 - Apps without open windows are left out. Windows on every Space count, other displays'
   and full-screen ones included, so the list is the same on every Space, as with the
   native switcher. Switching to an app whose windows are all on another Space moves
@@ -194,8 +197,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - `SwitcherList` is the listed `SwitcherItems` (apps, or one app's windows), the row
   width and the selection, a value whose changes (advancing, moving between rows,
   removing an app, keeping the selected app across Cmd+F) return a new list.
-  `SwitcherListLoader` loads it the same way for the switcher and the preview: recent
-  apps first, the whitelist filter, and the row width from `SwitcherCellMetrics`.
+  `SwitcherListLoader` loads it the same way for the switcher and the preview: running
+  apps by recency, the whitelist filter, and the row width from `SwitcherCellMetrics`.
 - `SwitcherPreview` is the live preview beside the settings pane: it follows the
   settings stores, the settings window's focus and the checkbox, and steps aside while
   the switcher is up. `WindowThumbnailCache` keeps the thumbnails both share.

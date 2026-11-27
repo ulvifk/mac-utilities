@@ -133,7 +133,7 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func neverActivatedAppsFollowRecentOnes() async {
+    func untrackedAppsFollowTrackedOnes() async {
         let harness = AppSwitcherTestHarness()
         harness.workspace.recentBundleIdentifiers = ["test.app.2", "test.app.0"]
 

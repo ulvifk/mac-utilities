@@ -78,7 +78,7 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
 }
 
 final class SwitcherFakeApp: SwitcherApp {
-    let bundleIdentifier: String
+    var bundleIdentifier: String
     let processIdentifier: pid_t
     let name = "Test App"
     let icon: NSImage? = NSImage(size: NSSize(width: 68, height: 68))
