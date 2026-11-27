@@ -3,7 +3,7 @@ import os
 
 let application = NSApplication.shared
 let preferences = Preferences(defaults: .standard)
-let interface = buildMenuBarInterface()
+let interface = MenuBarInterfaceFactory.buildInterface()
 
 let keepAwake = KeepAwakeFeatureFactory.buildFeature(setMenuBarSymbol: interface.setMenuBarSymbol)
 let hotkeys = HotkeysFeature(toggleKeepAwake: {
