@@ -1,8 +1,8 @@
 import AppKit
 
 /// Process identifiers of the processes active since the last start: the frontmost one at start, then each one activated since; front of the
-/// array is the most recent. A process leaves when it quits, and each start begins anew, as quits went unheard while stopped; so a later
-/// process that reuses an identifier starts untracked.
+/// array is the most recent. A process leaves when it quits. Each start begins anew, since quits go unheard while stopped. So a process that
+/// reuses a quit one's identifier starts untracked.
 final class RecentAppsTracker {
     private(set) var processIdentifiers: [pid_t] = []
     private var observers: [NSObjectProtocol] = []

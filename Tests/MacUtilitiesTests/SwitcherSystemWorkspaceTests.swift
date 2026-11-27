@@ -5,7 +5,8 @@ import Testing
 /// SystemSwitcherWorkspace hears the workspace's activate, quit, hide and unhide notifications, reading the app from the notification. They
 /// are posted to this process's own workspace notification center, which reaches no other process, and name made-up apps, so the tests do
 /// not depend on what Launch Services lists. What the tracker holds is read for the made-up apps only, as the real frontmost app is tracked
-/// too and may change while a test runs.
+/// too and may change while a test runs; except in tracksTheFrontmostProcessAtStart, which reads the real frontmost app in the same main
+/// queue turn as the start, so no activation can come between them.
 @MainActor @Suite(.serialized)
 final class SwitcherSystemWorkspaceTests {
     private let defaults = TestDefaults()
@@ -38,11 +39,11 @@ final class SwitcherSystemWorkspaceTests {
 
     @Test
     func tracksTheFrontmostProcessAtStart() {
-        let frontmost = NSWorkspace.shared.frontmostApplication!
+        let expected = NSWorkspace.shared.frontmostApplication.map { [$0.processIdentifier] } ?? [] // none without a GUI session
 
         startObserving()
 
-        #expect(workspace.getRecentlyActiveProcessIdentifiers() == [frontmost.processIdentifier], "Frontmost process at start was not tracked")
+        #expect(workspace.getRecentlyActiveProcessIdentifiers() == expected, "Frontmost process at start was not tracked")
         workspace.stopObserving()
     }
 
