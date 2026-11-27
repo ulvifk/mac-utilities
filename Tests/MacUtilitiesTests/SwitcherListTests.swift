@@ -51,8 +51,8 @@ final class SwitcherListTests {
     func selectingAppFallsBackToTheFirst() {
         let list = buildAppList(cellsPerRow: 5)
 
-        #expect(list.selectingApp(bundleIdentifier: "test.app.3").selectedIndex == 3)
-        #expect(list.selecting(2).selectingApp(bundleIdentifier: "gone").selectedIndex == 0)
+        #expect(list.selectingApp(processIdentifier: 3).selectedIndex == 3)
+        #expect(list.selecting(2).selectingApp(processIdentifier: 99).selectedIndex == 0)
     }
 
     @Test
@@ -88,9 +88,9 @@ final class SwitcherListTests {
     // MARK: loading
 
     @Test
-    func loadsRecentAppsThenNeverActivatedOnes() {
+    func loadsTrackedAppsThenUntrackedOnes() {
         let loader = buildLoader(defaults: testDefaults.buildUserDefaults())
-        workspace.recentBundleIdentifiers = ["test.app.3", "gone", "test.app.1"]
+        workspace.recentProcessIdentifiers = [3, 99, 1] // 99 is no regular app, such as a menu bar app
 
         let list = loader.loadAppList()
 
@@ -109,6 +109,32 @@ final class SwitcherListTests {
         let list = buildLoader(defaults: defaults).loadAppList()
 
         #expect(getBundleIdentifiers(list) == ["test.app.2"])
+        #expect(list.items.isWhitelistOnly)
+    }
+
+    @Test
+    func loadsEachInstanceOfAnAppAtItsOwnRecency() {
+        let secondInstance = workspace.buildApp(index: 5)
+        secondInstance.bundleIdentifier = "test.app.1"
+        workspace.runningApps.append(secondInstance)
+        workspace.recentProcessIdentifiers = [5, 3, 1]
+
+        let list = buildLoader(defaults: testDefaults.buildUserDefaults()).loadAppList()
+
+        #expect(getProcessIdentifiers(list) == [5, 3, 1, 0, 2, 4])
+    }
+
+    @Test
+    func filterListsWhitelistedAppThatIsUntracked() {
+        let defaults = testDefaults.buildUserDefaults()
+        let whitelistStore = WhitelistStore(defaults: defaults)
+        whitelistStore.setListed("test.app.1", true)
+        whitelistStore.setFilterEnabled(true)
+        workspace.recentProcessIdentifiers = [2, 0]
+
+        let list = buildLoader(defaults: defaults).loadAppList()
+
+        #expect(getBundleIdentifiers(list) == ["test.app.1"])
         #expect(list.items.isWhitelistOnly)
     }
 
@@ -149,5 +175,10 @@ final class SwitcherListTests {
     private func getBundleIdentifiers(_ list: SwitcherList) -> [String] {
         guard case .apps(let apps, _) = list.items else { return [] }
         return apps.map { $0.bundleIdentifier }
+    }
+
+    private func getProcessIdentifiers(_ list: SwitcherList) -> [pid_t] {
+        guard case .apps(let apps, _) = list.items else { return [] }
+        return apps.map { $0.processIdentifier }
     }
 }

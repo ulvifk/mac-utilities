@@ -1,34 +1,46 @@
 import AppKit
 
-/// Bundle identifiers of the apps activated since start, the frontmost one at start included; front of the array is the most recent.
-/// Apps that quit stay listed, as the switcher only reads the ones still running.
+/// Process identifiers of the processes active since the last start: the frontmost one at start, then each one activated since; front of the
+/// array is the most recent. A process leaves when it quits. Each start begins anew, since quits go unheard while stopped. So a process that
+/// reuses a quit one's identifier starts untracked.
 final class RecentAppsTracker {
-    private(set) var bundleIdentifiers: [String] = []
-    private var observer: NSObjectProtocol?
+    private(set) var processIdentifiers: [pid_t] = []
+    private var observers: [NSObjectProtocol] = []
 
     func start() {
-        if let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier {
-            moveToFront(frontmost)
-        }
+        let notificationCenter = NSWorkspace.shared.notificationCenter
 
-        observer = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { notification in
-            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-            guard let bundleIdentifier = app?.bundleIdentifier else { return }
-            self.moveToFront(bundleIdentifier)
+        processIdentifiers = []
+        if let frontmost = NSWorkspace.shared.frontmostApplication {
+            moveToFront(frontmost.processIdentifier)
         }
+        observers.append(notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { notification in
+            self.moveToFront(Self.getProcessIdentifier(notification))
+        })
+        observers.append(notificationCenter.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { notification in
+            self.forget(Self.getProcessIdentifier(notification))
+        })
     }
 
     func stop() {
-        NSWorkspace.shared.notificationCenter.removeObserver(observer!)
-        observer = nil
+        for observer in observers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        observers = []
     }
 
-    func moveToFront(_ bundleIdentifier: String) {
-        bundleIdentifiers.removeAll { $0 == bundleIdentifier }
-        bundleIdentifiers.insert(bundleIdentifier, at: 0)
+    private func moveToFront(_ processIdentifier: pid_t) {
+        forget(processIdentifier)
+        processIdentifiers.insert(processIdentifier, at: 0)
+    }
+
+    private func forget(_ processIdentifier: pid_t) {
+        processIdentifiers.removeAll { $0 == processIdentifier }
+    }
+
+    /// Of the app a workspace notification is about.
+    private static func getProcessIdentifier(_ notification: Notification) -> pid_t {
+        let app = notification.userInfo![NSWorkspace.applicationUserInfoKey] as! NSRunningApplication
+        return app.processIdentifier
     }
 }

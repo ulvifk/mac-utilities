@@ -115,7 +115,7 @@ struct AppSwitcherPreviewTests {
 
         #expect(harness.workspace.runningAppQueryCount == 1, "Slider repeated running app queries")
         #expect(harness.workspace.appsWithWindowsQueryCount == 1, "Slider repeated apps-with-windows queries")
-        #expect(harness.workspace.windowQueryCount == (listingWindows ? 1 : 0), "Slider repeated window queries")
+        #expect(harness.workspace.windowQueryProcessIdentifiers.count == (listingWindows ? 1 : 0), "Slider repeated window queries")
         #expect(harness.log.shownStates.count == 1, "Slider rebuilt the panel")
         #expect(harness.log.glassUpdatedStates.count == 20, "Slider lost appearance changes")
         #expect(harness.log.glassUpdatedStates.last!.list.count == 3, "Slider replaced preview candidates")
@@ -136,7 +136,7 @@ struct AppSwitcherPreviewTests {
         await harness.drainMainQueue()
 
         #expect(harness.workspace.runningAppQueryCount == 1, "Card changes repeated app queries")
-        #expect(harness.workspace.windowQueryCount == (listingWindows ? 1 : 0), "Card changes repeated window queries")
+        #expect(harness.workspace.windowQueryProcessIdentifiers.count == (listingWindows ? 1 : 0), "Card changes repeated window queries")
         #expect(harness.log.shownStates.count == 1, "Card changes rebuilt the panel")
         #expect(harness.log.glassUpdatedStates.count == 2, "Card changes lost appearance updates")
         #expect(harness.log.glassUpdatedStates.last!.cardGlass === cardGlass, "Cards used the other mode's glass")
@@ -145,6 +145,21 @@ struct AppSwitcherPreviewTests {
         cards.setShowsCards(false)
         await harness.drainMainQueue()
         #expect(harness.log.glassUpdatedStates.last!.cardGlass == nil, "Cards-off did not clear the mode's card glass")
+        await harness.finish()
+    }
+
+    /// Running [test.app.0 #0, test.app.1 #1, test.app.0 #2], with #2 the most recently active.
+    @Test
+    func windowModeListsTheMostRecentlyActiveProcess() async {
+        let harness = AppSwitcherTestHarness(itemCount: 2)
+        let secondInstance = harness.workspace.buildApp(index: 2)
+        secondInstance.bundleIdentifier = "test.app.0"
+        harness.workspace.runningApps.append(secondInstance)
+        harness.workspace.recentProcessIdentifiers = [2, 1, 0]
+
+        await harness.showPreview(listingWindows: true)
+
+        #expect(harness.workspace.windowQueryProcessIdentifiers == [2], "Preview listed another process's windows")
         await harness.finish()
     }
 
@@ -157,7 +172,7 @@ struct AppSwitcherPreviewTests {
         await harness.setPreviewMode(listingWindows: true)
 
         #expect(harness.workspace.runningAppQueryCount == 2, "Mode change reused the old app query")
-        #expect(harness.workspace.windowQueryCount == 1, "Mode change did not load windows")
+        #expect(harness.workspace.windowQueryProcessIdentifiers.count == 1, "Mode change did not load windows")
         #expect(harness.log.shownStates.count == 2, "Mode change did not rebuild for windows")
         #expect(harness.log.shownStates.last!.windowIDs == [9], "Mode change kept stale windows")
         #expect(harness.screen.thumbnailRequests[0].windowIDs == [9], "Mode change captured the old windows")
@@ -179,7 +194,7 @@ struct AppSwitcherPreviewTests {
         harness.settings.windowGlassStore.objectWillChange.send()
         await harness.drainMainQueue()
         #expect(harness.log.shownStates.last!.windowIDs == [9], "Next preview did not recover after an empty list")
-        #expect(harness.workspace.windowQueryCount == 2, "Next preview did not reload after an empty list")
+        #expect(harness.workspace.windowQueryProcessIdentifiers.count == 2, "Next preview did not reload after an empty list")
         await harness.finish()
     }
 
@@ -333,12 +348,12 @@ struct AppSwitcherPreviewTests {
         }
 
         let runningAppQueriesBeforeActivation = harness.workspace.runningAppQueryCount
-        let windowQueriesBeforeActivation = harness.workspace.windowQueryCount + (releaseWhileOpening ? 1 : 0)
+        let windowQueriesBeforeActivation = harness.workspace.windowQueryProcessIdentifiers.count + (releaseWhileOpening ? 1 : 0)
         harness.workspace.onBringToFront = { window in
             #expect(!harness.panel.isVisible, "Window activation kept the switcher visible")
             #expect(!harness.previewPanel.isVisible, "Preview restored before window activation")
             #expect(harness.workspace.runningAppQueryCount == runningAppQueriesBeforeActivation, "Preview queried apps before window activation")
-            #expect(harness.workspace.windowQueryCount == windowQueriesBeforeActivation, "Preview queried windows before window activation")
+            #expect(harness.workspace.windowQueryProcessIdentifiers.count == windowQueriesBeforeActivation, "Preview queried windows before window activation")
 
             harness.workspace.windows = [window] + harness.workspace.windows.filter { $0.windowID != window.windowID }
         }

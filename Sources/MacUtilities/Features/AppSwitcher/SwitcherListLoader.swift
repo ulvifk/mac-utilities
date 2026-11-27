@@ -14,11 +14,11 @@ final class SwitcherListLoader {
         self.panelWidthStore = panelWidthStore
     }
 
-    /// The recent running apps; while the filter is on only the whitelisted ones, unless none of them has a window.
+    /// The running apps by recency; while the filter is on only the whitelisted ones, unless none of them has a window.
     func loadAppList() -> SwitcherList {
-        let recentApps = getRecentRunningApps()
-        let whitelistedApps = getWhitelistedApps(recentApps)
-        let items = whitelistedApps.isEmpty ? SwitcherItems.apps(recentApps, whitelistOnly: false) : .apps(whitelistedApps, whitelistOnly: true)
+        let apps = getRunningAppsByRecency()
+        let whitelistedApps = getWhitelistedApps(apps)
+        let items = whitelistedApps.isEmpty ? SwitcherItems.apps(apps, whitelistOnly: false) : .apps(whitelistedApps, whitelistOnly: true)
 
         return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items))
     }
@@ -30,26 +30,25 @@ final class SwitcherListLoader {
         return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items))
     }
 
-    /// Regular running apps with a window: the ones activated since the switcher started, most recent first, then the rest in the order the
-    /// workspace lists them, so an app launched in the background is listed too. E.g. running [A, B, C], activated [C, A] -> [C, A, B].
-    func getRecentRunningApps() -> [SwitcherApp] {
-        let runningApps = workspace.getRunningApps()
-        let recentIdentifiers = workspace.getRecentlyActivatedBundleIdentifiers()
-        var appsByIdentifier: [String: SwitcherApp] = [:]
-        for app in runningApps {
-            appsByIdentifier[app.bundleIdentifier] = app
+    /// Regular running apps with a window, most recently active first, for the switcher to list. Each running process has its own place:
+    /// - first the processes the workspace tracks (the one frontmost when observing started, then each one activated since), most recent first
+    /// - then the untracked ones, such as apps launched in the background, in the order the workspace lists them
+    /// E.g. running [A, B, C, D], tracked [C, a menu bar app, A] -> [C, A, B, D].
+    func getRunningAppsByRecency() -> [SwitcherApp] {
+        let trackedProcessIdentifiers = workspace.getRecentlyActiveProcessIdentifiers()
+        var positionsInTracker: [pid_t: Int] = [:] // [processIdentifier] -> 0 for the most recent
+        for (position, processIdentifier) in trackedProcessIdentifiers.enumerated() {
+            positionsInTracker[processIdentifier] = position
+        }
+        let untrackedPosition = trackedProcessIdentifiers.count
+
+        let appsByRecency = workspace.getRunningApps().enumerated().sorted { first, second in
+            let firstKey = (positionsInTracker[first.element.processIdentifier] ?? untrackedPosition, first.offset)
+            let secondKey = (positionsInTracker[second.element.processIdentifier] ?? untrackedPosition, second.offset)
+            return firstKey < secondKey
         }
 
-        var recentApps: [SwitcherApp] = []
-        for bundleIdentifier in recentIdentifiers {
-            guard let app = appsByIdentifier[bundleIdentifier] else { continue }
-            recentApps.append(app)
-        }
-
-        let recentIdentifierSet = Set(recentIdentifiers)
-        let neverActivatedApps = runningApps.filter { !recentIdentifierSet.contains($0.bundleIdentifier) }
-
-        return workspace.getAppsWithWindows(recentApps + neverActivatedApps)
+        return workspace.getAppsWithWindows(appsByRecency.map { $0.element })
     }
 
     /// For the list's items at the panel width as it is now: the remembered one, or the default share of the screen until the edge has been

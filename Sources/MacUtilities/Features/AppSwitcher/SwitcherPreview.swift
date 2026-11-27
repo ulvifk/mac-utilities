@@ -146,7 +146,7 @@ final class SwitcherPreview {
     private func loadList(listingWindows: Bool) -> SwitcherList? {
         if !listingWindows { return listLoader.loadAppList() }
 
-        guard let app = listLoader.getRecentRunningApps().first else { return nil }
+        guard let app = listLoader.getRunningAppsByRecency().first else { return nil }
         return listLoader.loadWindowList(of: app)
     }
 

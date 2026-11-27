@@ -73,11 +73,11 @@ struct SwitcherList {
         )
     }
 
-    /// The app with this bundle identifier, or the first app when it is not listed.
-    func selectingApp(bundleIdentifier: String) -> SwitcherList {
+    /// The app with this process identifier, or the first app when it is not listed.
+    func selectingApp(processIdentifier: pid_t) -> SwitcherList {
         guard case .apps(let apps, _) = items else { preconditionFailure("Windows are listed") }
 
-        return selecting(apps.firstIndex { $0.bundleIdentifier == bundleIdentifier } ?? 0)
+        return selecting(apps.firstIndex { $0.processIdentifier == processIdentifier } ?? 0)
     }
 
     /// How far the cell is drawn from the selected one, in columns.

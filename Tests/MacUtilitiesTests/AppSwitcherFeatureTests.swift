@@ -133,14 +133,31 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func neverActivatedAppsFollowRecentOnes() async {
+    func untrackedAppsFollowTrackedOnes() async {
         let harness = AppSwitcherTestHarness()
-        harness.workspace.recentBundleIdentifiers = ["test.app.2", "test.app.0"]
+        harness.workspace.recentProcessIdentifiers = [2, 0]
 
         harness.press(tabKeyCode)
         await harness.drainMainQueue()
 
         #expect(harness.log.shownStates.last!.bundleIdentifiers == ["test.app.2", "test.app.0", "test.app.1"])
+        await harness.finish()
+    }
+
+    /// Running [test.app.0 #0, test.app.0 #2, test.app.1 #1], with #0 frontmost and test.app.1 active before it.
+    @Test
+    func quickSwitchFromAppWithTwoInstancesGoesToThePreviousApp() async {
+        let harness = AppSwitcherTestHarness(itemCount: 2)
+        let secondInstance = harness.workspace.buildApp(index: 2)
+        secondInstance.bundleIdentifier = "test.app.0"
+        harness.workspace.runningApps.insert(secondInstance, at: 1)
+        harness.workspace.recentProcessIdentifiers = [0, 1, 2]
+
+        harness.press(tabKeyCode)
+        harness.releaseCommand()
+        await harness.drainMainQueue()
+
+        #expect(harness.workspace.activatedBundleIdentifiers == ["test.app.1"], "Quick switch did not go to the previous app")
         await harness.finish()
     }
 
@@ -191,6 +208,25 @@ struct AppSwitcherFeatureTests {
         #expect(harness.settings.whitelistStore.isFilterEnabled, "Filter was not applied")
         #expect(harness.log.shownStates.last!.list.selectedIndex == 1, "Filter lost the selected app")
         #expect(harness.log.feedback.count == 1, "Filter feedback was lost")
+        await harness.finish()
+    }
+
+    /// Running and tracked [test.app.0 #0, test.app.1 #1, test.app.0 #2], #2 selected.
+    @Test
+    func filterKeepsTheSelectedInstance() async {
+        let harness = AppSwitcherTestHarness(itemCount: 2)
+        let secondInstance = harness.workspace.buildApp(index: 2)
+        secondInstance.bundleIdentifier = "test.app.0"
+        harness.workspace.runningApps.append(secondInstance)
+        harness.workspace.recentProcessIdentifiers = [0, 1, 2]
+
+        harness.press(tabKeyCode)
+        harness.press(tabKeyCode)
+        await harness.drainMainQueue()
+        harness.press(fKeyCode)
+        await harness.drainMainQueue()
+
+        #expect(harness.log.shownStates.last!.list.selectedApp.processIdentifier == 2, "Filter moved the selection to another instance")
         await harness.finish()
     }
 
