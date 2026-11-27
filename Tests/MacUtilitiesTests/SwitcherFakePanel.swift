@@ -35,9 +35,13 @@ final class SwitcherFakePanel: SwitcherPanel {
         log.glassUpdatedStates.append(state)
     }
 
-    func resize(state: SwitcherState) {}
+    func resize(state: SwitcherState) {
+        log.resizedStates.append(state)
+    }
 
-    func removeApp(at index: Int, state: SwitcherState) {}
+    func removeApp(at index: Int, state: SwitcherState) {
+        log.appRemovals.append(SwitcherAppRemoval(index: index, state: state))
+    }
 
     func showHintsAfterDelay() {}
 
@@ -56,6 +60,14 @@ final class SwitcherPanelLog {
     var shownStates: [SwitcherState] = []
     var updatedStates: [SwitcherState] = []
     var glassUpdatedStates: [SwitcherState] = []
+    var resizedStates: [SwitcherState] = []
+    var appRemovals: [SwitcherAppRemoval] = []
     var feedback: [SwitcherFeedback] = []
     var previewPositionCount = 0
+}
+
+/// The app's cell taken out at index, the rest drawn as in state.
+struct SwitcherAppRemoval {
+    let index: Int
+    let state: SwitcherState
 }

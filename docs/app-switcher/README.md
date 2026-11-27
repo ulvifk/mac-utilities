@@ -229,11 +229,15 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   apps' own launchd jobs after a Batch Quit, finding them with `lsappinfo` and removing
   them with `launchctl`.
 
-`Tests/MacUtilitiesTests/` test it in-process: `AppSwitcherFeatureTests` and
-`AppSwitcherPreviewTests` drive the feature through `AppSwitcherTestHarness` on fakes
-of the boundaries (`SwitcherFake*`), `SwitcherAppearanceTests` draw the real views into
-a `SwitcherPanelContent` without ordering a window in, and the pure units have their own
-tests.
+`Tests/MacUtilitiesTests/` test it in-process: `AppSwitcherFeatureTests`,
+`AppSwitcherKeyRoutingTests` (which presses are swallowed in each phase),
+`AppSwitcherOpenPanelTests` and `AppSwitcherPreviewTests` drive the feature through
+`AppSwitcherTestHarness` on fakes of the boundaries (`SwitcherFake*`).
+`SwitcherAppearanceTests` run the real `GlassSwitcherPanel` as `SwitcherTestGlassPanel`,
+whose ordering in and out only flips `isVisible`, so no window reaches the screen (the
+panel class is not `final` for this), and draw the rest into a `SwitcherPanelContent`.
+`SwitcherSystemWorkspaceTests` post the workspace notifications in-process to check
+`SystemSwitcherWorkspace`'s subscriptions, and the pure units have their own tests.
 
 ## Dev
 

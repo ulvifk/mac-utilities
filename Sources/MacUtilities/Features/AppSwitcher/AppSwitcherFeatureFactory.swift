@@ -1,16 +1,16 @@
 import AppKit
 
 /// Builds the App Switcher feature with the parts it reaches the system through.
-struct AppSwitcherFeatureFactory {
+enum AppSwitcherFeatureFactory {
     /// With APP_SWITCHER_SMOKE_TEST in the environment the feature runs the smoke test when it starts.
-    func buildFeature(settings: SwitcherSettings, workspace: SwitcherWorkspace, screen: SwitcherScreen, panel: SwitcherPanel, previewPanel: SwitcherPanel,
+    static func buildFeature(settings: SwitcherSettings, workspace: SwitcherWorkspace, screen: SwitcherScreen, panel: SwitcherPanel, previewPanel: SwitcherPanel,
                       environment: [String: String]) -> AppSwitcherFeature {
         let listLoader = SwitcherListLoader(workspace: workspace, screen: screen, whitelistStore: settings.whitelistStore, panelWidthStore: settings.panelWidthStore)
-        let smokeTest = environment["APP_SWITCHER_SMOKE_TEST"] == nil ? nil : AppSwitcherSmokeTest(
-            panel: GlassSwitcherPanel(), settings: settings, listLoader: listLoader, workspace: workspace, screen: screen, environment: environment
-        )
-
         let thumbnailCache = WindowThumbnailCache(screen: screen)
+        let smokeTest = environment["APP_SWITCHER_SMOKE_TEST"] == nil ? nil : AppSwitcherSmokeTest(
+            panel: GlassSwitcherPanel(), settings: settings, listLoader: listLoader, workspace: workspace, thumbnailCache: thumbnailCache,
+            environment: environment
+        )
 
         return AppSwitcherFeature(
             workspace: workspace,
@@ -24,7 +24,7 @@ struct AppSwitcherFeatureFactory {
     }
 
     /// On the system: the settings in the standard defaults, the preview's clicks passing through to the settings pane.
-    func buildFeature() -> AppSwitcherFeature {
+    static func buildFeature() -> AppSwitcherFeature {
         let settings = buildSettings(defaults: .standard)
         let previewPanel = GlassSwitcherPanel()
         previewPanel.ignoresMouseEvents = true
@@ -39,7 +39,7 @@ struct AppSwitcherFeatureFactory {
         )
     }
 
-    func buildSettings(defaults: UserDefaults) -> SwitcherSettings {
+    static func buildSettings(defaults: UserDefaults) -> SwitcherSettings {
         return SwitcherSettings(
             whitelistStore: WhitelistStore(defaults: defaults),
             batchQuitStore: BatchQuitStore(defaults: defaults),

@@ -15,21 +15,21 @@ final class AppSwitcherSmokeTest {
     private let settings: SwitcherSettings
     private let listLoader: SwitcherListLoader
     private let workspace: SwitcherWorkspace
-    private let screen: SwitcherScreen
+    private let thumbnailCache: WindowThumbnailCache
     private let environment: [String: String]
 
     /// The shown one; nil until the panel shows.
     private var list: SwitcherList?
-    /// [window id] -> the window's thumbnail, as captured
-    private var thumbnails: [CGWindowID: NSImage] = [:]
+    /// Never renewed: the smoke test exits once it has captured the panel.
+    private let session = SwitcherSession()
 
-    init(panel: GlassSwitcherPanel, settings: SwitcherSettings, listLoader: SwitcherListLoader, workspace: SwitcherWorkspace, screen: SwitcherScreen,
-         environment: [String: String]) {
+    init(panel: GlassSwitcherPanel, settings: SwitcherSettings, listLoader: SwitcherListLoader, workspace: SwitcherWorkspace,
+         thumbnailCache: WindowThumbnailCache, environment: [String: String]) {
         self.panel = panel
         self.settings = settings
         self.listLoader = listLoader
         self.workspace = workspace
-        self.screen = screen
+        self.thumbnailCache = thumbnailCache
         self.environment = environment
     }
 
@@ -51,15 +51,12 @@ final class AppSwitcherSmokeTest {
         let list = loadedList.selecting(Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!)
 
         self.list = list
-        panel.show(state: settings.buildState(list: list, thumbnails: thumbnails), glassStore: settings.getGlassStore(listingWindows: listingWindows))
+        panel.show(state: buildState(list), glassStore: settings.getGlassStore(listingWindows: listingWindows))
         panel.showHintsAfterDelay()
         showCaptureBackdrop(behind: panel)
 
         guard case .windows(let windows) = list.items else { return }
-        screen.captureThumbnails(of: windows.map { $0.windowID }) { windowID, thumbnail in
-            self.thumbnails[windowID] = thumbnail
-            self.panel.update(state: self.settings.buildState(list: list, thumbnails: self.thumbnails))
-        }
+        thumbnailCache.refresh(of: windows, session: session) { self.panel.update(state: self.buildState(list)) }
     }
 
     private func printAndCapturePanel() {
@@ -72,8 +69,12 @@ final class AppSwitcherSmokeTest {
         }
 
         print("smoke: frame=\(panel.frame) visible=\(panel.isVisible) alpha=\(panel.alphaValue) apps=\(appNames.count) windows=\(windowTitles.count) selected=\(list.selectedIndex)")
-        print("smoke: candidates=\(appNames) windows=\(windowTitles) thumbnails=\(thumbnails.count)")
+        print("smoke: candidates=\(appNames) windows=\(windowTitles) thumbnails=\(thumbnailCache.thumbnails.count)")
         writeCapture(around: panel, path: smokeCapturePath)
+    }
+
+    private func buildState(_ list: SwitcherList) -> SwitcherState {
+        return settings.buildState(list: list, thumbnails: thumbnailCache.thumbnails)
     }
 }
 

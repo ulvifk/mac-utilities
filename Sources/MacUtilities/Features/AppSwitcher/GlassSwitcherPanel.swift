@@ -2,8 +2,8 @@ import AppKit
 import QuartzCore
 
 /// A borderless floating window on every Space that never takes keyboard focus, its content the glass of a SwitcherPanelContent. It orders
-/// itself in and out, places itself and grows for the hint band; what it draws is the content's.
-final class GlassSwitcherPanel: NSPanel, SwitcherPanel {
+/// itself in and out, places itself and grows for the hint band; what it draws is the content's. Not final so tests can keep it off the screen.
+class GlassSwitcherPanel: NSPanel, SwitcherPanel {
     private let content = SwitcherPanelContent()
     private var hintShowing: DispatchWorkItem?
     private var feedbackHiding: DispatchWorkItem?
