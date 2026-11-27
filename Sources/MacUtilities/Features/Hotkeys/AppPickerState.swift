@@ -9,6 +9,8 @@ import Combine
 ///   highlight; the search field writes its unchanged text back when Return commits it, just before Return picks the highlighted app.
 /// - Up and Down move the highlight one result and stop at either end; from no highlight, either one highlights the first result.
 /// - Hovering a row highlights it and the highlight stays there when the pointer leaves, so the pointer and the keys share one highlight.
+///   A hover report counts only when the pointer has moved since the previous one: as the keys scroll the list, the row sliding under a
+///   still pointer is reported as hovered, and must not take the highlight back from the keys.
 /// The apps are fixed for the picker's life, so the highlighted index always points into the results.
 final class AppPickerState: ObservableObject {
     let apps: [InstalledApp] // by name
@@ -16,6 +18,7 @@ final class AppPickerState: ObservableObject {
     @Published var isShown = false
     @Published private(set) var searchText = ""
     @Published private(set) var highlightedIndex: Int? // into results
+    private var lastHoverPointerLocation: CGPoint? // in screen coordinates, which scrolling the list does not change
 
     init(apps: [InstalledApp]) {
         self.apps = apps
@@ -25,7 +28,7 @@ final class AppPickerState: ObservableObject {
     /// the search text is blank.
     /// e.g. " code " over [Safari, Visual Studio Code, Xcode] -> [Visual Studio Code, Xcode]
     var results: [InstalledApp] {
-        let trimmedSearchText = getTrimmedSearchText()
+        let trimmedSearchText = getTrimmed(searchText)
         if trimmedSearchText.isEmpty { return apps }
 
         return apps.filter { $0.name.localizedCaseInsensitiveContains(trimmedSearchText) }
@@ -39,17 +42,21 @@ final class AppPickerState: ObservableObject {
     }
 
     func changeSearchText(to newSearchText: String) {
-        let isSameSearch = getTrimmed(newSearchText) == getTrimmedSearchText()
+        let isSameSearch = getTrimmed(newSearchText) == getTrimmed(searchText)
         searchText = newSearchText
         if isSameSearch { return }
 
         highlightedIndex = nil
-        if getTrimmedSearchText().isEmpty { return }
+        if getTrimmed(searchText).isEmpty { return }
 
         highlightFirstResult()
     }
 
-    func highlightResult(at index: Int) {
+    /// Highlights the hovered result, unless the pointer is where it was at the previous hover report, which means the list scrolled under it.
+    func highlightHoveredResult(at index: Int, pointerLocation: CGPoint) {
+        if pointerLocation == lastHoverPointerLocation { return }
+
+        lastHoverPointerLocation = pointerLocation
         highlightedIndex = index
     }
 
@@ -76,10 +83,6 @@ final class AppPickerState: ObservableObject {
         if results.isEmpty { return }
 
         highlightedIndex = 0
-    }
-
-    private func getTrimmedSearchText() -> String {
-        return getTrimmed(searchText)
     }
 
     private func getTrimmed(_ text: String) -> String {

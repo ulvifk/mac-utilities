@@ -21,13 +21,14 @@ struct AppPickerStateTests {
 
     @Test
     func testEmptySearchListsEveryAppWithoutAHighlight() {
-        state.changeSearchText(to: "")
+        state.show()
         #expect(state.results.map(\.name) == ["Safari", "Visual Studio Code", "Xcode"])
         #expect(state.getHighlightedApp() == nil)
     }
 
     @Test
     func testWhitespaceOnlySearchListsEveryAppWithoutAHighlight() {
+        state.show()
         state.changeSearchText(to: "  ")
         #expect(state.results.map(\.name) == ["Safari", "Visual Studio Code", "Xcode"])
         #expect(state.getHighlightedApp() == nil)
@@ -67,14 +68,14 @@ struct AppPickerStateTests {
 
     @Test
     func testDownWithoutAHighlightHighlightsTheFirstResult() {
-        state.changeSearchText(to: "")
+        state.show()
         state.moveHighlightDown()
         #expect(state.getHighlightedApp()?.name == "Safari")
     }
 
     @Test
     func testUpWithoutAHighlightHighlightsTheFirstResult() {
-        state.changeSearchText(to: "")
+        state.show()
         state.moveHighlightUp()
         #expect(state.getHighlightedApp()?.name == "Safari")
     }
@@ -113,16 +114,18 @@ struct AppPickerStateTests {
     }
 
     @Test
-    func testChangingOnlyTheSurroundingWhitespaceKeepsTheHighlight() {
+    func testChangingOnlyTheSurroundingWhitespaceKeepsTheHighlight() throws {
         state.changeSearchText(to: "a")
         state.moveHighlightDown()
         state.changeSearchText(to: " a ")
+        #expect(state.searchText == " a ")
+        try #require(state.results.count == 2)
         #expect(state.getHighlightedApp()?.name == "Visual Studio Code")
     }
 
     @Test
     func testSettingTheSameBlankSearchKeepsTheHighlight() {
-        state.changeSearchText(to: "")
+        state.show()
         state.moveHighlightDown()
         state.moveHighlightDown()
         state.changeSearchText(to: "")
@@ -130,10 +133,46 @@ struct AppPickerStateTests {
     }
 
     @Test
-    func testHoverHighlightsTheHoveredResult() {
+    func testDeletingTheSearchToBlankClearsTheHighlight() {
+        state.changeSearchText(to: "a")
+        state.moveHighlightDown()
         state.changeSearchText(to: "")
-        state.highlightResult(at: 2)
+        #expect(state.highlightedIndex == nil)
+    }
+
+    @Test
+    func testTypingToASearchWithoutResultsClearsTheHighlight() {
+        state.changeSearchText(to: "a")
+        state.moveHighlightDown()
+        state.changeSearchText(to: "terminal")
+        #expect(state.highlightedIndex == nil)
+    }
+
+    @Test
+    func testHoverHighlightsTheHoveredResult() {
+        state.show()
+        state.highlightHoveredResult(at: 2, pointerLocation: CGPoint(x: 10, y: 50))
         #expect(state.getHighlightedApp()?.name == "Xcode")
+    }
+
+    @Test
+    func testHoverWithAStillPointerKeepsTheKeyboardHighlight() {
+        state.show()
+        state.highlightHoveredResult(at: 0, pointerLocation: CGPoint(x: 10, y: 50))
+        state.moveHighlightDown()
+        state.moveHighlightDown()
+        state.highlightHoveredResult(at: 1, pointerLocation: CGPoint(x: 10, y: 50))
+        #expect(state.highlightedIndex == 2)
+    }
+
+    @Test
+    func testHoverAfterThePointerMovedHighlightsTheHoveredResult() {
+        state.show()
+        state.highlightHoveredResult(at: 0, pointerLocation: CGPoint(x: 10, y: 50))
+        state.moveHighlightDown()
+        state.moveHighlightDown()
+        state.highlightHoveredResult(at: 1, pointerLocation: CGPoint(x: 10, y: 30))
+        #expect(state.highlightedIndex == 1)
     }
 
     @Test
@@ -147,7 +186,7 @@ struct AppPickerStateTests {
 
     @Test
     func testShowingAfterBrowsingABlankSearchClearsTheHighlight() {
-        state.changeSearchText(to: "")
+        state.show()
         state.moveHighlightDown()
         state.show()
         #expect(state.getHighlightedApp() == nil)

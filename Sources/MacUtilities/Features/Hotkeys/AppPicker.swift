@@ -115,7 +115,7 @@ struct AppPicker: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovered in
-            if isHovered { state.highlightResult(at: index) }
+            if isHovered { state.highlightHoveredResult(at: index, pointerLocation: NSEvent.mouseLocation) }
         }
     }
 
