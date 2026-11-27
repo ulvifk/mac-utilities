@@ -76,7 +76,7 @@ final class SwitcherPanelContent {
         switch state.list.items {
         case .apps(let apps, _):
             showAppStatus(apps, layout: layout)
-        case .windows(let windows):
+        case .windows(let windows, _):
             showWindowStatus(windows)
         }
         hintBand.setHints(buildShortcutHints(), width: layout.contentSize.width)
@@ -197,9 +197,9 @@ final class SwitcherPanelContent {
             for (index, app) in apps.enumerated() {
                 cells.append(buildIconCell(app: app, index: index))
             }
-        case .windows(let windows):
+        case .windows(let windows, let app):
             for (index, window) in windows.enumerated() {
-                cells.append(buildWindowCell(window: window, index: index))
+                cells.append(buildWindowCell(window: window, appIcon: app.icon, index: index))
             }
         }
 
@@ -221,8 +221,8 @@ final class SwitcherPanelContent {
         return cell
     }
 
-    private func buildWindowCell(window: SwitcherWindow, index: Int) -> SwitcherCellView {
-        let cell = WindowCellView(window: window, cardGlass: state.cardGlass)
+    private func buildWindowCell(window: SwitcherWindow, appIcon: NSImage?, index: Int) -> SwitcherCellView {
+        let cell = WindowCellView(window: window, appIcon: appIcon, cardGlass: state.cardGlass)
 
         cell.card.showSelected(index == state.list.selectedIndex)
         if let thumbnail = state.thumbnails[window.windowID] {

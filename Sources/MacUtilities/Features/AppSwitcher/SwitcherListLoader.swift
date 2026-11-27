@@ -25,7 +25,7 @@ final class SwitcherListLoader {
 
     /// Whatever the whitelist and the filter say.
     func loadWindowList(of app: SwitcherApp) -> SwitcherList {
-        let items = SwitcherItems.windows(workspace.getWindows(of: app))
+        let items = SwitcherItems.windows(workspace.getWindows(of: app), of: app)
 
         return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items))
     }

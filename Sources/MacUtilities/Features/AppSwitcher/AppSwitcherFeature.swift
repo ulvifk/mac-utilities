@@ -82,14 +82,21 @@ final class AppSwitcherFeature: Feature {
 
     // MARK: workspace changes
 
-    /// The open switcher's list loses the app; a shown preview loads afresh.
+    /// The open switcher's app list loses the app, and a window list of the app closes; a shown preview loads afresh. An opening has no
+    /// list yet and loads one on the next turn; on windows, the frontmost app then may still be the one that quit, whose empty list closes
+    /// the switcher without showing it.
     private func handleAppTermination(_ processIdentifier: pid_t) {
         preview.reloadIfShown()
         guard case .open(let list) = phase else { return }
-        guard case .apps(let apps, _) = list.items else { return }
-        guard let index = apps.firstIndex(where: { $0.processIdentifier == processIdentifier }) else { return }
 
-        removeApp(at: index, from: list)
+        switch list.items {
+        case .apps(let apps, _):
+            guard let index = apps.firstIndex(where: { $0.processIdentifier == processIdentifier }) else { return }
+            removeApp(at: index, from: list)
+        case .windows(_, let app):
+            if app.processIdentifier != processIdentifier { return }
+            dismissSwitcher()
+        }
     }
 
     /// Redraws the dimming once the app is really hidden or shown, whether it was our Cmd+H or done elsewhere.
@@ -329,7 +336,7 @@ final class AppSwitcherFeature: Feature {
         panel.show(state: buildState(list), glassStore: settings.getGlassStore(listingWindows: list.isListingWindows))
         panel.showHintsAfterDelay()
 
-        guard case .windows(let windows) = list.items else { return }
+        guard case .windows(let windows, _) = list.items else { return }
         thumbnailCache.refresh(of: windows, session: switcherSession) { self.redrawThumbnails() }
     }
 
@@ -347,7 +354,7 @@ final class AppSwitcherFeature: Feature {
     /// A window is raised on the next turn of the main queue: its accessibility round trips must stay out of the tap callback releasing Cmd.
     private func activateSelection(of list: SwitcherList) {
         switch list.items {
-        case .windows(let windows):
+        case .windows(let windows, _):
             let window = windows[list.selectedIndex]
             featureSession.runOnNextTurn { window.bringToFront() }
 

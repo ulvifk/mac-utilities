@@ -55,7 +55,7 @@ final class AppSwitcherSmokeTest {
         panel.showHintsAfterDelay()
         showCaptureBackdrop(behind: panel)
 
-        guard case .windows(let windows) = list.items else { return }
+        guard case .windows(let windows, _) = list.items else { return }
         thumbnailCache.refresh(of: windows, session: session) { self.panel.update(state: self.buildState(list)) }
     }
 
@@ -65,7 +65,7 @@ final class AppSwitcherSmokeTest {
         var windowTitles: [String] = []
         switch list.items {
         case .apps(let apps, _): appNames = apps.map { $0.name }
-        case .windows(let windows): windowTitles = windows.map { $0.title }
+        case .windows(let windows, _): windowTitles = windows.map { $0.title }
         }
 
         print("smoke: frame=\(panel.frame) visible=\(panel.isVisible) alpha=\(panel.alphaValue) apps=\(appNames.count) windows=\(windowTitles.count) selected=\(list.selectedIndex)")

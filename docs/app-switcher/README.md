@@ -175,6 +175,8 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   apps; the panel width is the same one, so the thumbnails wrap to it. Cmd+Tab and the
   app shortcuts (Cmd+W, Cmd+F, Cmd+Q, Cmd+Shift+Q, Cmd+H) do nothing while windows are
   listed.
+- If the app quits while its windows are listed, the switcher closes, as it does when
+  the last listed app quits; another app quitting leaves the list as it is.
 - The hints come in as with apps but offer only ← → Select, with ↑ ↓ once there is a
   second row, and esc Cancel.
 
