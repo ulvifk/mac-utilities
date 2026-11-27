@@ -43,23 +43,25 @@ struct AppPickerStateTests {
     func testSearchWithoutResultsHighlightsNothing() {
         state.changeSearchText(to: "terminal")
         #expect(state.results.isEmpty)
-        #expect(state.getHighlightedApp() == nil)
+        #expect(state.highlightedIndex == nil)
     }
 
     @Test
-    func testDownStopsAtTheLastResult() {
+    func testDownStopsAtTheLastResult() throws {
         state.changeSearchText(to: "a")
         state.moveHighlightDown()
         state.moveHighlightDown()
+        try #require(state.highlightedIndex == 1)
         #expect(state.getHighlightedApp()?.name == "Visual Studio Code")
     }
 
     @Test
-    func testUpStopsAtTheFirstResult() {
+    func testUpStopsAtTheFirstResult() throws {
         state.changeSearchText(to: "a")
         state.moveHighlightDown()
         state.moveHighlightUp()
         state.moveHighlightUp()
+        try #require(state.highlightedIndex == 0)
         #expect(state.getHighlightedApp()?.name == "Safari")
     }
 
@@ -82,7 +84,7 @@ struct AppPickerStateTests {
         state.changeSearchText(to: "terminal")
         state.moveHighlightDown()
         state.moveHighlightUp()
-        #expect(state.getHighlightedApp() == nil)
+        #expect(state.highlightedIndex == nil)
     }
 
     @Test
