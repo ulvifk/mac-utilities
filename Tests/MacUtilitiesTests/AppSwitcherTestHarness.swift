@@ -41,11 +41,17 @@ final class AppSwitcherTestHarness {
         defaults.remove()
     }
 
+    /// A press the switcher must swallow.
     func press(_ keyCode: Int64, modifiers: CGEventFlags = .maskCommand, sourceLocation: SourceLocation = #_sourceLocation) {
+        #expect(sendKeyDown(keyCode, modifiers: modifiers), "Shortcut \(keyCode) was not handled", sourceLocation: sourceLocation)
+    }
+
+    /// Whether the switcher swallowed the press; false passes it on to the focused app.
+    func sendKeyDown(_ keyCode: Int64, modifiers: CGEventFlags) -> Bool {
         let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(keyCode), keyDown: true)!
         event.flags = modifiers
 
-        #expect(feature.handle(type: .keyDown, event: event), "Shortcut \(keyCode) was not handled", sourceLocation: sourceLocation)
+        return feature.handle(type: .keyDown, event: event)
     }
 
     func releaseCommand(sourceLocation: SourceLocation = #_sourceLocation) {
