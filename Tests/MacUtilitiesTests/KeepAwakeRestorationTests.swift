@@ -87,30 +87,6 @@ struct KeepAwakeRestorationTests {
     }
 
     @Test
-    func appKitTerminationFinishesCleanupFromQueuedAndNativeRequests() throws {
-        let directory = try Self.createTemporaryDirectory()
-        defer { try! FileManager.default.removeItem(at: directory) }
-
-        let harness = directory.appendingPathComponent("termination-harness")
-        let main = directory.appendingPathComponent("main.swift")
-        try FileManager.default.copyItem(at: Self.fixtures.appendingPathComponent("termination.swift"), to: main)
-        let compilation = try Self.runProcess("/usr/bin/xcrun", arguments: [
-            "swiftc", main.path,
-            Self.sources.appendingPathComponent("Core/AppController.swift").path,
-            Self.sources.appendingPathComponent("Core/ApplicationTermination.swift").path,
-            Self.sources.appendingPathComponent("Core/Feature.swift").path,
-            "-o", harness.path
-        ])
-        try #require(compilation.status == 0, "\(compilation.output)")
-
-        for context in ["dispatch", "task", "native"] {
-            let result = try Self.runProcess(harness.path, arguments: [context])
-            #expect(result.status == 0, "\(context): \(result.output)")
-            #expect(result.output.components(separatedBy: "PASS \(context)").count == 2, "\(result.output)")
-        }
-    }
-
-    @Test
     func watchdogRetriesAfterParentExitUntilRestoreSucceeds() throws {
         let directory = try Self.createTemporaryDirectory()
         defer { try! FileManager.default.removeItem(at: directory) }

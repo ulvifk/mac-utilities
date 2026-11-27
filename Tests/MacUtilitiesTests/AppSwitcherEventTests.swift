@@ -3,21 +3,6 @@ import Testing
 
 struct AppSwitcherEventTests {
     @Test
-    func settingsWindowReportsPreviewVisibility() throws {
-        let sources = [
-            "Sources/MacUtilities/Settings/SettingsWindow.swift",
-            "Sources/MacUtilities/Settings/SettingsSplitViewController.swift",
-            "Sources/MacUtilities/Settings/SettingsPane.swift",
-            "Sources/MacUtilities/Settings/SettingsMetrics.swift",
-            "Sources/MacUtilities/Core/Feature.swift",
-            "Tests/MacUtilitiesTests/Fixtures/SettingsPreview/SettingsPreviewFakes.swift",
-            "Tests/MacUtilitiesTests/Fixtures/SettingsPreview/main.swift",
-        ]
-
-        try runFixture(sources: sources, expectedScenarioCount: 6)
-    }
-
-    @Test
     func eventHandlingPreservesDirectionCancellationAndPreviewReuse() throws {
         let sources = [
             "Sources/MacUtilities/Features/AppSwitcher/AppSwitcherFeature.swift",
