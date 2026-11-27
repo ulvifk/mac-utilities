@@ -264,4 +264,29 @@ struct KeepAwakeFeatureTests {
         try await harness.waitUntil { didFinishTermination }
         #expect(power.commandHistory == [true, false], "Termination ran overlapping restoration commands")
     }
+
+    /// Between AppController stopping the feature and its cleanup starting, the popover tile can still be clicked.
+    @Test
+    func togglesBetweenStopAndCleanupOnQuitAreIgnored() async throws {
+        let harness = KeepAwakeHarness()
+        let power = harness.power
+        let feature = harness.buildFeature()
+
+        feature.stop(because: .quit)
+        feature.toggle(from: .popoverToggle)
+        feature.turnOn(for: .oneHour)
+        try await harness.letMainQueueRun()
+        try #require(power.commandHistory.isEmpty, "A toggle during Quit ran a power command")
+        #expect(feature.session == nil, "A toggle during Quit started a session")
+        #expect(!feature.isChangingSession, "A toggle during Quit started a transition")
+
+        // Cleanup would wait forever on a command nobody completes, so the wait also ends when one appears.
+        var didFinishCleanup = false
+        Task { @MainActor in
+            await feature.prepareForTermination()
+            didFinishCleanup = true
+        }
+        try await harness.waitUntil { didFinishCleanup || !power.pendingCommands.isEmpty }
+        #expect(power.commandHistory.isEmpty, "Quit ran a power command")
+    }
 }

@@ -51,17 +51,15 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     func stop(because cause: FeatureStopCause) {
         switch cause {
         case .switchedOff: dropRequest(because: .featureSwitchedOff)
-        case .quit: dropRequest(because: .quit)
+        case .quit: beginTerminating()
         }
     }
 
+    /// A feature switched off earlier is not stopped on Quit, so this begins terminating too.
     @MainActor func prepareForTermination() async {
-        isTerminating = true
-        dropRequest(because: .quit)
+        beginTerminating()
         await transition?.value
 
-        deactivation?.cancel()
-        deactivation = nil
         sleepRestorationRetry?.cancel()
         sleepRestorationRetry = nil
     }
@@ -193,11 +191,11 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         }
     }
 
-    /// Sleeps the Mac the way macOS would have once a session stops holding a closed lid awake.
+    /// Sleeps the Mac as macOS would have once a session stops holding a closed lid awake, since macOS does not re-check a closed lid when sleep is restored. Skipped:
     ///
-    /// - macOS decides whether a closed lid sleeps the Mac only on lid, power-source and display changes. When one of those ends the session, for example unplugging with "Only while connected to power" on, macOS decides while sleep is still disabled, and restoring sleep does not make it decide again.
-    /// - Skipped when macOS's own rule keeps a closed lid awake, such as an external display on AC power; macOS then decides again on the next display or power change.
-    /// - Skipped on Quit, so a log out, restart or shut down is never turned into a sleep.
+    /// - when the next session keeps the lid awake;
+    /// - when macOS's own verdict keeps a closed lid awake, such as an external display on AC power (closed-display mode);
+    /// - on Quit, so a log out, restart or shut down never becomes a sleep.
     @MainActor private func sleepIfClosedLidIsLeftAwake() {
         if isTerminating {
             Logger.keepAwake.notice("Not putting the Mac to sleep after the lid-closed session: quitting")
@@ -225,6 +223,13 @@ final class KeepAwakeFeature: Feature, ObservableObject {
             keepsAwakeWithLidClosed: preferences.keepsAwakeWithLidClosed,
             powerManagement: powerManagement
         )
+    }
+
+    /// Drops the request and from then on ignores toggles, duration chips and condition changes, so no session starts during Quit and the
+    /// session Quit ends never sleeps the Mac, however long the other features take to clean up.
+    private func beginTerminating() {
+        isTerminating = true
+        dropRequest(because: .quit)
     }
 
     /// Drops the request. The cause is recorded only when there was a request, so a session still restoring sleep keeps the cause it ended for.

@@ -63,7 +63,9 @@ an enabled session to resume on battery.
 - when Keep Awake is toggled off, its time is up, the feature is switched off in its
   settings pane or the app quits. Quit stops enabled features, then waits for
   outstanding Keep Awake commands before allowing the app to exit, including
-  cleanup still owned by a disabled feature;
+  cleanup still owned by a disabled feature. From the moment Quit stops it, Keep
+  Awake ignores the toggle and the duration chips, so no session starts while the
+  app is on its way out;
 - when external power is disconnected with "Only while connected to power" on,
   including when an activation command is still in flight;
 - when the app dies any other way: activating spawns a child watchdog shell that
