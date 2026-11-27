@@ -44,8 +44,6 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         powerManagement.startObservingExternalPower { [unowned self] in updateSessionForChangedCondition() }
     }
 
-    func start() {}
-
     func stop() {
         requestedSession = nil
         updateSession()
@@ -60,10 +58,6 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         deactivation = nil
         sleepRestorationRetry?.cancel()
         sleepRestorationRetry = nil
-    }
-
-    func handle(type: CGEventType, event: CGEvent) -> Bool {
-        return false
     }
 
     func buildSettingsSections() -> AnyView {
