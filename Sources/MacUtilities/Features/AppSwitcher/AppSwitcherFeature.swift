@@ -190,34 +190,37 @@ final class AppSwitcherFeature: Feature {
             showSelection(list.movingBetweenRows(up: false))
         case .cancel:
             dismissSwitcher()
+        case .toggleWhitelisted where !list.isListingWindows:
+            toggleSelectedAppWhitelisted(list)
+        case .toggleFilter where !list.isListingWindows:
+            switcherSession.runOnNextTurn { self.toggleFilter() }
+        case .batchQuit where !list.isListingWindows:
+            runBatchQuit()
+        case .quit where !list.isListingWindows:
+            quitSelectedApp(list)
+        case .hide where !list.isListingWindows:
+            hideSelectedApp(list)
         case .toggleWhitelisted, .toggleFilter, .batchQuit, .quit, .hide:
-            if !list.isListingWindows { handleAppShortcut(shortcut, list: list) }
+            break
         }
 
         return true
     }
 
-    private func handleAppShortcut(_ shortcut: SwitcherShortcut, list: SwitcherList) {
-        switch shortcut {
-        case .toggleWhitelisted:
-            let bundleIdentifier = list.selectedApp.bundleIdentifier
-            let listed = !settings.whitelistStore.isListed(bundleIdentifier)
-            settings.whitelistStore.setListed(bundleIdentifier, listed)
-            panel.update(state: buildState(list))
-            showFeedback(listed ? .addedToWhitelist : .removedFromWhitelist)
-        case .toggleFilter:
-            switcherSession.runOnNextTurn { self.toggleFilter() }
-        case .batchQuit:
-            runBatchQuit()
-        case .quit:
-            let app = list.selectedApp
-            app.terminate()
-            showFeedback(.quittingApp(name: app.name))
-        case .hide:
-            hideSelectedApp(list)
-        default:
-            preconditionFailure("\(shortcut) is not an app shortcut")
-        }
+    private func toggleSelectedAppWhitelisted(_ list: SwitcherList) {
+        let bundleIdentifier = list.selectedApp.bundleIdentifier
+        let listed = !settings.whitelistStore.isListed(bundleIdentifier)
+
+        settings.whitelistStore.setListed(bundleIdentifier, listed)
+        panel.update(state: buildState(list))
+        showFeedback(listed ? .addedToWhitelist : .removedFromWhitelist)
+    }
+
+    private func quitSelectedApp(_ list: SwitcherList) {
+        let app = list.selectedApp
+
+        app.terminate()
+        showFeedback(.quittingApp(name: app.name))
     }
 
     /// A second press on a hidden app does nothing.
