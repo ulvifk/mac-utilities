@@ -2,8 +2,9 @@ import AppKit
 import Testing
 @testable import MacUtilities
 
-/// The panel's real views, drawn into SwitcherPanelContent without a window: look changes reuse the content, cells and images, and the preview
-/// is placed beside the settings window at its final size. No window is ordered onto the screen.
+/// The panel's real views: look changes reuse the content, cells and images, and the preview is placed beside the settings window at its
+/// final size. The real panel runs as SwitcherTestGlassPanel and the rest draws into SwitcherPanelContent, so no window is ordered onto the
+/// screen.
 @MainActor @Suite(.serialized)
 final class SwitcherAppearanceTests {
     struct PlacementScenario: CustomTestStringConvertible, Sendable {
@@ -52,44 +53,47 @@ final class SwitcherAppearanceTests {
 
     // MARK: glass
 
+    /// On the panel, as the preview shows it: only the preview's look changes while it is shown.
     @Test(arguments: [false, true])
     func darknessReusesAllViews(listingWindows: Bool) {
-        let content = SwitcherPanelContent()
+        let panel = SwitcherTestGlassPanel()
         let state = buildState(listingWindows: listingWindows, cardGlass: cardGlass)
-        content.rebuild(state: state, glassStore: panelGlass, showsHintsAtOnce: false)
-        let glass = content.glass!
+        panel.showPreview(state: state, glassStore: panelGlass, beside: buildSettingsWindow())
+        let glass = panel.contentView as! NSGlassEffectView
         let container = glass.contentView!
         let cells = getCells(in: container)
         #expect(cells.count == 2, "Panel did not build the initial cells")
 
         for step in 0..<20 {
             panelGlass.setDarkness(CGFloat(step) / 40)
-            content.updateGlass(state: state, glassStore: panelGlass)
+            panel.updateGlass(state: state, glassStore: panelGlass)
 
-            #expect(content.glass === glass, "Darkness change replaced the glass")
+            #expect(panel.contentView === glass, "Darkness change replaced the glass")
             #expect(glass.tintColor!.alphaComponent == panelGlass.darkness, "Darkness change was not applied")
-            expectSameViews(content: content, container: container, cells: cells)
+            expectSameViews(glass: glass, container: container, cells: cells)
         }
     }
 
-    /// The panel answers _hasActiveAppearance with the content's isFrosted negated.
+    /// The panel shows the new glass the content moved into, and tells AppKit it has the active appearance only while Clear.
     @Test(arguments: [false, true])
     func frostedReusesContentAndCells(listingWindows: Bool) {
-        let content = SwitcherPanelContent()
+        let panel = SwitcherTestGlassPanel()
         let state = buildState(listingWindows: listingWindows, cardGlass: cardGlass)
-        content.rebuild(state: state, glassStore: panelGlass, showsHintsAtOnce: false)
-        let container = content.glass.contentView!
+        panel.showPreview(state: state, glassStore: panelGlass, beside: buildSettingsWindow())
+        let container = (panel.contentView as! NSGlassEffectView).contentView!
         let cells = getCells(in: container)
+        #expect(panel._hasActiveAppearance(), "Clear panel did not ask for the active appearance")
 
         for frosted in [true, false, true] {
-            let previousGlass = content.glass!
+            let previousGlass = panel.contentView!
             panelGlass.setFrosted(frosted)
-            content.updateGlass(state: state, glassStore: panelGlass)
+            panel.updateGlass(state: state, glassStore: panelGlass)
+            let glass = panel.contentView as! NSGlassEffectView
 
-            #expect(content.glass !== previousGlass, "Frosted change did not refresh the effect wrapper")
-            #expect(content.isFrosted == frosted, "Frosted appearance did not change")
-            #expect(content.glass.tintColor!.alphaComponent == panelGlass.darkness, "Frosted change lost the tint")
-            expectSameViews(content: content, container: container, cells: cells)
+            #expect(glass !== previousGlass, "Frosted change did not show a new effect wrapper")
+            #expect(panel._hasActiveAppearance() == !frosted, "Frosted appearance did not change")
+            #expect(glass.tintColor!.alphaComponent == panelGlass.darkness, "Frosted change lost the tint")
+            expectSameViews(glass: glass, container: container, cells: cells)
         }
     }
 
@@ -105,7 +109,7 @@ final class SwitcherAppearanceTests {
             content.updateGlass(state: cardViews.state, glassStore: panelGlass)
 
             #expect(content.glass === cardViews.glass, "Card darkness replaced panel glass")
-            expectSameViews(content: content, container: cardViews.container, cells: cardViews.cells)
+            expectSameViews(glass: content.glass, container: cardViews.container, cells: cardViews.cells)
             #expect(cardViews.cell.subviews[0] === cardViews.card, "Card darkness replaced the card")
             #expect(cardViews.card.subviews[1] === cardViews.tint, "Card darkness replaced the tint")
             #expect(NSColor(cgColor: cardViews.tint.layer!.backgroundColor!)!.alphaComponent == cardGlass.darkness, "Card darkness was not applied")
@@ -126,7 +130,7 @@ final class SwitcherAppearanceTests {
             #expect(cardViews.blur.isHidden == !frosted, "Card look did not update the blur")
             #expect(cardViews.blur.state == .active, "Card blur lost its active state")
             #expect(cardViews.imageView.image === cardViews.image, "Card look lost the image")
-            expectSameViews(content: cardViews.content, container: cardViews.container, cells: cardViews.cells)
+            expectSameViews(glass: cardViews.content.glass, container: cardViews.container, cells: cardViews.cells)
         }
     }
 
@@ -143,7 +147,7 @@ final class SwitcherAppearanceTests {
         #expect(!cardViews.card.isHidden, "Cards-on did not show the card")
         #expect(cardViews.imageView.image === cardViews.image, "Cards-on lost the image")
         #expect(cardViews.border.layer!.borderWidth == selectedCardBorderWidth, "Cards-on lost the selection")
-        expectSameViews(content: content, container: cardViews.container, cells: cardViews.cells)
+        expectSameViews(glass: content.glass, container: cardViews.container, cells: cardViews.cells)
     }
 
     @Test(arguments: [false, true])
@@ -191,7 +195,7 @@ final class SwitcherAppearanceTests {
             #expect(hiddenCell.icon.alphaValue == (dimHiddenApps ? 0.4 : 1), "Appearance change did not refresh hidden icon opacity")
             #expect(visibleCell.icon.alphaValue == 1, "Appearance change dimmed a visible app")
             #expect(!hiddenCell.dot.isHidden, "Appearance change lost the whitelist marker")
-            expectSameViews(content: content, container: container, cells: cells)
+            expectSameViews(glass: content.glass, container: container, cells: cells)
         }
     }
 
@@ -208,57 +212,71 @@ final class SwitcherAppearanceTests {
         }
     }
 
-    /// The panel sized to the content as showPreview sizes it, never ordered in; positioning only sets the panel's frame, so the content's
-    /// views are left as they are.
+    /// Shown beside the settings window at the size of its content, then following the window with the same views.
     @Test(arguments: [false, true])
     func previewPanelFollowsSettings(listingWindows: Bool) {
         let settingsWindow = buildSettingsWindow()
-        let content = SwitcherPanelContent()
-        content.rebuild(state: buildState(listingWindows: listingWindows, cardGlass: cardGlass, itemCount: listingWindows ? 1 : 2), glassStore: panelGlass,
-                        showsHintsAtOnce: true)
-        let previewPanel = GlassSwitcherPanel()
-        previewPanel.setContentSize(content.layout.contentSize)
-
-        previewPanel.positionPreview(beside: settingsWindow)
-        #expect(!previewPanel.frame.intersects(settingsWindow.frame), "Native preview covered settings controls")
+        let screenFrame = settingsWindow.screen!.visibleFrame
+        let previewPanel = SwitcherTestGlassPanel()
+        previewPanel.showPreview(state: buildState(listingWindows: listingWindows, cardGlass: cardGlass, itemCount: listingWindows ? 1 : 2),
+                                 glassStore: panelGlass, beside: settingsWindow)
+        let glass = previewPanel.contentView as! NSGlassEffectView
+        let container = glass.contentView!
+        let cells = getCells(in: container)
         let originalSize = previewPanel.frame.size
+
+        #expect(previewPanel.isVisible, "Preview was not ordered in")
+        #expect(originalSize == container.frame.size, "Preview was not sized to its content")
+        expectFrame(previewPanel.frame, near: getPreviewFrame(contentSize: originalSize, settingsFrame: settingsWindow.frame, screenFrame: screenFrame),
+                    "Preview was placed before it had its content's size")
+        #expect(!previewPanel.frame.intersects(settingsWindow.frame), "Native preview covered settings controls")
 
         settingsWindow.setFrameOrigin(NSPoint(x: 600, y: 100))
         previewPanel.positionPreview(beside: settingsWindow)
-        let expectedFrame = getPreviewFrame(contentSize: originalSize, settingsFrame: settingsWindow.frame, screenFrame: settingsWindow.screen!.visibleFrame)
-        let pixel = 1 / settingsWindow.screen!.backingScaleFactor
 
-        #expect(abs(previewPanel.frame.minX - expectedFrame.minX) <= pixel, "Native preview did not follow settings horizontally")
-        #expect(abs(previewPanel.frame.minY - expectedFrame.minY) <= pixel, "Native preview did not follow settings vertically")
+        expectFrame(previewPanel.frame, near: getPreviewFrame(contentSize: originalSize, settingsFrame: settingsWindow.frame, screenFrame: screenFrame),
+                    "Native preview did not follow settings")
         #expect(!previewPanel.frame.intersects(settingsWindow.frame), "Moved native preview covered settings controls")
         #expect(previewPanel.frame.size == originalSize, "Repositioning changed preview size")
-        #expect(!previewPanel.isVisible, "Placement tests presented the preview")
+        #expect(previewPanel.contentView === glass, "Repositioning replaced the glass")
+        expectSameViews(glass: glass, container: container, cells: cells)
         #expect(!settingsWindow.isVisible, "Placement tests presented a settings window")
+        previewPanel.hide()
     }
 
-    /// Fullscreen settings or settings filling the lower part of the screen; either way the preview's hint band is in it when it is placed.
-    @Test(arguments: [false, true], ["fullscreen", "above"])
-    func previewIncludesHints(listingWindows: Bool, placement: String) {
-        let settingsWindow = buildSettingsWindow()
-        let visibleFrame = settingsWindow.screen!.visibleFrame
-        let settingsFrame = placement == "fullscreen" ? visibleFrame : NSRect(
-            x: visibleFrame.minX, y: visibleFrame.minY + 100,
-            width: visibleFrame.width, height: visibleFrame.height / 3
-        )
-        let content = SwitcherPanelContent()
+    /// Fullscreen settings or settings filling the lower part of the screen; either way the preview's hint band is in it when it is placed,
+    /// and it does not grow once the switcher's hints would have come in. All four previews wait out the hints together.
+    @Test
+    func previewIncludesHints() async throws {
+        var shownPreviews: [(panel: SwitcherTestGlassPanel, settingsWindow: NSWindow, frame: NSRect, placement: String)] = []
+        for listingWindows in [false, true] {
+            for placement in ["fullscreen", "above"] {
+                let settingsWindow = buildSettingsWindow()
+                let visibleFrame = settingsWindow.screen!.visibleFrame
+                settingsWindow.setFrame(placement == "fullscreen" ? visibleFrame : NSRect(
+                    x: visibleFrame.minX, y: visibleFrame.minY + 100,
+                    width: visibleFrame.width, height: visibleFrame.height / 3
+                ), display: false)
+                let previewPanel = SwitcherTestGlassPanel()
 
-        content.rebuild(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 2), glassStore: panelGlass, showsHintsAtOnce: true)
-        let contentSize = content.layout.contentSize
-        let frame = getPreviewFrame(contentSize: contentSize, settingsFrame: settingsFrame, screenFrame: visibleFrame)
-        let container = content.glass.contentView!
-        let hintBand = container.subviews.first { $0 is HintBandView }!
-        #expect(container.bounds.contains(hintBand.frame), "Preview did not reserve the hint band before placement")
+                previewPanel.showPreview(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 2), glassStore: panelGlass,
+                                         beside: settingsWindow)
+                let container = (previewPanel.contentView as! NSGlassEffectView).contentView!
+                let hintBand = container.subviews.first { $0 is HintBandView }!
+                #expect(container.bounds.contains(hintBand.frame), "Preview did not reserve the hint band before placement")
+                shownPreviews.append((previewPanel, settingsWindow, previewPanel.frame, placement))
+            }
+        }
 
-        content.showHintBand()
-        #expect(content.layout.contentSize == contentSize, "Preview grew after being positioned")
-        #expect(visibleFrame.contains(frame), "Preview hints extended below the visible screen")
-        if placement == "above" {
-            #expect(!frame.intersects(settingsFrame), "Preview hints overlapped settings")
+        try await Task.sleep(for: .seconds(hintDelay + hintFadeDuration + 0.1))
+
+        for preview in shownPreviews {
+            #expect(preview.panel.frame == preview.frame, "Preview grew after being positioned")
+            #expect(preview.settingsWindow.screen!.visibleFrame.contains(preview.panel.frame), "Preview hints extended below the visible screen")
+            if preview.placement == "above" {
+                #expect(!preview.panel.frame.intersects(preview.settingsWindow.frame), "Preview hints overlapped settings")
+            }
+            preview.panel.hide()
         }
     }
 
@@ -299,14 +317,23 @@ final class SwitcherAppearanceTests {
         return container.subviews.compactMap { $0 as? SwitcherCellView }
     }
 
-    private func expectSameViews(content: SwitcherPanelContent, container: NSView, cells: [SwitcherCellView],
+    private func expectSameViews(glass: NSGlassEffectView, container: NSView, cells: [SwitcherCellView],
                                  sourceLocation: SourceLocation = #_sourceLocation) {
-        #expect(content.glass.contentView === container, "Appearance change rebuilt content", sourceLocation: sourceLocation)
+        #expect(glass.contentView === container, "Appearance change rebuilt content", sourceLocation: sourceLocation)
         let currentCells = getCells(in: container)
         #expect(currentCells.count == cells.count, "Appearance change changed the cells", sourceLocation: sourceLocation)
         for (current, original) in zip(currentCells, cells) {
             #expect(current === original, "Appearance change replaced a cell", sourceLocation: sourceLocation)
         }
+    }
+
+    /// Within a pixel, as the window server places windows on whole pixels.
+    private func expectFrame(_ frame: NSRect, near expectedFrame: NSRect, _ comment: Comment, sourceLocation: SourceLocation = #_sourceLocation) {
+        let pixel = 1 / NSScreen.main!.backingScaleFactor
+
+        #expect(abs(frame.minX - expectedFrame.minX) <= pixel, comment, sourceLocation: sourceLocation)
+        #expect(abs(frame.minY - expectedFrame.minY) <= pixel, comment, sourceLocation: sourceLocation)
+        #expect(frame.size == expectedFrame.size, comment, sourceLocation: sourceLocation)
     }
 
     /// The first cell's card and its parts, with a known image in the cell's image view.
