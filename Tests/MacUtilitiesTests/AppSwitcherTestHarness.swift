@@ -108,7 +108,7 @@ extension SwitcherState {
     }
 
     var windowIDs: [CGWindowID] {
-        guard case .windows(let windows) = list.items else { return [] }
+        guard case .windows(let windows, _) = list.items else { return [] }
         return windows.map { $0.windowID }
     }
 }

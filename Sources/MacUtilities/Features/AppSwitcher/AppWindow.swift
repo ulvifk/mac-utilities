@@ -9,10 +9,6 @@ struct AppWindow: SwitcherWindow {
     let windowID: CGWindowID
     let title: String
 
-    var app: SwitcherApp {
-        return runningApp
-    }
-
     func bringToFront() {
         let unminimizeResult = AXUIElementSetAttributeValue(element, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
         let makeMainResult = AXUIElementSetAttributeValue(element, kAXMainAttribute as CFString, kCFBooleanTrue)

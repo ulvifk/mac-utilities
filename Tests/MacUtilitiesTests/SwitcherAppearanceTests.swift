@@ -285,7 +285,7 @@ final class SwitcherAppearanceTests {
     /// Two cells, the first selected: apps test.app.0 and test.app.1, or windows 1 and 2.
     private func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int = 0, itemCount: Int = 2) -> SwitcherState {
         let items = listingWindows
-            ? SwitcherItems.windows((0..<itemCount).map { workspace.buildWindow(windowID: CGWindowID($0 + 1)) })
+            ? SwitcherItems.windows((0..<itemCount).map { workspace.buildWindow(windowID: CGWindowID($0 + 1)) }, of: workspace.buildApp(index: 0))
             : .apps((0..<itemCount).map { workspace.buildApp(index: $0) }, whitelistOnly: false)
 
         return SwitcherState(

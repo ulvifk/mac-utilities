@@ -76,6 +76,34 @@ struct AppSwitcherOpenPanelTests {
         await harness.finish()
     }
 
+    // MARK: apps quitting while windows are listed
+
+    @Test
+    func listedWindowsAppQuits() async {
+        let harness = await openWindowSwitcher()
+
+        harness.workspace.onAppTerminated!(0)
+
+        #expect(!harness.panel.isVisible, "Switcher stayed open on the quit app's windows")
+        harness.releaseCommand()
+        await harness.drainMainQueue()
+        harness.expectNoActivation()
+        await harness.finish()
+    }
+
+    @Test
+    func otherAppQuitsWhileWindowsAreListed() async {
+        let harness = await openWindowSwitcher()
+
+        harness.workspace.onAppTerminated!(1)
+
+        #expect(harness.panel.isVisible, "Another app's quit closed the window list")
+        harness.releaseCommand()
+        await harness.drainMainQueue()
+        harness.expectActivation(listingWindows: true, selection: 1)
+        await harness.finish()
+    }
+
     // MARK: app shortcuts
 
     @Test
@@ -266,6 +294,16 @@ struct AppSwitcherOpenPanelTests {
         let harness = AppSwitcherTestHarness(itemCount: itemCount)
 
         harness.press(tabKeyCode, modifiers: backward ? [.maskCommand, .maskShift] : .maskCommand)
+        await harness.drainMainQueue()
+
+        return harness
+    }
+
+    /// Cmd+` with the panel up on the windows of test.app.0, the frontmost app, window 1 selected.
+    private func openWindowSwitcher() async -> AppSwitcherTestHarness {
+        let harness = AppSwitcherTestHarness()
+
+        harness.press(graveKeyCode)
         await harness.drainMainQueue()
 
         return harness

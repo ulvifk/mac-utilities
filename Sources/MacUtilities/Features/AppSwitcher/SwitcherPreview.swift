@@ -155,7 +155,7 @@ final class SwitcherPreview {
         self.list = list
         panel.showPreview(state: buildState(list), glassStore: settings.getGlassStore(listingWindows: list.isListingWindows), beside: settingsWindow)
 
-        guard case .windows(let windows) = list.items else { return }
+        guard case .windows(let windows, _) = list.items else { return }
         thumbnailCache.refresh(of: windows, session: session) { self.panel.update(state: self.buildState(self.list!)) }
     }
 

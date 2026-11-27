@@ -33,9 +33,8 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
         return SwitcherFakeApp(index: index, workspace: self)
     }
 
-    /// Of test.app.0, the frontmost app.
     func buildWindow(windowID: CGWindowID) -> SwitcherFakeWindow {
-        return SwitcherFakeWindow(app: buildApp(index: 0), windowID: windowID, workspace: self)
+        return SwitcherFakeWindow(windowID: windowID, workspace: self)
     }
 
     func startObserving(onAppTerminated: @escaping (pid_t) -> Void, onAppHiddenOrShown: @escaping () -> Void) {
@@ -107,7 +106,6 @@ final class SwitcherFakeApp: SwitcherApp {
 }
 
 struct SwitcherFakeWindow: SwitcherWindow {
-    let app: SwitcherApp
     let windowID: CGWindowID
     let title = "Test Window"
     unowned let workspace: SwitcherFakeWorkspace
