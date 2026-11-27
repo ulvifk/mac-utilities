@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import CoreAudio
 import SwiftUI
@@ -43,10 +42,6 @@ final class MicrophoneFeature: Feature, ObservableObject {
         isTerminating = true
         stop()
         await transition?.value
-    }
-
-    func handle(type: CGEventType, event: CGEvent) -> Bool {
-        return false
     }
 
     func buildSettingsSections() -> AnyView {
