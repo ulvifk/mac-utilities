@@ -29,13 +29,14 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         super.init()
     }
 
+    /// The login item is registered before the interface launches, so the settings window built then shows the status registering landed on.
     func applicationDidFinishLaunching(_ notification: Notification) {
         startEnabledFeatures()
         eventTap.start { [unowned self] type, event in self.handle(type: type, event: event) }
+        let registeredLoginItem = registerLoginItemOnFirstLaunch()
         interface.launch(controller: self)
 
-        if isFirstInstalledLaunch() {
-            registerLoginItem()
+        if registeredLoginItem {
             openGeneralSettingsIfLoginItemAwaitsApproval()
         }
     }
@@ -93,35 +94,35 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         return false
     }
 
-    /// Only the installed app records its launches, so a development build, the smoke runs included, neither registers the login item nor
-    /// uses up the installed app's first launch.
-    private func isFirstInstalledLaunch() -> Bool {
+    /// Registers the login item on the installed app's first launch and returns whether it did.
+    ///
+    /// - Only the installed app records its launches, so a development build, the smoke runs included, neither registers nor uses up the
+    ///   installed app's first launch.
+    /// - The launch is recorded first, so the app registers itself once: switching it off in General sticks, and a registration that fails
+    ///   is not retried on every launch; the switch is there for that.
+    /// - A login item already registered, enabled or awaiting approval, is left as it is.
+    private func registerLoginItemOnFirstLaunch() -> Bool {
         if !isInstalled { return false }
-        return preferences.isFirstLaunch()
-    }
+        if !preferences.isFirstLaunch() { return false }
 
-    /// Registers once, on the first launch, so switching it off in General sticks. The launch is recorded first, so a registration that
-    /// fails is not retried on every launch either; the switch is there for that. A login item the user switched on before this version is
-    /// left as it is.
-    private func registerLoginItem() {
         preferences.recordFirstLaunch()
-
         if loginItem.status.isRegistered {
             Logger.core.notice("First launch: login item already registered, \(self.loginItem.status.logDescription, privacy: .public)")
-            return
+            return false
         }
 
         do {
             try loginItem.register()
         } catch {
             Logger.core.error("First launch: registering the login item failed: \(error.localizedDescription, privacy: .public)")
-            return
+            return false
         }
         Logger.core.notice("First launch: registered the login item, \(self.loginItem.status.logDescription, privacy: .public)")
+        return true
     }
 
-    /// Until the user approves it under Login Items the app does not start at login, so General, which says so and links there, opens. The
-    /// pane re-reads the status whenever its window becomes key, so it shows the registration just made.
+    /// Until the user approves the registration just made under Login Items the app does not start at login, so General, which says so and
+    /// links there, opens.
     private func openGeneralSettingsIfLoginItemAwaitsApproval() {
         if loginItem.status != .requiresApproval { return }
 

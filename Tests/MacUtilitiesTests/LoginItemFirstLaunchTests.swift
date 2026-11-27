@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import Testing
 @testable import MacUtilities
 
@@ -44,16 +45,30 @@ final class LoginItemFirstLaunchTests {
         #expect(loginItem.registerCount == 1)
     }
 
-    /// An existing install has no record of a launch, so it counts as a first launch; one already launching at login is left alone.
-    @Test
-    func existingInstallWithTheLoginItemOnIsLeftAlone() {
-        let loginItem = FakeLoginItem(status: .enabled)
+    /// An existing install has no record of a launch, so it counts as a first launch; a login item already registered is left alone, and
+    /// one awaiting approval, which may be the user's own switch-off under Login Items, does not open General.
+    @Test(arguments: [SMAppService.Status.enabled, .requiresApproval])
+    func existingInstallWithTheLoginItemOnIsLeftAlone(status: SMAppService.Status) {
+        let loginItem = FakeLoginItem(status: status)
 
-        launch(loginItem: loginItem, isInstalled: true)
+        let firstInterface = launch(loginItem: loginItem, isInstalled: true)
         loginItem.status = .notRegistered
-        launch(loginItem: loginItem, isInstalled: true)
+        let secondInterface = launch(loginItem: loginItem, isInstalled: true)
 
         #expect(loginItem.registerCount == 0, "A login item that was already on was registered again, or again on a later launch")
+        #expect(firstInterface.generalSettingsOpenCount == 0, "A login item registered before this launch opened General")
+        #expect(secondInterface.generalSettingsOpenCount == 0)
+    }
+
+    @Test
+    func failedRegistrationIsNotRetried() {
+        let loginItem = FakeLoginItem(registrationError: CocoaError(.featureUnsupported))
+
+        let firstInterface = launch(loginItem: loginItem, isInstalled: true)
+        launch(loginItem: loginItem, isInstalled: true)
+
+        #expect(firstInterface.generalSettingsOpenCount == 0, "A failed registration opened General")
+        #expect(loginItem.registerCount == 1, "A later launch retried the failed registration")
     }
 
     /// The smoke runs launch the development build from the build folder.
@@ -75,6 +90,7 @@ final class LoginItemFirstLaunchTests {
         let firstInterface = launch(loginItem: loginItem, isInstalled: true)
         let secondInterface = launch(loginItem: loginItem, isInstalled: true)
 
+        #expect(firstInterface.loginItemStatusAtLaunch == .requiresApproval, "The interface launched before registering, so General showed it off")
         #expect(firstInterface.generalSettingsOpenCount == 1, "A registration awaiting approval did not open General")
         #expect(secondInterface.generalSettingsOpenCount == 0, "A later launch opened General")
     }
@@ -87,12 +103,25 @@ final class LoginItemFirstLaunchTests {
     }
 
     @Test
-    func onlyAppsFoldersCountAsInstalled() {
+    func onlyApplicationsFoldersCountAsInstalled() {
         let home = FileManager.default.homeDirectoryForCurrentUser
 
         #expect(isInApplicationsFolder(bundleURL: home.appendingPathComponent("Applications/MacUtilities.app", isDirectory: true)))
         #expect(isInApplicationsFolder(bundleURL: URL(fileURLWithPath: "/Applications/MacUtilities.app", isDirectory: true)))
         #expect(!isInApplicationsFolder(bundleURL: home.appendingPathComponent("git-repo/mac-utilities/MacUtilities.app", isDirectory: true)))
+    }
+
+    /// The symlink lives in a temporary directory and points at /Applications; nothing is written to an Applications folder.
+    @Test
+    func bundleReachedThroughASymlinkCountsAsInstalled() {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("mac-utilities-tests-\(UUID().uuidString)")
+        let link = directory.appendingPathComponent("Applications")
+
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try! FileManager.default.createSymbolicLink(at: link, withDestinationURL: URL(fileURLWithPath: "/Applications"))
+        defer { try! FileManager.default.removeItem(at: directory) }
+
+        #expect(isInApplicationsFolder(bundleURL: link.appendingPathComponent("MacUtilities.app", isDirectory: true)))
     }
 
     @discardableResult

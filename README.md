@@ -33,17 +33,17 @@ A feature's pane opens with its icon, its name, one line on what it does and the
 switch that turns it on or off. A feature switched off stops on the spot and stays
 off across launches; the rest of its pane is faded and disabled until it is back on.
 
-General opens with the app's card: how many features are on, and each feature's
-icon, faded while it is off, which opens its pane when clicked. Below it are a
-"Launch at login" switch, on from the first launch and off for good once switched
-off, and the Accessibility grant. The event tap every shortcut
-depends on needs the grant and is only created at launch, so until it runs a warning
-card sits above them and the General row in the sidebar carries a warning badge. While
-the grant is missing, the card says no shortcut works without it and has a button to
-the Privacy & Security > Accessibility pane; once granted, it offers Reopen
-MacUtilities, which quits the app and opens it again. With the tap running, a
-checkmark row says access is allowed. The grant is re-checked whenever the window
-comes back to the front. Every change applies immediately.
+General opens with the app's card: how many features are on, and each feature's icon,
+faded while it is off, which opens its pane when clicked. Below it are a "Launch at
+login" switch, which the app switches on by itself on its first launch only, and the
+Accessibility grant. The event tap every shortcut depends on needs the grant and is
+only created at launch, so until it runs a warning card sits above them and the
+General row in the sidebar carries a warning badge. While the grant is missing, the
+card says no shortcut works without it and has a button to the Privacy & Security >
+Accessibility pane; once granted, it offers Reopen MacUtilities, which quits the app
+and opens it again. With the tap running, a checkmark row says access is allowed. The
+grant is re-checked whenever the window comes back to the front. Every change applies
+immediately.
 
 ## Features
 
@@ -241,10 +241,11 @@ compiler's default plugin path, so plain `swift test` fails to build the tests w
 Xcode; the script passes the path when it is there.
 
 The tests follow one convention: whatever reaches the operating system, such as
-CoreAudio, the event tap, UserDefaults, the login item or the menu bar, sits behind a protocol or a
-parameter that the code receives, and `main.swift` passes the real ones. Tests build
-the code in-process with `@testable import MacUtilities` and fakes from `Tests`, so
-they never change the Mac's settings, show a window or write the app's defaults.
+CoreAudio, the event tap, UserDefaults, the login item or the menu bar, sits behind a
+protocol or a parameter that the code receives, and `main.swift` passes the real ones.
+Tests build the code in-process with `@testable import MacUtilities` and fakes from
+`Tests`, so they never change the Mac's settings, show a window or write the app's
+defaults.
 Nothing compiles sources by hand. Quitting ends the process, so the termination tests
 run the real `NSApplication` in Swift Testing exit tests, child processes of the test
 runner.
