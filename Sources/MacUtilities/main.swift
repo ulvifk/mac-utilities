@@ -1,9 +1,11 @@
 import AppKit
+import ServiceManagement
 import os
 
 let application = NSApplication.shared
 let preferences = Preferences(defaults: .standard)
-let interface = MenuBarInterfaceFactory.buildInterface()
+let loginItem = SMAppService.mainApp
+let interface = MenuBarInterfaceFactory.buildInterface(loginItem: loginItem)
 
 let keepAwake = KeepAwakeFeatureFactory.buildFeature(setMenuBarSymbol: interface.setMenuBarSymbol)
 let hotkeys = HotkeysFeature(toggleKeepAwake: {
@@ -16,7 +18,17 @@ let hotkeys = HotkeysFeature(toggleKeepAwake: {
 let microphone = MicrophoneFeature(audioInput: SystemAudioInput(hardware: SystemAudioHardware()))
 let features: [Feature] = [AppSwitcherFeatureFactory.buildFeature(), keepAwake, hotkeys, microphone]
 
-let controller = AppController(features: features, preferences: preferences, eventTap: SystemEventTap(), interface: interface)
+let controller = AppController(
+    features: features,
+    preferences: preferences,
+    eventTap: SystemEventTap(),
+    loginItem: loginItem,
+    isInstalled: isInApplicationsFolder(
+        bundleURL: Bundle.main.bundleURL,
+        applicationsFolders: FileManager.default.urls(for: .applicationDirectory, in: [.userDomainMask, .localDomainMask])
+    ),
+    interface: interface
+)
 application.setActivationPolicy(.accessory)
 application.delegate = controller
 application.run()

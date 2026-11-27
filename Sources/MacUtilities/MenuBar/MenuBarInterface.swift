@@ -5,21 +5,23 @@ import AppKit
 final class MenuBarInterface: NSObject, AppInterface {
     private let statusItem: NSStatusItem
     private let menuBarGlyph: NSImage
+    private let loginItem: LoginItem // switched in the settings window's General pane
 
     private(set) var menuBarPopover: MenuBarPopover!
     /// Built at launch rather than when first opened, since building every pane takes a moment.
     private(set) var settingsWindow: SettingsWindow!
 
-    init(statusItem: NSStatusItem, menuBarGlyph: NSImage) {
+    init(statusItem: NSStatusItem, menuBarGlyph: NSImage, loginItem: LoginItem) {
         self.statusItem = statusItem
         self.menuBarGlyph = menuBarGlyph
+        self.loginItem = loginItem
     }
 
     func launch(controller: AppController) {
         let popoverView = MenuBarPopoverView(controller: controller) { [unowned self] in self.openSettings(controller: controller) }
 
         menuBarPopover = MenuBarPopover(rootView: popoverView, statusItemButton: statusItem.button!)
-        settingsWindow = SettingsWindow(controller: controller)
+        settingsWindow = SettingsWindow(controller: controller, loginItem: loginItem)
         statusItem.button!.target = self
         statusItem.button!.action = #selector(MenuBarInterface.toggleMenuBarPopover)
 
@@ -46,6 +48,11 @@ final class MenuBarInterface: NSObject, AppInterface {
 
         settingsWindow.open()
         menuBarPopover.close()
+    }
+
+    func openGeneralSettings() {
+        settingsWindow.showPane(generalPaneIdentifier)
+        settingsWindow.open()
     }
 
     @objc private func toggleMenuBarPopover() {

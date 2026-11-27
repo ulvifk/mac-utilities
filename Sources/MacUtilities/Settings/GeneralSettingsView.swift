@@ -4,8 +4,8 @@ import SwiftUI
 /// once they run, a calm row saying so. The grant and the login item are re-read whenever the window comes back to the front.
 struct GeneralSettingsView: View {
     @ObservedObject var controller: AppController
+    @ObservedObject var state: GeneralSettingsState
     let showPane: (String) -> Void
-    @StateObject private var state = GeneralSettingsState()
 
     var body: some View {
         Form {

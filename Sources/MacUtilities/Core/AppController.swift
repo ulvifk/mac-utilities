@@ -3,31 +3,42 @@ import Combine
 import os
 
 /// The app delegate. Starts the enabled features at launch and stops them as their switches change or the app quits, offers them every
-/// tapped event unless paused, and launches the app's interface once they run.
+/// tapped event unless paused, and launches the app's interface once they run. The installed app's first launch registers it as a login
+/// item.
 final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
 
     private let preferences: Preferences
     private let eventTap: EventTap
+    private let loginItem: LoginItem
     private let interface: AppInterface
+    private let isInstalled: Bool // in an Applications folder; a development build never registers itself as a login item
 
     /// The running features, in the order the tap offers events to them.
     @Published private(set) var enabledFeatures: [Feature] = []
     /// While paused every event passes through untouched; the features keep running.
     @Published private(set) var isPaused = false
 
-    init(features: [Feature], preferences: Preferences, eventTap: EventTap, interface: AppInterface) {
+    init(features: [Feature], preferences: Preferences, eventTap: EventTap, loginItem: LoginItem, isInstalled: Bool, interface: AppInterface) {
         self.features = features
         self.preferences = preferences
         self.eventTap = eventTap
+        self.loginItem = loginItem
+        self.isInstalled = isInstalled
         self.interface = interface
         super.init()
     }
 
+    /// The login item is registered before the interface launches, so the settings window built then shows the status registering landed on.
     func applicationDidFinishLaunching(_ notification: Notification) {
         startEnabledFeatures()
         eventTap.start { [unowned self] type, event in self.handle(type: type, event: event) }
+        let didRegisterLoginItem = registerLoginItemOnFirstLaunch()
         interface.launch(controller: self)
+
+        if didRegisterLoginItem {
+            openGeneralSettingsIfLoginItemAwaitsApproval()
+        }
     }
 
     /// Stops the enabled features at once, so no event reaches them while they clean up, then lets every feature finish its cleanup before
@@ -81,6 +92,42 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         }
 
         return false
+    }
+
+    /// Registers the login item on the installed app's first launch and returns whether it did.
+    ///
+    /// - Only the installed app records its launches, so a development build, the smoke runs included, neither registers nor uses up the
+    ///   installed app's first launch.
+    /// - The launch is recorded first, so the app registers itself once: switching it off in General sticks, and a registration that fails
+    ///   is not retried on every launch; the switch is there for that.
+    /// - A login item already registered, enabled or awaiting approval, is left as it is.
+    private func registerLoginItemOnFirstLaunch() -> Bool {
+        if !isInstalled { return false }
+        if !preferences.isFirstLaunch() { return false }
+
+        preferences.recordFirstLaunch()
+        if loginItem.status.isRegistered {
+            Logger.core.notice("First launch: login item already registered, \(self.loginItem.status.logDescription, privacy: .public)")
+            return false
+        }
+
+        do {
+            try loginItem.register()
+        } catch {
+            Logger.core.error("First launch: registering the login item failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+        Logger.core.notice("First launch: registered the login item, \(self.loginItem.status.logDescription, privacy: .public)")
+        return true
+    }
+
+    /// A registration just made does not start the app at login until the user approves it under Login Items, so General, which says so
+    /// and links there, opens.
+    private func openGeneralSettingsIfLoginItemAwaitsApproval() {
+        if loginItem.status != .requiresApproval { return }
+
+        Logger.core.notice("Opening General: the login item awaits approval under Login Items")
+        interface.openGeneralSettings()
     }
 
     private func startEnabledFeatures() {
