@@ -27,14 +27,14 @@ struct SystemAudioInputTests {
     }
 
     @Test
-    func deviceListChangeKeepsWaitingAndTheTargetConfirms() async {
+    func deviceListChangeKeepsWaitingAndTheTargetConfirms() async throws {
         var completed = false
         let selection = Task {
             let status = await input.setDefaultInputDevice(20)
             completed = true
             return status
         }
-        await waitUntil { hardware.requestedDeviceID == 20 }
+        try await waitUntil { hardware.requestedDeviceID == 20 }
 
         hardware.notify(kAudioHardwarePropertyDevices)
         for _ in 0..<10 { await Task.yield() }
@@ -48,9 +48,9 @@ struct SystemAudioInputTests {
 
     /// 30 is another input; 10 is the one selected before, so the change was undone.
     @Test(arguments: [AudioDeviceID(30), AudioDeviceID(10)])
-    func anotherDefaultInputInterruptsTheSelection(defaultInputDeviceID: AudioDeviceID) async {
+    func anotherDefaultInputInterruptsTheSelection(defaultInputDeviceID: AudioDeviceID) async throws {
         let selection = Task { await input.setDefaultInputDevice(20) }
-        await waitUntil { hardware.requestedDeviceID == 20 }
+        try await waitUntil { hardware.requestedDeviceID == 20 }
 
         hardware.defaultInputDeviceID = defaultInputDeviceID
         hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
@@ -61,9 +61,9 @@ struct SystemAudioInputTests {
     }
 
     @Test
-    func removedTargetFailsTheSelection() async {
+    func removedTargetFailsTheSelection() async throws {
         let selection = Task { await input.setDefaultInputDevice(20) }
-        await waitUntil { hardware.requestedDeviceID == 20 }
+        try await waitUntil { hardware.requestedDeviceID == 20 }
 
         hardware.deviceIDs = [10, 30]
         hardware.notify(kAudioHardwarePropertyDevices)
@@ -73,11 +73,11 @@ struct SystemAudioInputTests {
     }
 
     @Test
-    func stoppingObservationKeepsListeningUntilThePendingSelectionFinishes() async {
+    func stoppingObservationKeepsListeningUntilThePendingSelectionFinishes() async throws {
         var notifications = 0
         input.startObserving { notifications += 1 }
         let selection = Task { await input.setDefaultInputDevice(20) }
-        await waitUntil { hardware.requestedDeviceID == 20 }
+        try await waitUntil { hardware.requestedDeviceID == 20 }
 
         input.stopObserving()
         #expect(hardware.listeners.count == 1)
@@ -107,13 +107,5 @@ struct SystemAudioInputTests {
         #expect(status == noErr)
         #expect(hardware.requestedDeviceID == nil)
         #expect(hardware.listeners.isEmpty)
-    }
-
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<100 {
-            if condition() { return }
-            await Task.yield()
-        }
-        #expect(condition(), "Expected asynchronous work did not complete")
     }
 }

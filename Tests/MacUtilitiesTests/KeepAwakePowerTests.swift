@@ -17,27 +17,27 @@ struct KeepAwakePowerTests {
 
         feature.turnOn(for: .oneHour)
         if keepsLidAwake { try await harness.completeCommand(disabled: true) }
-        try await harness.waitUntil { feature.session != nil }
+        try await waitUntil { feature.session != nil }
         let session = try #require(feature.session)
         let deadline = session.deactivationDate
 
         power.setExternalPowerConnected(false)
         if keepsLidAwake { try await harness.completeCommand(disabled: false) }
-        try await harness.waitUntil { feature.session == nil }
+        try await waitUntil { feature.session == nil }
         #expect(feature.isWaitingForPower, "Unplugging lost the user's enabled session")
         #expect(power.assertionReleaseCount == 1, "Unplugging did not release the power assertion")
         #expect(power.watchdogTerminationCount == (keepsLidAwake ? 1 : 0), "Unplugging did not stop the restored watchdog")
 
         power.setExternalPowerConnected(true)
         if keepsLidAwake { try await harness.completeCommand(disabled: true) }
-        try await harness.waitUntil { feature.session != nil }
+        try await waitUntil { feature.session != nil }
         #expect(feature.session === session, "Reconnecting replaced the suspended session")
         #expect(feature.session?.deactivationDate == deadline, "Reconnecting restarted the deadline")
         #expect(!feature.isWaitingForPower, "Reconnecting kept the waiting subtitle")
 
         feature.stop(because: .switchedOff)
         if keepsLidAwake { try await harness.completeCommand(disabled: false) }
-        try await harness.waitUntil { feature.session == nil }
+        try await waitUntil { feature.session == nil }
         #expect(power.assertionReleaseCount == 2, "The resumed assertion was not released")
         if keepsLidAwake {
             #expect(power.commandHistory == [true, false, true, false], "Power changes did not serialize lid commands")
@@ -67,7 +67,7 @@ struct KeepAwakePowerTests {
 
         power.setExternalPowerConnected(true)
         try await harness.completeCommand(disabled: true)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session != nil, "Reconnecting did not honor battery enablement")
         if usesDurationChip {
             #expect(feature.session?.autoOff == .oneHour, "The battery duration chip lost its duration")
@@ -83,7 +83,7 @@ struct KeepAwakePowerTests {
         try await harness.activate(feature)
         power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
 
         if stopsFeature {
             feature.stop(because: .switchedOff)
@@ -94,7 +94,7 @@ struct KeepAwakePowerTests {
         #expect(!feature.isWaitingForPower, "Turning off retained suspended enablement")
 
         power.setExternalPowerConnected(true)
-        try await harness.letMainQueueRun()
+        await letMainQueueRun()
         #expect(feature.session == nil, "Reconnecting enabled a manually disabled session")
         #expect(power.commandHistory == [true, false], "Reconnecting ran commands for a disabled session")
     }
@@ -109,14 +109,14 @@ struct KeepAwakePowerTests {
         try await harness.activate(feature)
         power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.isWaitingForPower)
 
         harness.clock.advance(by: 30 * 60)
         #expect(!feature.isWaitingForPower, "An expired session still waited for power")
 
         power.setExternalPowerConnected(true)
-        try await harness.letMainQueueRun()
+        await letMainQueueRun()
         #expect(feature.session == nil, "Reconnecting restarted an expired session")
         #expect(power.commandHistory == [true, false], "Reconnecting disabled sleep after expiration")
     }
@@ -132,13 +132,13 @@ struct KeepAwakePowerTests {
 
         harness.preferences.setOnlyWhileConnectedToPower(true)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session == nil, "Enabling the power option did not restore sleep on battery")
         #expect(feature.isWaitingForPower, "Enabling the power option lost user enablement")
 
         harness.preferences.setOnlyWhileConnectedToPower(false)
         try await harness.completeCommand(disabled: true)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session === session, "Disabling the power option replaced the session")
         #expect(!feature.isWaitingForPower, "Disabling the power option left battery gating active")
     }
@@ -150,12 +150,12 @@ struct KeepAwakePowerTests {
         harness.preferences.setOnlyWhileConnectedToPower(true)
         let feature = harness.buildFeature()
         feature.turnOn(for: .oneHour)
-        try await harness.waitUntil { power.pendingCommands.count == 1 }
+        try await waitUntil { power.pendingCommands.count == 1 }
 
         power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: true)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session == nil, "Unplugging retained an in-flight activation")
         #expect(feature.isWaitingForPower, "Unplugging discarded in-flight enablement")
         #expect(power.commandHistory == [true, false], "Unplugging overlapped activation and restoration")
@@ -172,12 +172,12 @@ struct KeepAwakePowerTests {
         try await harness.activate(feature)
         let session = feature.session
         power.setExternalPowerConnected(false)
-        try await harness.waitUntil { power.pendingCommands.count == 1 }
+        try await waitUntil { power.pendingCommands.count == 1 }
 
         power.setExternalPowerConnected(true)
         try await harness.completeCommand(disabled: false)
         try await harness.completeCommand(disabled: true)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session === session, "Reconnecting during restoration lost the enabled session")
         #expect(power.commandHistory == [true, false, true], "Reconnecting during restoration overlapped power commands")
     }
@@ -192,14 +192,14 @@ struct KeepAwakePowerTests {
 
         power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false, succeeds: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.isSleepRestorationRefused, "Unplugging hid restoration failure")
         #expect(power.assertionReleaseCount == 0, "Unplugging released an unrestored assertion")
         #expect(power.watchdogTerminationCount == 0, "Unplugging abandoned failed cleanup")
 
         harness.clock.advance(by: sleepRestorationRetryInterval)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session == nil, "Unplugging did not retry failed cleanup")
         #expect(feature.isWaitingForPower, "Cleanup retry discarded suspended enablement")
         #expect(power.commandHistory == [true, false, false], "Cleanup retry activated on battery")
@@ -223,10 +223,10 @@ struct KeepAwakePowerTests {
         let deadline = session?.deactivationDate
 
         power.setExternalPowerConnected(false)
-        try await harness.waitUntil { power.pendingCommands.count == 1 }
+        try await waitUntil { power.pendingCommands.count == 1 }
         if !beforeRestorationFails {
             try await harness.completeCommand(disabled: false, succeeds: false)
-            try await harness.waitUntil { !feature.isChangingSession }
+            try await waitUntil { !feature.isChangingSession }
             #expect(feature.isSleepRestorationRefused, "Failed restoration did not report its warning")
         }
 
@@ -238,8 +238,8 @@ struct KeepAwakePowerTests {
         if beforeRestorationFails {
             try await harness.completeCommand(disabled: false, succeeds: false)
         }
-        try await harness.letMainQueueRun()
-        try await harness.waitUntil { !feature.isChangingSession }
+        await letMainQueueRun()
+        try await waitUntil { !feature.isChangingSession }
 
         #expect(feature.session === session, "Allowing power replaced the already active session")
         #expect(feature.session?.deactivationDate == deadline, "Allowing power restarted the deadline")
@@ -249,7 +249,7 @@ struct KeepAwakePowerTests {
         #expect(power.watchdogTerminationCount == 0, "Failed restoration stopped the eligible session's watchdog")
 
         harness.clock.advance(by: sleepRestorationRetryInterval)
-        try await harness.letMainQueueRun()
+        await letMainQueueRun()
         #expect(power.commandHistory == [true, false], "An eligible session retried obsolete restoration")
     }
 }

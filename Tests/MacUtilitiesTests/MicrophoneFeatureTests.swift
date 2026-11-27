@@ -25,20 +25,20 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func selectionRestoresPreviousInput() async {
+    func selectionRestoresPreviousInput() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
 
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(feature.canSelect)
         #expect(feature.defaultInput == iPhone)
         #expect(feature.isActive)
 
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id])
         #expect(feature.defaultInput == builtIn)
@@ -46,15 +46,15 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func disablingFeatureRestoresInputAndStopsObserving() async {
+    func disablingFeatureRestoresInputAndStopsObserving() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         feature.stop(because: .switchedOff)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
         #expect(audioInput.onChange == nil)
@@ -62,15 +62,15 @@ struct MicrophoneFeatureTests {
     }
 
     @Test @MainActor
-    func terminationRestoresInputAfterFeatureWasDisabled() async {
+    func terminationRestoresInputAfterFeatureWasDisabled() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         audioInput.selectionStatus = kAudioHardwareUnspecifiedError
         feature.stop(because: .switchedOff)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(feature.isActive)
 
         audioInput.selectionStatus = noErr
@@ -81,17 +81,17 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func externalSelectionReleasesControlWithoutRestoring() async {
+    func externalSelectionReleasesControlWithoutRestoring() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone, headset], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         audioInput.defaultInputDeviceID = headset.id
         audioInput.onChange!()
         feature.stop(because: .switchedOff)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(!feature.isActive)
         #expect(audioInput.selectedDeviceIDs == [iPhone.id])
@@ -99,12 +99,12 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func disconnectReleasesControlAndReconnectDoesNotSelectAutomatically() async {
+    func disconnectReleasesControlAndReconnectDoesNotSelectAutomatically() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         audioInput.devices = [builtIn]
         audioInput.onChange!()
@@ -121,31 +121,31 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func restorationUsesPersistentDeviceIdentifierAfterReconnect() async {
+    func restorationUsesPersistentDeviceIdentifierAfterReconnect() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         let reconnectedInput = AudioInputDevice(id: 4, uid: builtIn.uid, name: builtIn.name)
         audioInput.devices = [reconnectedInput, iPhone]
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(audioInput.defaultInputDeviceID == reconnectedInput.id)
         #expect(!feature.isActive)
     }
 
     @Test
-    func failedSelectionLeavesPreviousInputAndPermitsRetry() async {
+    func failedSelectionLeavesPreviousInputAndPermitsRetry() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         audioInput.selectionStatus = kAudioHardwareUnspecifiedError
 
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(!feature.isActive)
         #expect(feature.statusText.hasPrefix("Couldn't select microphone"))
@@ -153,23 +153,23 @@ struct MicrophoneFeatureTests {
 
         audioInput.selectionStatus = noErr
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(feature.isActive)
         #expect(feature.statusText == "Using \(iPhone.name)")
     }
 
     @Test
-    func failedRestorationKeepsSessionForRetry() async {
+    func failedRestorationKeepsSessionForRetry() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         audioInput.selectionStatus = kAudioHardwareUnspecifiedError
 
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(feature.isActive)
         #expect(feature.canSelect)
@@ -178,7 +178,7 @@ struct MicrophoneFeatureTests {
 
         audioInput.selectionStatus = noErr
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(!feature.isActive)
         #expect(feature.statusText == "Using \(builtIn.name)")
@@ -186,16 +186,16 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func missingPreviousInputShowsMessageAndPreservesSelection() async {
+    func missingPreviousInputShowsMessageAndPreservesSelection() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         audioInput.devices = [iPhone]
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(audioInput.selectedDeviceIDs == [iPhone.id])
         #expect(feature.isActive)
@@ -204,17 +204,17 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func inputCanBeSelectedWhenMacHasNoOtherMicrophone() async {
+    func inputCanBeSelectedWhenMacHasNoOtherMicrophone() async throws {
         let audioInput = FakeAudioInput(devices: [iPhone], defaultInputDeviceID: AudioDeviceID(kAudioObjectUnknown))
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
 
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(feature.defaultInput == iPhone)
 
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(feature.isActive)
         #expect(feature.canSelect)
         #expect(feature.statusText.hasPrefix("No previous microphone to restore"))
@@ -222,15 +222,15 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func selectingCurrentInputDoesNotTakeOwnership() async {
+    func selectingCurrentInputDoesNotTakeOwnership() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: iPhone.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
 
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(feature.canSelect)
         #expect(!feature.canRestore)
@@ -240,61 +240,61 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func deferredSelectionRetainsControlUntilConfirmed() async {
+    func deferredSelectionRetainsControlUntilConfirmed() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         audioInput.defersSelection = true
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
 
         feature.selectInput(iPhone.uid)
-        await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
+        try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
         audioInput.onChange!()
         #expect(feature.statusText == "Switching microphone…")
         #expect(!feature.canSelect)
 
         audioInput.completeSelection()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(feature.isActive)
         #expect(feature.canSelect)
         #expect(feature.statusText == "Using \(iPhone.name)")
 
         audioInput.defersSelection = false
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id])
         #expect(feature.defaultInput == builtIn)
     }
 
     @Test
-    func disablingDuringSelectionWaitsForRestoration() async {
+    func disablingDuringSelectionWaitsForRestoration() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         audioInput.defersSelection = true
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
+        try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
 
         feature.stop(because: .switchedOff)
         #expect(audioInput.onChange != nil)
         audioInput.completeSelection()
-        await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
+        try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
         #expect(audioInput.onChange != nil)
         #expect(feature.isActive)
 
         audioInput.completeSelection()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
         #expect(audioInput.onChange == nil)
     }
 
     @Test
-    func terminationWaitsForPendingSelectionAndRestoration() async {
+    func terminationWaitsForPendingSelectionAndRestoration() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         audioInput.defersSelection = true
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
+        try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
 
         var terminationStarted = false
         var didTerminate = false
@@ -303,11 +303,11 @@ struct MicrophoneFeatureTests {
             await feature.prepareForTermination()
             didTerminate = true
         }
-        await waitUntil { terminationStarted }
+        try await waitUntil { terminationStarted }
         #expect(!didTerminate)
 
         audioInput.completeSelection()
-        await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
+        try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
         #expect(!didTerminate)
 
         audioInput.completeSelection()
@@ -325,33 +325,33 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func turningOffWaitsForRestorationConfirmation() async {
+    func turningOffWaitsForRestorationConfirmation() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         audioInput.defersSelection = true
         feature.restorePreviousInput()
-        await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
+        try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
         #expect(feature.isActive)
         #expect(!feature.canSelect)
         #expect(feature.statusText == "Switching microphone…")
 
         audioInput.completeSelection()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(feature.defaultInput == builtIn)
         #expect(feature.canSelect)
     }
 
     @Test
-    func reusedDeviceIDDoesNotRetainOwnershipOfExternalInput() async {
+    func reusedDeviceIDDoesNotRetainOwnershipOfExternalInput() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone, headset], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         let reconnectedIPhone = AudioInputDevice(id: 4, uid: iPhone.uid, name: iPhone.name)
         let reassignedHeadset = AudioInputDevice(id: iPhone.id, uid: headset.uid, name: headset.name)
@@ -360,18 +360,18 @@ struct MicrophoneFeatureTests {
         audioInput.onChange!()
 
         feature.stop(because: .switchedOff)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(audioInput.defaultInputDeviceID == reassignedHeadset.id)
         #expect(audioInput.selectedDeviceIDs == [iPhone.id])
     }
 
     @Test
-    func sameSelectedInputKeepsOwnershipAfterDeviceIDChanges() async {
+    func sameSelectedInputKeepsOwnershipAfterDeviceIDChanges() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         let reconnectedIPhone = AudioInputDevice(id: 4, uid: iPhone.uid, name: iPhone.name)
         audioInput.devices = [builtIn, reconnectedIPhone]
@@ -380,13 +380,13 @@ struct MicrophoneFeatureTests {
         #expect(feature.canSelect)
 
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
         #expect(audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id])
     }
 
     @Test
-    func selectorListsAndSelectsEveryConnectedInput() async {
+    func selectorListsAndSelectsEveryConnectedInput() async throws {
         let usb = AudioInputDevice(id: 5, uid: "usb", name: "USB microphone")
         let devices = [builtIn, usb, headset, iPhone]
         let audioInput = FakeAudioInput(devices: devices, defaultInputDeviceID: iPhone.id)
@@ -396,30 +396,30 @@ struct MicrophoneFeatureTests {
 
         for input in devices {
             feature.selectInput(input.uid)
-            await waitForInputChange(feature)
+            try await waitForInputChange(feature)
             #expect(feature.defaultInput == input)
             #expect(feature.statusText == "Using \(input.name)")
         }
 
         #expect(audioInput.selectedDeviceIDs == devices.map { $0.id })
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         #expect(feature.defaultInput == iPhone)
         #expect(!feature.isActive)
     }
 
     @Test
-    func switchingBetweenInputsRestoresOriginalMicrophone() async {
+    func switchingBetweenInputsRestoresOriginalMicrophone() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone, headset], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         feature.selectInput(headset.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(audioInput.selectedDeviceIDs == [iPhone.id, headset.id, builtIn.id])
         #expect(feature.defaultInput == builtIn)
@@ -427,19 +427,19 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func externalChangeBecomesPreviousInputForNextSelection() async {
+    func externalChangeBecomesPreviousInputForNextSelection() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn, iPhone, headset], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         audioInput.defaultInputDeviceID = headset.id
         audioInput.onChange!()
         #expect(feature.defaultInput == headset)
         #expect(!feature.canRestore)
         feature.selectInput(builtIn.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         await feature.prepareForTermination()
 
         #expect(audioInput.defaultInputDeviceID == headset.id)
@@ -464,31 +464,23 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func switchingWithoutPreviousInputDoesNotInventOne() async {
+    func switchingWithoutPreviousInputDoesNotInventOne() async throws {
         let audioInput = FakeAudioInput(devices: [iPhone, headset], defaultInputDeviceID: AudioDeviceID(kAudioObjectUnknown))
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
         feature.selectInput(iPhone.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         feature.selectInput(headset.uid)
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
         feature.restorePreviousInput()
-        await waitForInputChange(feature)
+        try await waitForInputChange(feature)
 
         #expect(feature.defaultInput == headset)
         #expect(feature.statusText.hasPrefix("No previous microphone to restore"))
         #expect(audioInput.selectedDeviceIDs == [iPhone.id, headset.id])
     }
 
-    private func waitForInputChange(_ feature: MicrophoneFeature) async {
-        await waitUntil { feature.statusText != "Switching microphone…" }
-    }
-
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<100 {
-            if condition() { return }
-            await Task.yield()
-        }
-        #expect(condition())
+    private func waitForInputChange(_ feature: MicrophoneFeature) async throws {
+        try await waitUntil { feature.statusText != "Switching microphone…" }
     }
 }

@@ -29,11 +29,11 @@ struct KeepAwakeLidClosedSleepCommandsTests {
             didFinish = true
             return status
         }
-        while !process.isRunning { await Task.yield() }
+        try await waitUntil { process.isRunning }
 
         var mainQueueProgressed = false
         DispatchQueue.main.async { mainQueueProgressed = true }
-        while !mainQueueProgressed { try await Task.sleep(nanoseconds: 1_000_000) }
+        try await waitUntil { mainQueueProgressed }
         #expect(!didFinish, "The power command finished before its process terminated")
 
         input.fileHandleForWriting.write("\(exitStatus)\n".data(using: .utf8)!)

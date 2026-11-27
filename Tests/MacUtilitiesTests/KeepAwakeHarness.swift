@@ -52,17 +52,4 @@ final class KeepAwakeHarness {
         try await waitUntil { !feature.isChangingSession }
         try #require(feature.session != nil, "Successful activation did not publish a session")
     }
-
-    /// Lets queued main queue work, such as preference change deliveries and finished transitions, run for a moment.
-    func letMainQueueRun() async throws {
-        try await Task.sleep(nanoseconds: 20_000_000)
-    }
-
-    func waitUntil(_ condition: () -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
-        let deadline = Date(timeIntervalSinceNow: 5)
-        while !condition() {
-            try #require(Date() < deadline, "Timed out waiting for a transition", sourceLocation: sourceLocation)
-            try await Task.sleep(nanoseconds: 1_000_000)
-        }
-    }
 }
