@@ -11,7 +11,7 @@ final class KeepAwakeHarness {
     private(set) var menuBarSymbol: String?
     private(set) var menuBarSymbolChangeCount = 0
 
-    private let defaults = KeepAwakeTestDefaults()
+    private let defaults = TestDefaults()
 
     init() {
         preferences = KeepAwakePreferences(defaults: defaults.buildUserDefaults())

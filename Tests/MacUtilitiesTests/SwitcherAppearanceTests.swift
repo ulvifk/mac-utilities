@@ -35,21 +35,19 @@ final class SwitcherAppearanceTests {
                           screenFrame: screenFrame, expectedOrigin: screenFrame.origin),
     ]
 
-    private let defaultsSuiteName = "SwitcherAppearanceTests-\(UUID().uuidString)"
-    private let defaults: UserDefaults
+    private let defaults = TestDefaults()
     private let workspace = SwitcherFakeWorkspace(itemCount: 0)
     private let panelGlass: GlassStore
     private let cardGlass: GlassStore
 
     init() {
         _ = NSApplication.shared.setActivationPolicy(.prohibited)
-        defaults = UserDefaults(suiteName: defaultsSuiteName)!
-        panelGlass = GlassStore(keyPrefix: "panelGlass", defaultDarkness: defaultGlassDarkness, defaults: defaults)
-        cardGlass = GlassStore(keyPrefix: "cardGlass", defaultDarkness: defaultCardDarkness, defaults: defaults)
+        panelGlass = GlassStore(keyPrefix: "panelGlass", defaultDarkness: defaultGlassDarkness, defaults: defaults.buildUserDefaults())
+        cardGlass = GlassStore(keyPrefix: "cardGlass", defaultDarkness: defaultCardDarkness, defaults: defaults.buildUserDefaults())
     }
 
     deinit {
-        UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
+        defaults.remove()
     }
 
     // MARK: glass

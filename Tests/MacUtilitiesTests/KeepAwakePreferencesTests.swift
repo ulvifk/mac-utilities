@@ -30,12 +30,12 @@ struct KeepAwakePreferencesTests {
         }
     }
 
-    private func buildPreferences(_ defaults: KeepAwakeTestDefaults) -> KeepAwakePreferences {
+    private func buildPreferences(_ defaults: TestDefaults) -> KeepAwakePreferences {
         return KeepAwakePreferences(defaults: defaults.buildUserDefaults())
     }
 
-    private func withTestDefaults(_ body: (KeepAwakeTestDefaults) -> Void) {
-        let defaults = KeepAwakeTestDefaults()
+    private func withTestDefaults(_ body: (TestDefaults) -> Void) {
+        let defaults = TestDefaults()
         defer { defaults.remove() }
         body(defaults)
     }

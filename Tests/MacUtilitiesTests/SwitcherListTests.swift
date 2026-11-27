@@ -4,8 +4,13 @@ import Testing
 
 /// The list, its selection and the row arithmetic as pure values, and the loading of the apps from a fake workspace.
 @MainActor
-struct SwitcherListTests {
+final class SwitcherListTests {
     private let workspace = SwitcherFakeWorkspace(itemCount: 5)
+    private let testDefaults = TestDefaults()
+
+    deinit {
+        testDefaults.remove()
+    }
 
     @Test(arguments: [(0, -1, 4), (0, 7, 2), (4, 1, 0), (2, -12, 0)])
     func advancingWrapsAroundBothEnds(selectedIndex: Int, step: Int, expected: Int) {
@@ -84,7 +89,7 @@ struct SwitcherListTests {
 
     @Test
     func loadsRecentAppsThenNeverActivatedOnes() {
-        let loader = buildLoader(defaults: buildDefaults())
+        let loader = buildLoader(defaults: testDefaults.buildUserDefaults())
         workspace.recentBundleIdentifiers = ["test.app.3", "gone", "test.app.1"]
 
         let list = loader.loadAppList()
@@ -96,7 +101,7 @@ struct SwitcherListTests {
 
     @Test
     func filterListsOnlyWhitelistedApps() {
-        let defaults = buildDefaults()
+        let defaults = testDefaults.buildUserDefaults()
         let whitelistStore = WhitelistStore(defaults: defaults)
         whitelistStore.setListed("test.app.2", true)
         whitelistStore.setFilterEnabled(true)
@@ -109,7 +114,7 @@ struct SwitcherListTests {
 
     @Test
     func filterListsEveryAppWhileNoWhitelistedOneIsRunning() {
-        let defaults = buildDefaults()
+        let defaults = testDefaults.buildUserDefaults()
         let whitelistStore = WhitelistStore(defaults: defaults)
         whitelistStore.setListed("not.running", true)
         whitelistStore.setFilterEnabled(true)
@@ -122,7 +127,7 @@ struct SwitcherListTests {
 
     @Test
     func rowWidthFollowsTheRememberedPanelWidth() {
-        let defaults = buildDefaults()
+        let defaults = testDefaults.buildUserDefaults()
         PanelWidthStore(defaults: defaults).setWidth(44 + 2 * 68 + 5)
 
         let list = buildLoader(defaults: defaults).loadAppList()
@@ -134,14 +139,6 @@ struct SwitcherListTests {
 
     private func buildAppList(cellsPerRow: Int) -> SwitcherList {
         return SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false), cellsPerRow: cellsPerRow)
-    }
-
-    private func buildDefaults() -> UserDefaults {
-        let suiteName = "SwitcherListTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-
-        return defaults
     }
 
     private func buildLoader(defaults: UserDefaults) -> SwitcherListLoader {

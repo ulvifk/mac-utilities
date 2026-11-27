@@ -15,7 +15,7 @@ final class AppSwitcherTestHarness {
     let settings: SwitcherSettings
     let feature: AppSwitcherFeature
 
-    private let defaultsSuiteName = "AppSwitcherTests-\(UUID().uuidString)"
+    private let defaults = TestDefaults()
 
     /// That many running apps, each with a window, all activated in order.
     init(itemCount: Int = 3) {
@@ -26,7 +26,7 @@ final class AppSwitcherTestHarness {
         previewPanel = SwitcherFakePanel(log: log)
         settingsWindow = SwitcherTestSettingsWindow(contentRect: NSRect(x: 360, y: 180, width: 720, height: 540), styleMask: .titled,
                                                     backing: .buffered, defer: false)
-        settings = AppSwitcherFeatureFactory().buildSettings(defaults: UserDefaults(suiteName: defaultsSuiteName)!)
+        settings = AppSwitcherFeatureFactory().buildSettings(defaults: defaults.buildUserDefaults())
         feature = AppSwitcherFeatureFactory().buildFeature(
             settings: settings, workspace: workspace, screen: screen, panel: panel, previewPanel: previewPanel, environment: [:]
         )
@@ -38,7 +38,7 @@ final class AppSwitcherTestHarness {
     func finish() async {
         feature.stop()
         await drainMainQueue()
-        UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
+        defaults.remove()
     }
 
     func press(_ keyCode: Int64, modifiers: CGEventFlags = .maskCommand, sourceLocation: SourceLocation = #_sourceLocation) {
