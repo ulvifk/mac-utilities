@@ -100,6 +100,7 @@ struct KeepAwakeClosedLidTests {
         #expect(power.sleepCount == 0, "Ending a session that never held the lid awake slept the Mac")
     }
 
+    /// Follows AppController: stop on Quit, then cleanup in a Task once the earlier features finished theirs, which here outlast the restore.
     @Test
     func quitRestoresSleepWithoutSleepingAClosedLid() async throws {
         let harness = KeepAwakeHarness()
@@ -108,10 +109,32 @@ struct KeepAwakeClosedLidTests {
         let feature = harness.buildFeature()
         try await harness.activate(feature)
 
+        feature.stop(because: .quit)
+        try await harness.completeCommand(disabled: false)
+        try await harness.waitUntil { !feature.isChangingSession }
+        #expect(feature.session == nil, "Quit did not restore sleep")
+        #expect(power.sleepCount == 0, "Quit slept the Mac before its cleanup began")
+
+        await Task { await feature.prepareForTermination() }.value
+        #expect(power.sleepCount == 0, "Quit slept the Mac")
+    }
+
+    /// A feature switched off earlier is never stopped on Quit, but its retried restoration still finishes in its cleanup.
+    @Test
+    func quitAfterSwitchingOffRestoresSleepWithoutSleepingAClosedLid() async throws {
+        let harness = KeepAwakeHarness()
+        let power = harness.power
+        power.closedLidCausesSleep = true
+        let feature = harness.buildFeature()
+        try await harness.activate(feature)
+        feature.stop(because: .switchedOff)
+        try await harness.completeCommand(disabled: false, succeeds: false)
+        try await harness.waitUntil { !feature.isChangingSession }
+
         let termination = Task { await feature.prepareForTermination() }
         try await harness.completeCommand(disabled: false)
         await termination.value
-        #expect(feature.session == nil, "Termination did not restore sleep")
-        #expect(power.sleepCount == 0, "Termination slept the Mac")
+        #expect(feature.session == nil, "Quit did not finish the switched-off feature's restoration")
+        #expect(power.sleepCount == 0, "Quit slept the Mac")
     }
 }
