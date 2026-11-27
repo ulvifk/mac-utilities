@@ -6,9 +6,12 @@ final class KeepAwakePreferences: ObservableObject {
     private let autoOffKey = "keepAwakeAutoOff"
     private let lidClosedKey = "keepAwakeWithLidClosed"
     private let powerOnlyKey = "keepAwakeOnlyWhileConnectedToPower"
-    private let defaults = UserDefaults.standard
 
-    init() {
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+
         defaults.register(defaults: [
             autoOffKey: KeepAwakeAutoOff.untilTurnedOff.rawValue,
             lidClosedKey: true,

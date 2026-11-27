@@ -14,8 +14,9 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     let iconSymbolName = keepAwakeSymbolName
     let iconGradient = Gradient(colors: [.orange, .brown])
 
-    private let preferences = KeepAwakePreferences()
-    private let powerSource = ExternalPowerSource()
+    private let preferences: KeepAwakePreferences
+    private let powerManagement: PowerManagement
+    private let clock: WallClock
     private let setMenuBarSymbol: (String?) -> Void
 
     @Published private(set) var session: KeepAwakeSession?
@@ -27,13 +28,20 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     private var transition: Task<Void, Never>?
     private var deactivation: DispatchWorkItem?
     private var sleepRestorationRetry: DispatchWorkItem?
-    private var conditionChanges: [AnyCancellable] = []
+    private var preferenceChanges: AnyCancellable?
     private var isTerminating = false
 
-    init(setMenuBarSymbol: @escaping (String?) -> Void) {
+    init(preferences: KeepAwakePreferences, powerManagement: PowerManagement, clock: WallClock, setMenuBarSymbol: @escaping (String?) -> Void) {
+        self.preferences = preferences
+        self.powerManagement = powerManagement
+        self.clock = clock
         self.setMenuBarSymbol = setMenuBarSymbol
 
-        conditionChanges = [observeConditionChanges(of: preferences), observeConditionChanges(of: powerSource)]
+        // objectWillChange fires before the preference is stored, so the update waits for the next main queue turn.
+        preferenceChanges = preferences.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [unowned self] _ in updateSessionForChangedCondition() }
+        powerManagement.startObservingExternalPower { [unowned self] in updateSessionForChangedCondition() }
     }
 
     func start() {}
@@ -77,7 +85,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
             return
         }
 
-        requestedSession = KeepAwakeSession(preferences: preferences)
+        requestedSession = buildSessionFromPreferences()
         updateSession()
     }
 
@@ -85,16 +93,18 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         if isTerminating { return }
 
         preferences.setAutoOff(autoOff)
-        requestedSession = KeepAwakeSession(preferences: preferences)
+        requestedSession = buildSessionFromPreferences()
         updateSession()
     }
 
+    /// True while an enabled session that has not run out is held back because the Mac is on battery.
     var isWaitingForPower: Bool {
         if requestedSession == nil { return false }
         if isRequestedSessionExpired() { return false }
         return !isPowerAllowed()
     }
 
+    /// Reschedules the deadline of the requested session and starts a transition when the published session is not the eligible one. A running transition picks up the change itself.
     private func updateSession() {
         objectWillChange.send()
 
@@ -105,7 +115,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
 
         if isRequestedSessionExpired() { requestedSession = nil }
         if let deactivationDate = requestedSession?.deactivationDate {
-            deactivation = scheduleUpdate(at: deactivationDate, turnsOff: true)
+            deactivation = scheduleDeactivation(at: deactivationDate)
         }
 
         if transition != nil { return }
@@ -122,6 +132,10 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         }
     }
 
+    /// Ends and begins sessions one command at a time until the published session is the eligible one, re-reading the eligible session after every command.
+    ///
+    /// - A session whose restoration fails stays published and is retried on a timer, unless it became eligible again meanwhile.
+    /// - A refused activation drops the request it came from, unless a newer request replaced it.
     @MainActor private func reconcileSession() async {
         var didRestoreLidClosedSleep = false
         while true {
@@ -138,7 +152,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
                     if session === getEligibleSession() { continue }
 
                     isSleepRestorationRefused = true
-                    sleepRestorationRetry = scheduleUpdate(at: Date(timeIntervalSinceNow: Self.sleepRestorationRetryInterval))
+                    sleepRestorationRetry = scheduleSleepRestorationRetry()
                     return
                 }
 
@@ -171,9 +185,20 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     @MainActor private func sleepIfClosedLidIsLeftAwake() {
         if isTerminating { return }
         if session?.keepsAwakeWithLidClosed == true { return }
-        if !isClosedLidCausingSleep() { return }
+        if !powerManagement.isClosedLidCausingSleep() { return }
 
-        sleepMac()
+        powerManagement.sleepMac()
+    }
+
+    /// The duration and lid option are read once here; later changes apply to the next session.
+    private func buildSessionFromPreferences() -> KeepAwakeSession {
+        let autoOff = preferences.autoOff
+        return KeepAwakeSession(
+            autoOff: autoOff,
+            deactivationDate: autoOff.duration.map { clock.now().addingTimeInterval($0) },
+            keepsAwakeWithLidClosed: preferences.keepsAwakeWithLidClosed,
+            powerManagement: powerManagement
+        )
     }
 
     private func getEligibleSession() -> KeepAwakeSession? {
@@ -184,33 +209,28 @@ final class KeepAwakeFeature: Feature, ObservableObject {
 
     private func isRequestedSessionExpired() -> Bool {
         guard let deactivationDate = requestedSession?.deactivationDate else { return false }
-        return deactivationDate <= Date()
+        return deactivationDate <= clock.now()
     }
 
     private func isPowerAllowed() -> Bool {
         if !preferences.onlyWhileConnectedToPower { return true }
-        return powerSource.isConnected
+        return powerManagement.isConnectedToExternalPower()
     }
 
-    private func observeConditionChanges(of store: some ObservableObject) -> AnyCancellable {
-        return store.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [unowned self] _ in
-                if self.isTerminating { return }
-                self.updateSession()
-            }
+    private func updateSessionForChangedCondition() {
+        if isTerminating { return }
+        updateSession()
     }
 
-    /// Uses wall time so a Mac that slept past its deadline turns off on waking.
-    private func scheduleUpdate(at date: Date, turnsOff: Bool = false) -> DispatchWorkItem {
-        let deactivation = DispatchWorkItem { [unowned self] in
-            if turnsOff {
-                stop()
-                return
-            }
-            updateSession()
-        }
-        DispatchQueue.main.asyncAfter(wallDeadline: .now() + date.timeIntervalSinceNow, execute: deactivation)
+    private func scheduleDeactivation(at date: Date) -> DispatchWorkItem {
+        let deactivation = DispatchWorkItem { [unowned self] in stop() }
+        clock.schedule(deactivation, at: date)
         return deactivation
+    }
+
+    private func scheduleSleepRestorationRetry() -> DispatchWorkItem {
+        let retry = DispatchWorkItem { [unowned self] in updateSession() }
+        clock.schedule(retry, at: clock.now().addingTimeInterval(Self.sleepRestorationRetryInterval))
+        return retry
     }
 }
