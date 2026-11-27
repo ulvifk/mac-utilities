@@ -19,17 +19,31 @@ private let appShortcuts: [(String, [[String]])] = [
 
 /// Settings for filtering, glass, app and window cards, Batch Quit, and shortcuts.
 struct AppSwitcherSettingsView: View {
-    @ObservedObject var whitelistStore: WhitelistStore
-    @ObservedObject var batchQuitStore: BatchQuitStore
-    @ObservedObject var appearanceStore: SwitcherAppearanceStore
-    let appGlassStore: GlassStore
-    let windowGlassStore: GlassStore
-    @ObservedObject var appCardStore: SwitcherCardStore
-    let appCardGlassStore: GlassStore
-    @ObservedObject var windowCardStore: SwitcherCardStore
-    let windowCardGlassStore: GlassStore
-    @ObservedObject var previewStore: SwitcherPreviewStore
+    @ObservedObject private var whitelistStore: WhitelistStore
+    @ObservedObject private var batchQuitStore: BatchQuitStore
+    @ObservedObject private var appearanceStore: SwitcherAppearanceStore
+    private let appGlassStore: GlassStore
+    private let windowGlassStore: GlassStore
+    @ObservedObject private var appCardStore: SwitcherCardStore
+    private let appCardGlassStore: GlassStore
+    @ObservedObject private var windowCardStore: SwitcherCardStore
+    private let windowCardGlassStore: GlassStore
+    @ObservedObject private var previewStore: SwitcherPreviewStore
     @StateObject private var runningApps = RunningRegularApps()
+
+    /// Observes each store the sections read, so they follow changes made with the in-switcher shortcuts too.
+    init(settings: SwitcherSettings) {
+        whitelistStore = settings.whitelistStore
+        batchQuitStore = settings.batchQuitStore
+        appearanceStore = settings.appearanceStore
+        appGlassStore = settings.appGlassStore
+        windowGlassStore = settings.windowGlassStore
+        appCardStore = settings.appCardStore
+        appCardGlassStore = settings.appCardGlassStore
+        windowCardStore = settings.windowCardStore
+        windowCardGlassStore = settings.windowCardGlassStore
+        previewStore = settings.previewStore
+    }
 
     var body: some View {
         Section {

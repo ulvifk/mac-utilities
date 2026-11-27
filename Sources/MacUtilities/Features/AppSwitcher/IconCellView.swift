@@ -6,7 +6,7 @@ final class IconCellView: SwitcherCellView {
     let icon = NSImageView()
     let dot = NSView()
 
-    convenience init(app: NSRunningApplication, cardGlass: GlassStore?) {
+    convenience init(app: SwitcherApp, cardGlass: GlassStore?) {
         self.init(frame: .zero)
 
         card.frame = alignToPixels(iconCardFrameInCell)
@@ -30,7 +30,7 @@ final class IconCellView: SwitcherCellView {
         card.updateGlass(cardGlass)
     }
 
-    func showStatus(app: NSRunningApplication, whitelisted: Bool, isFiltered: Bool, dimHiddenApps: Bool) {
+    func showStatus(app: SwitcherApp, whitelisted: Bool, isFiltered: Bool, dimHiddenApps: Bool) {
         icon.alphaValue = 1
         if dimHiddenApps {
             icon.alphaValue = app.isHidden ? hiddenIconAlpha : 1

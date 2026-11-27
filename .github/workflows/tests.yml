@@ -1,0 +1,16 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the release binary
+        run: swift build -c release
+      - name: Run the tests
+        run: ./scripts/test.sh

@@ -9,41 +9,46 @@ final class KeepAwakeSession {
     let deactivationDate: Date?
     let keepsAwakeWithLidClosed: Bool
 
-    private var assertion: PowerAssertion!
+    private let powerManagement: PowerManagement
+
+    private var assertionID: IOPMAssertionID!
     private var lidClosedSleepWatchdog: Process?
 
-    init(preferences: KeepAwakePreferences) {
-        autoOff = preferences.autoOff
-        deactivationDate = autoOff.duration.map { Date(timeIntervalSinceNow: $0) }
-        keepsAwakeWithLidClosed = preferences.keepsAwakeWithLidClosed
+    init(autoOff: KeepAwakeAutoOff, deactivationDate: Date?, keepsAwakeWithLidClosed: Bool, powerManagement: PowerManagement) {
+        self.autoOff = autoOff
+        self.deactivationDate = deactivationDate
+        self.keepsAwakeWithLidClosed = keepsAwakeWithLidClosed
+        self.powerManagement = powerManagement
     }
 
+    /// False when sudo refuses to disable lid-closed sleep; nothing is held then.
     @MainActor func begin() async -> Bool {
         if !keepsAwakeWithLidClosed {
-            assertion = PowerAssertion(type: kIOPMAssertionTypePreventUserIdleSystemSleep as String)
+            assertionID = powerManagement.createAssertion(type: kIOPMAssertionTypePreventUserIdleSystemSleep as String)
             return true
         }
 
-        let watchdog = launchLidClosedSleepWatchdog()
-        let didDisableSleep = await setLidClosedSleepDisabled(true)
+        let watchdog = powerManagement.launchLidClosedSleepWatchdog()
+        let didDisableSleep = await powerManagement.setLidClosedSleepDisabled(true)
         if !didDisableSleep {
-            watchdog.terminate()
+            powerManagement.terminateLidClosedSleepWatchdog(watchdog)
             return false
         }
 
-        assertion = PowerAssertion(type: kIOPMAssertionTypePreventUserIdleDisplaySleep as String)
+        assertionID = powerManagement.createAssertion(type: kIOPMAssertionTypePreventUserIdleDisplaySleep as String)
         lidClosedSleepWatchdog = watchdog
         return true
     }
 
+    /// False when sudo refuses to restore lid-closed sleep; the assertion and watchdog are kept then, so end can be retried.
     @MainActor func end() async -> Bool {
         if let lidClosedSleepWatchdog {
-            let didRestoreSleep = await setLidClosedSleepDisabled(false)
+            let didRestoreSleep = await powerManagement.setLidClosedSleepDisabled(false)
             if !didRestoreSleep { return false }
-            lidClosedSleepWatchdog.terminate()
+            powerManagement.terminateLidClosedSleepWatchdog(lidClosedSleepWatchdog)
         }
 
-        assertion.release()
+        powerManagement.releaseAssertion(assertionID)
         return true
     }
 }

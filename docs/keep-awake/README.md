@@ -78,7 +78,8 @@ with "Only while connected to power" on, macOS decides while `disablesleep` is s
 no session that keeps the lid awake follows it, the app reads `AppleClamshellState`
 and `AppleClamshellCausesSleep`, macOS's own verdict on whether a closed lid sleeps,
 from `IOPMrootDomain`. If the lid is closed and that verdict is yes, it sleeps the Mac
-with `IOPMSleepSystem`, as macOS would have without Keep Awake, and logs a failed call.
+with `IOPMSleepSystem`, as macOS would have without Keep Awake. The log shows both values
+and the decision, and a failed call.
 This covers toggling off, the auto-off timer, unplugging and switching the feature off.
 The verdict is no while an external display is connected on AC power; macOS keeps
 the Mac in closed-display mode and decides again on the next display or power change.
@@ -104,6 +105,24 @@ so `disablesleep` stays `1` until Keep Awake is toggled again or `uninstall.sh` 
 `uninstall.sh` runs `pmset -a disablesleep 0` once more before removing the sudoers
 line, in case the app was killed while active.
 
+## The log
+
+Keep Awake logs under the category `keep-awake`, so when it turned on and off, and why,
+can be read without `pmset -g log`:
+
+```sh
+log show --last 1h --predicate 'subsystem == "com.ulvifk.mac-utilities" and category == "keep-awake"'
+```
+
+It records each request with where it came from (the popover toggle, a duration chip
+or a hotkey) and its auto-off, lid and power options; the session beginning or being
+refused; the session ending with its cause (toggled off, deadline reached, not
+connected to power, replaced by a new session, feature switched off, quit); entering
+and leaving "Waiting for power"; each `pmset -a disablesleep` with sudo's exit status;
+each refused restoration and retry; the power assertions and the watchdog's pid; power
+source changes; and after a lid-closed session, `AppleClamshellState`,
+`AppleClamshellCausesSleep` and whether the Mac was put to sleep.
+
 ## The sudoers line
 
 `pmset -a disablesleep` needs root. `install.sh` writes
@@ -124,13 +143,27 @@ Settings", until the next time it is turned on.
 `Sources/MacUtilities/Features/KeepAwake/`: `KeepAwakeFeature` publishes the current
 `KeepAwakeSession` to `KeepAwakeTile`, its tile in the menu bar popover, and ends it
 on the one-shot timer. One transition task processes the latest requested session
-without canceling external commands; the session holds the `PowerAssertion` and,
-with the lid switch on, the watchdog from `LidClosedSleep`; `KeepAwakePreferences` keeps the
-`KeepAwakeAutoOff` choice, lid switch and power option in UserDefaults for
-`KeepAwakeSettingsView`, the settings pane's section, and the tile's chips.
-`ExternalPowerSource` watches IOKit power-source changes on the main run loop. The
-feature keeps the requested session while it waits on battery and runs its deadline
-timer independently of sleep-restoration retries.
+without canceling external commands; the session holds the power assertion and,
+with the lid switch on, the watchdog. `KeepAwakePreferences` keeps the
+`KeepAwakeAutoOff` choice, lid switch and power option in the UserDefaults it is
+given, for `KeepAwakeSettingsView`, the settings pane's section, and the tile's chips.
+The feature keeps the requested session while it waits on battery and runs its
+deadline timer independently of sleep-restoration retries.
+
+The feature and its sessions reach macOS only through what they are given:
+
+- `PowerManagement`: power assertions, `pmset -a disablesleep` through sudo, the
+  watchdog, the clamshell verdict, `IOPMSleepSystem`, and the external power source
+  with its change notifications. `SystemPowerManagement` implements it with IOKit and
+  the processes `LidClosedSleepCommands.swift` builds.
+- `WallClock`: the current time and work scheduled at a date, for the auto-off
+  deadline and the restoration retry. `SystemWallClock` schedules on a wall deadline.
+
+`KeepAwakeFeatureFactory` builds the feature on the real implementations and the
+app's standard UserDefaults. The tests in `Tests/MacUtilitiesTests/KeepAwake*.swift`
+drive the feature in-process on `FakePowerManagement` and `FakeWallClock`, with
+preferences in a throwaway defaults domain; the watchdog test runs the real shell
+script against a fake `sudo`.
 
 App-owned Quit and reopening requests use `ApplicationTermination` to enter AppKit
 through its run loop, so queued UI actions finish before deferred Quit waits for

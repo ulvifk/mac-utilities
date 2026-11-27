@@ -1,45 +1,41 @@
 import AppKit
 import Combine
+import os
 
-/// Owns the menu bar item and its popover, the event tap, the settings window and the features; starts and stops features as their toggles change.
+/// The app delegate. Starts the enabled features at launch and stops them as their switches change or the app quits, offers them every
+/// tapped event unless paused, and launches the app's interface once they run.
 final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     let features: [Feature]
 
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let menuBarGlyph = buildMenuBarGlyph()
-    private let preferences = Preferences()
-    private(set) lazy var menuBarPopover = MenuBarPopover(rootView: MenuBarPopoverView(controller: self), statusItemButton: statusItem.button!)
-    /// Built at launch rather than when first opened, since building every pane takes a moment; after the event tap, whose state it shows.
-    private(set) var settingsWindow: SettingsWindow!
+    private let preferences: Preferences
+    private let eventTap: EventTap
+    private let interface: AppInterface
 
-    private var eventTap: EventTap!
     /// The running features, in the order the tap offers events to them.
     @Published private(set) var enabledFeatures: [Feature] = []
     /// While paused every event passes through untouched; the features keep running.
     @Published private(set) var isPaused = false
 
-    init(features: [Feature]) {
+    init(features: [Feature], preferences: Preferences, eventTap: EventTap, interface: AppInterface) {
         self.features = features
+        self.preferences = preferences
+        self.eventTap = eventTap
+        self.interface = interface
         super.init()
-
-        eventTap = EventTap { [unowned self] type, event in self.handle(type: type, event: event) }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        setMenuBarSymbol(nil)
-        statusItem.button!.target = self
-        statusItem.button!.action = #selector(AppController.toggleMenuBarPopover)
         startEnabledFeatures()
-        requestAccessibilityTrust()
-        eventTap.start()
-        settingsWindow = SettingsWindow(controller: self)
-        runSettingsSmokeTestIfRequested(controller: self)
-        runMenuBarSmokeTestIfRequested(controller: self)
+        eventTap.start { [unowned self] type, event in self.handle(type: type, event: event) }
+        interface.launch(controller: self)
     }
 
+    /// Stops the enabled features at once, so no event reaches them while they clean up, then lets every feature finish its cleanup before
+    /// AppKit goes on quitting.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Logger.core.notice("Quitting")
         for feature in enabledFeatures {
-            feature.stop()
+            stop(feature, because: .quit)
         }
         enabledFeatures = []
 
@@ -61,9 +57,10 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         enabledFeatures = getEnabledFeatures()
 
         if enabled {
+            Logger.core.notice("Starting \(feature.displayName, privacy: .public): switched on")
             feature.start()
         } else {
-            feature.stop()
+            stop(feature, because: .switchedOff)
         }
     }
 
@@ -74,27 +71,6 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
 
     func togglePause() {
         isPaused = !isPaused
-    }
-
-    /// A feature doing something in the background shows its own symbol in the menu bar; nil shows the app's glyph.
-    func setMenuBarSymbol(_ symbolName: String?) {
-        guard let symbolName else {
-            statusItem.button!.image = menuBarGlyph
-            return
-        }
-
-        statusItem.button!.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Mac Utilities")
-    }
-
-    /// While no shortcut works it opens on General, whose card says why. The popover would stay open over the window otherwise: it closes by
-    /// itself only on a click elsewhere. The window goes first, so the popover closing finds it key and leaves the app active.
-    func openSettings() {
-        if !isEventTapRunning {
-            settingsWindow.showPane(generalPaneIdentifier)
-        }
-
-        settingsWindow.open()
-        menuBarPopover.close()
     }
 
     private func handle(type: CGEventType, event: CGEvent) -> Bool {
@@ -110,15 +86,17 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     private func startEnabledFeatures() {
         enabledFeatures = getEnabledFeatures()
         for feature in enabledFeatures {
+            Logger.core.notice("Starting \(feature.displayName, privacy: .public): launch")
             feature.start()
         }
     }
 
-    private func getEnabledFeatures() -> [Feature] {
-        return features.filter { preferences.isFeatureEnabled($0.identifier) }
+    private func stop(_ feature: Feature, because cause: FeatureStopCause) {
+        Logger.core.notice("Stopping \(feature.displayName, privacy: .public): \(cause.rawValue, privacy: .public)")
+        feature.stop(because: cause)
     }
 
-    @objc private func toggleMenuBarPopover() {
-        menuBarPopover.toggle()
+    private func getEnabledFeatures() -> [Feature] {
+        return features.filter { preferences.isFeatureEnabled($0.identifier) }
     }
 }

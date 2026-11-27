@@ -20,6 +20,19 @@ struct SwitcherCellMetrics {
     func getRowCount(forPanelHeight height: CGFloat) -> CGFloat {
         return (height - 2 * verticalPadding + rowSpacing) / (cellSize.height + rowSpacing)
     }
+
+    /// How many of the items a row holds: the count nearest the panel width, so a drag has to travel half a cell either way before a column
+    /// comes or goes; raised when that many rows and the hint band would run past the screen's height, then held between one and what fits on
+    /// its width, so a width dragged past the screen or remembered from a wider one still fits.
+    func getCellsPerRow(itemCount: Int, panelWidth: CGFloat, screenSize: NSSize) -> Int {
+        let nearest = Int(getCellCount(forPanelWidth: panelWidth).rounded())
+        let fittingRows = max(1, Int(getRowCount(forPanelHeight: screenSize.height - hintBandHeight).rounded(.down)))
+        let fewestForHeight = (itemCount + fittingRows - 1) / fittingRows
+        let fitting = Int(getCellCount(forPanelWidth: screenSize.width).rounded(.down))
+
+        let wanted = max(nearest, fewestForHeight)
+        return max(1, min(wanted, fitting))
+    }
 }
 
 func getCellMetrics(listingWindows: Bool) -> SwitcherCellMetrics {

@@ -6,6 +6,6 @@ let package = Package(
     platforms: [.macOS("26.0")],
     targets: [
         .executableTarget(name: "MacUtilities"),
-        .testTarget(name: "MacUtilitiesTests", dependencies: ["MacUtilities"], exclude: ["Fixtures"])
+        .testTarget(name: "MacUtilitiesTests", dependencies: ["MacUtilities"])
     ]
 )

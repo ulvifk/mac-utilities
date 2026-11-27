@@ -180,38 +180,64 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 
 ## Code
 
-`Sources/MacUtilities/Features/AppSwitcher/`: `AppSwitcherFeature` handles the tapped
-keys and keeps the candidates, the listed windows and the selection; its switcher and
-preview sessions keep delayed opening, filtering, feedback and thumbnail deliveries with
-the panel that requested them; `AppSwitcherSettingsView` holds the sections of the
-settings pane, listing the apps `RunningRegularApps` keeps current and drawing the
-shortcuts with the shared `KeycapsView`; `SwitcherPreviewStore` holds the transient
-preview checkbox and selected mode. `SettingsWindow` and `SettingsSplitViewController`
-report pane visibility through `Feature.settingsWindowChanged`, including close,
-minimize, sidebar and geometry changes; `SwitcherPanel` draws the glass panel from a
-`SwitcherState` using `SwitcherLayout`, which places the content of a
-`SwitcherContentView` from the top down so it stays in place while the hint band grows
-in, `IconCellView` or `WindowCellView` (both `SwitcherCellView`s), `WhitelistBadgeView`
-and `HintBandView`, which shows the `ShortcutHint`s and, for a moment after a shortcut,
-its `SwitcherFeedback`, with the sizes and colours in `SwitcherMetrics` and the ones
-that differ between icon and window cells in `SwitcherCellMetrics`; `AppWindows.swift`
-lists an app's windows as `AppWindow`s through the accessibility API, which also raises
-them, and `WindowThumbnails.swift` captures their thumbnails with ScreenCaptureKit; one
-`GlassStore` each for the app and window panels and their cards keeps a look and
-darkness in UserDefaults, each set in a `GlassSettingsRow`. `SwitcherCardView` draws the
-shared card fill and selection border, and `SwitcherCardStore` keeps each list's cards
-switch; `SwitcherAppearanceStore` saves the hidden-app dimming preference;
-`WhitelistStore` keeps the filter switch and the whitelist in UserDefaults and publishes
-changes to the pane; `BatchQuitStore` keeps the Batch Quit list and its mode the same
-way, and an `AppListPicker` edits either list; `BatchQuitTile` is the popover tile, its
-feedback held in a `BatchQuitTileState`; `PanelWidthStore` keeps the dragged panel
-width, `ResizeHandleView` is the strip along each side edge that takes the drag and
-`BackgroundCursor.swift` lets the panel show the resize cursor while the app is
-inactive; `RecentAppsTracker` and `RunningApps` provide the most-recently-used order and
-the windowed apps, with `SpaceWindows.swift` asking the window server for the open
-windows on other Spaces, which the accessibility API does not see; `BackgroundJobs.swift`
-removes the quit apps' own launchd jobs after a Batch Quit, finding them with `lsappinfo`
-and removing them with `launchctl`.
+`Sources/MacUtilities/Features/AppSwitcher/`, built by `AppSwitcherFeatureFactory`:
+
+- `AppSwitcherFeature` coordinates: it turns each tapped key into a `SwitcherShortcut`
+  (`getSwitcherShortcut`, pure over key code and modifiers) and acts on it by its
+  `SwitcherPhase`: closed, a `SwitcherOpening` collecting the presses that arrive before
+  the list is loaded, or open on a `SwitcherList`. The tap callback never does real
+  work; everything is queued on the main queue through `SwitcherSession`s, renewed when
+  the feature stops, when an opening starts or the switcher closes, and when the
+  preview hides, so queued work for a panel or state that is gone does nothing.
+- `SwitcherList` is the listed `SwitcherItems` (apps, or one app's windows), the row
+  width and the selection, a value whose changes (advancing, moving between rows,
+  removing an app, keeping the selected app across Cmd+F) return a new list.
+  `SwitcherListLoader` loads it the same way for the switcher and the preview: recent
+  apps first, the whitelist filter, and the row width from `SwitcherCellMetrics`.
+- `SwitcherPreview` is the live preview beside the settings pane: it follows the
+  settings stores, the settings window's focus and the checkbox, and steps aside while
+  the switcher is up. `WindowThumbnailCache` keeps the thumbnails both share.
+- The system is reached through `SwitcherWorkspace` (running apps, the activation
+  order, windows, Batch Quit, and quit/hide notifications), `SwitcherScreen` (the
+  visible size and thumbnail capture) and `SwitcherPanel`, with `SwitcherApp` and
+  `SwitcherWindow` as the switcher's own notion of an app and a window. The real ones
+  are `SystemSwitcherWorkspace` (NSWorkspace, `RecentAppsTracker`, `RunningApps.swift`,
+  `SpaceWindows.swift` asking the window server for the open windows on other Spaces,
+  and `AppWindows.swift` listing an app's windows as `AppWindow`s through the
+  accessibility API), `SystemSwitcherScreen` (ScreenCaptureKit), `GlassSwitcherPanel`
+  and `RunningApp`.
+- `GlassSwitcherPanel` is the window: it orders itself in and out, places itself
+  (`getPreviewFrame` beside settings) and grows for the hint band. What it draws is a
+  `SwitcherPanelContent`, which builds and updates the views from a `SwitcherState`
+  without needing a window: a `SwitcherContentView` laid out from the top down by
+  `SwitcherLayout`, `IconCellView` or `WindowCellView` (both `SwitcherCellView`s with a
+  `SwitcherCardView`), `WhitelistBadgeView`, the `ResizeHandleView` strips and
+  `HintBandView`, which shows the `ShortcutHint`s and, for a moment after a shortcut,
+  its `SwitcherFeedback`. Sizes and colours are in `SwitcherMetrics`; the ones that
+  differ between icon and window cells in `SwitcherCellMetrics`.
+  `BackgroundCursor.swift` lets the panel show the resize cursor while the app is
+  inactive.
+- `SwitcherSettings` groups the stores, all in UserDefaults except the preview's:
+  `WhitelistStore` (filter switch and whitelist), `BatchQuitStore` (list and mode),
+  `SwitcherAppearanceStore` (hidden-app dimming), one `GlassStore` each for the app and
+  window panels and their cards, a `SwitcherCardStore` per list's cards switch,
+  `PanelWidthStore` (dragged width) and `SwitcherPreviewStore` (the transient preview
+  checkbox and mode). `AppSwitcherSettingsView` draws the settings pane from them, with
+  `GlassSettingsRow`, an `AppListPicker` per app list, the running apps from
+  `RunningRegularApps` and the shared `KeycapsView`. `BatchQuitTile` is the popover tile,
+  its feedback held in a `BatchQuitTileState`; `BackgroundJobs.swift` removes the quit
+  apps' own launchd jobs after a Batch Quit, finding them with `lsappinfo` and removing
+  them with `launchctl`.
+
+`Tests/MacUtilitiesTests/` test it in-process: `AppSwitcherFeatureTests`,
+`AppSwitcherKeyRoutingTests` (which presses are swallowed in each phase),
+`AppSwitcherOpenPanelTests` and `AppSwitcherPreviewTests` drive the feature through
+`AppSwitcherTestHarness` on fakes of the boundaries (`SwitcherFake*`).
+`SwitcherAppearanceTests` run the real `GlassSwitcherPanel` as `SwitcherTestGlassPanel`,
+whose ordering in and out only flips `isVisible`, so no window reaches the screen (the
+panel class is not `final` for this), and draw the rest into a `SwitcherPanelContent`.
+`SwitcherSystemWorkspaceTests` post the workspace notifications in-process to check
+`SystemSwitcherWorkspace`'s subscriptions, and the pure units have their own tests.
 
 ## Dev
 
@@ -231,5 +257,5 @@ gradient behind the panel for a dark one. The capture is a screen-region capture
 our own windows, so it needs no Screen Recording permission but only shows the
 desktop and this app; the window thumbnails need Screen Recording for the terminal
 running it. A gradient window is put behind the panel first, so the glass has
-something to blur. The smoke test runs from the feature's start, so the App Switcher
+something to blur. The smoke test, `AppSwitcherSmokeTest`, runs from the feature's start, so the App Switcher
 toggle must be on.

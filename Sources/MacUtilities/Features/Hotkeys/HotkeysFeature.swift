@@ -16,10 +16,6 @@ final class HotkeysFeature: Feature {
         self.toggleKeepAwake = toggleKeepAwake
     }
 
-    func start() {}
-
-    func stop() {}
-
     /// Runs the action off the tap; a held key repeats the press, and those repeats are swallowed without acting again. While the settings pane records a shortcut every combo passes, so a bound one can be recorded again.
     func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type != .keyDown { return false }
@@ -36,10 +32,6 @@ final class HotkeysFeature: Feature {
 
     func buildSettingsSections() -> AnyView {
         return AnyView(HotkeysSettingsView(store: store))
-    }
-
-    func buildPopoverTile() -> AnyView? {
-        return nil
     }
 
     private func isRecordingShortcut() -> Bool {

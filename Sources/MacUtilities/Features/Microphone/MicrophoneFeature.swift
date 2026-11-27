@@ -1,6 +1,6 @@
-import AppKit
 import Combine
 import CoreAudio
+import os
 import SwiftUI
 
 final class MicrophoneFeature: Feature, ObservableObject {
@@ -21,7 +21,7 @@ final class MicrophoneFeature: Feature, ObservableObject {
     private var isEnabled = false
     private var isTerminating = false
 
-    init(audioInput: AudioInput = SystemAudioInput()) {
+    init(audioInput: AudioInput) {
         self.audioInput = audioInput
     }
 
@@ -34,19 +34,15 @@ final class MicrophoneFeature: Feature, ObservableObject {
         refresh()
     }
 
-    func stop() {
+    func stop(because cause: FeatureStopCause) {
         isEnabled = false
         changeInput(to: nil)
     }
 
     @MainActor func prepareForTermination() async {
         isTerminating = true
-        stop()
+        stop(because: .quit)
         await transition?.value
-    }
-
-    func handle(type: CGEventType, event: CGEvent) -> Bool {
-        return false
     }
 
     func buildSettingsSections() -> AnyView {
@@ -126,11 +122,13 @@ final class MicrophoneFeature: Feature, ObservableObject {
 
         let status = await audioInput.setDefaultInputDevice(input.id)
         if status != noErr {
+            Logger.microphone.error("Input \(input.name, privacy: .public) not selected: error \(status, privacy: .public)")
             errorMessage = "Couldn't select microphone (error \(status))."
             return
         }
 
         session = MicrophoneSession(selectedInputUID: uid, previousInputUID: previousInputUID)
+        Logger.microphone.notice("Input changed by the user's pick: \(input.name, privacy: .public)")
         refresh()
     }
 
@@ -140,30 +138,38 @@ final class MicrophoneFeature: Feature, ObservableObject {
 
         guard let session else { return }
         guard let previousInputUID = session.previousInputUID else {
+            Logger.microphone.notice("Previous input not restored: there was none")
             errorMessage = "No previous microphone to restore. Choose another input."
             return
         }
         guard let restoredInput = inputDevices.first(where: { $0.uid == previousInputUID }) else {
+            Logger.microphone.notice("Previous input not restored: it is disconnected")
             errorMessage = "Previous microphone disconnected. Choose another input."
             return
         }
 
         let status = await audioInput.setDefaultInputDevice(restoredInput.id)
         if status != noErr {
+            Logger.microphone.error("Previous input \(restoredInput.name, privacy: .public) not restored: error \(status, privacy: .public)")
             errorMessage = "Couldn't restore previous microphone (error \(status))."
             return
         }
 
         self.session = nil
+        Logger.microphone.notice("Input changed by a restore: \(restoredInput.name, privacy: .public)")
         refresh()
     }
 
+    /// A selection that no longer holds while no change of ours runs was replaced by the system or another app.
     private func refresh() {
         inputDevices = audioInput.getInputDevices()
         defaultInputDeviceID = audioInput.getDefaultInputDeviceID()
 
         guard let session else { return }
         if defaultInput?.uid == session.selectedInputUID { return }
+        if transition == nil {
+            Logger.microphone.notice("Input changed by the system: \(self.defaultInput?.name ?? "none", privacy: .public); the picked input is no longer the default")
+        }
         self.session = nil
         errorMessage = nil
     }
