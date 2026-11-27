@@ -63,11 +63,11 @@ struct AppPicker: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($isSearchFieldFocused)
                 .onKeyPress(.upArrow) {
-                    state.moveHighlightUp()
+                    state.moveHighlightUp(pointerLocation: NSEvent.mouseLocation)
                     return .handled
                 }
                 .onKeyPress(.downArrow) {
-                    state.moveHighlightDown()
+                    state.moveHighlightDown(pointerLocation: NSEvent.mouseLocation)
                     return .handled
                 }
                 .onSubmit { selectHighlightedApp() }
