@@ -124,13 +124,27 @@ Settings", until the next time it is turned on.
 `Sources/MacUtilities/Features/KeepAwake/`: `KeepAwakeFeature` publishes the current
 `KeepAwakeSession` to `KeepAwakeTile`, its tile in the menu bar popover, and ends it
 on the one-shot timer. One transition task processes the latest requested session
-without canceling external commands; the session holds the `PowerAssertion` and,
-with the lid switch on, the watchdog from `LidClosedSleep`; `KeepAwakePreferences` keeps the
-`KeepAwakeAutoOff` choice, lid switch and power option in UserDefaults for
-`KeepAwakeSettingsView`, the settings pane's section, and the tile's chips.
-`ExternalPowerSource` watches IOKit power-source changes on the main run loop. The
-feature keeps the requested session while it waits on battery and runs its deadline
-timer independently of sleep-restoration retries.
+without canceling external commands; the session holds the power assertion and,
+with the lid switch on, the watchdog. `KeepAwakePreferences` keeps the
+`KeepAwakeAutoOff` choice, lid switch and power option in the UserDefaults it is
+given, for `KeepAwakeSettingsView`, the settings pane's section, and the tile's chips.
+The feature keeps the requested session while it waits on battery and runs its
+deadline timer independently of sleep-restoration retries.
+
+The feature and its sessions reach macOS only through what they are given:
+
+- `PowerManagement`: power assertions, `pmset -a disablesleep` through sudo, the
+  watchdog, the clamshell verdict, `IOPMSleepSystem`, and the external power source
+  with its change notifications. `SystemPowerManagement` implements it with IOKit and
+  the processes `LidClosedSleepCommands.swift` builds.
+- `WallClock`: the current time and work scheduled at a date, for the auto-off
+  deadline and the restoration retry. `SystemWallClock` schedules on a wall deadline.
+
+`KeepAwakeFeatureFactory` builds the feature on the real implementations and the
+app's standard UserDefaults. The tests in `Tests/MacUtilitiesTests/KeepAwake*.swift`
+drive the feature in-process on `FakePowerManagement` and `FakeWallClock`, with
+preferences in a throwaway defaults domain; the watchdog test runs the real shell
+script against a fake `sudo`.
 
 App-owned Quit and reopening requests use `ApplicationTermination` to enter AppKit
 through its run loop, so queued UI actions finish before deferred Quit waits for
