@@ -10,7 +10,7 @@ let hotkeys = HotkeysFeature(toggleKeepAwake: {
     keepAwake.toggle()
 })
 let microphone = MicrophoneFeature(audioInput: SystemAudioInput(hardware: SystemAudioHardware()))
-let features: [Feature] = [AppSwitcherFeatureFactory().buildFeature(), keepAwake, hotkeys, microphone]
+let features: [Feature] = [AppSwitcherFeatureFactory.buildFeature(), keepAwake, hotkeys, microphone]
 
 let controller = AppController(features: features, preferences: preferences, eventTap: SystemEventTap(), interface: interface)
 application.setActivationPolicy(.accessory)

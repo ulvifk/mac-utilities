@@ -26,8 +26,8 @@ final class AppSwitcherTestHarness {
         previewPanel = SwitcherFakePanel(log: log)
         settingsWindow = SwitcherTestSettingsWindow(contentRect: NSRect(x: 360, y: 180, width: 720, height: 540), styleMask: .titled,
                                                     backing: .buffered, defer: false)
-        settings = AppSwitcherFeatureFactory().buildSettings(defaults: defaults.buildUserDefaults())
-        feature = AppSwitcherFeatureFactory().buildFeature(
+        settings = AppSwitcherFeatureFactory.buildSettings(defaults: defaults.buildUserDefaults())
+        feature = AppSwitcherFeatureFactory.buildFeature(
             settings: settings, workspace: workspace, screen: screen, panel: panel, previewPanel: previewPanel, environment: [:]
         )
 
