@@ -90,7 +90,7 @@ final class SwitcherListTests {
     @Test
     func loadsTrackedAppsThenUntrackedOnes() {
         let loader = buildLoader(defaults: testDefaults.buildUserDefaults())
-        workspace.recentBundleIdentifiers = ["test.app.3", "gone", "test.app.1"]
+        workspace.recentProcessIdentifiers = [3, 99, 1] // 99 is no regular app, such as a menu bar app
 
         let list = loader.loadAppList()
 
@@ -113,15 +113,15 @@ final class SwitcherListTests {
     }
 
     @Test
-    func loadsEveryInstanceOfAnAppInItsPlace() {
+    func loadsEachInstanceOfAnAppAtItsOwnRecency() {
         let secondInstance = workspace.buildApp(index: 5)
         secondInstance.bundleIdentifier = "test.app.1"
         workspace.runningApps.append(secondInstance)
-        workspace.recentBundleIdentifiers = ["test.app.1", "test.app.3"]
+        workspace.recentProcessIdentifiers = [5, 3, 1]
 
         let list = buildLoader(defaults: testDefaults.buildUserDefaults()).loadAppList()
 
-        #expect(getProcessIdentifiers(list) == [1, 5, 3, 0, 2, 4])
+        #expect(getProcessIdentifiers(list) == [5, 3, 1, 0, 2, 4])
     }
 
     @Test
@@ -130,7 +130,7 @@ final class SwitcherListTests {
         let whitelistStore = WhitelistStore(defaults: defaults)
         whitelistStore.setListed("test.app.1", true)
         whitelistStore.setFilterEnabled(true)
-        workspace.recentBundleIdentifiers = ["test.app.2", "test.app.0"]
+        workspace.recentProcessIdentifiers = [2, 0]
 
         let list = buildLoader(defaults: defaults).loadAppList()
 

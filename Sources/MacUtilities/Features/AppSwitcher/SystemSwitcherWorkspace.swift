@@ -41,8 +41,8 @@ final class SystemSwitcherWorkspace: SwitcherWorkspace {
         return apps
     }
 
-    func getRecentlyActivatedBundleIdentifiers() -> [String] {
-        return tracker.bundleIdentifiers
+    func getRecentlyActiveProcessIdentifiers() -> [pid_t] {
+        return tracker.processIdentifiers
     }
 
     func getAppsWithWindows(_ apps: [SwitcherApp]) -> [SwitcherApp] {

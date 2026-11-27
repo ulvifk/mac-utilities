@@ -51,12 +51,14 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - Apps are listed most recently used first: the app frontmost when the switcher started
   counts as used then, and each app activated since as used when it was activated. Apps
   not used since the switcher started, such as ones launched in the background or as
-  login items, follow them in the order macOS lists them. An app with several running
-  instances lists each of them.
-- Apps without open windows are left out. Windows on every Space count, other displays'
-  and full-screen ones included, so the list is the same on every Space, as with the
-  native switcher. Switching to an app whose windows are all on another Space moves
-  there, as macOS does.
+  login items, follow them in the order macOS lists them; so does an app that quit and
+  was opened again without being activated. Each running instance of an app is listed
+  in its own place, so a quick Cmd+Tab goes to the app used before, even when the
+  frontmost app has a second instance.
+- Apps without open windows are left out, each instance by its own windows. Windows on
+  every Space count, other displays' and full-screen ones included, so the list is the
+  same on every Space, as with the native switcher. Switching to an app whose windows
+  are all on another Space moves there, as macOS does.
 - Hidden apps stay listed, whether they were hidden with Cmd+H here or anywhere else;
   releasing Cmd on one unhides and activates it. "Dim hidden apps" in settings defaults
   to on and gives hidden icons 40% opacity. Turn it off for normal opacity; the choice

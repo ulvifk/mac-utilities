@@ -135,12 +135,29 @@ struct AppSwitcherFeatureTests {
     @Test
     func untrackedAppsFollowTrackedOnes() async {
         let harness = AppSwitcherTestHarness()
-        harness.workspace.recentBundleIdentifiers = ["test.app.2", "test.app.0"]
+        harness.workspace.recentProcessIdentifiers = [2, 0]
 
         harness.press(tabKeyCode)
         await harness.drainMainQueue()
 
         #expect(harness.log.shownStates.last!.bundleIdentifiers == ["test.app.2", "test.app.0", "test.app.1"])
+        await harness.finish()
+    }
+
+    /// Running [test.app.0 #0, test.app.0 #2, test.app.1 #1], with #0 frontmost and test.app.1 active before it.
+    @Test
+    func quickSwitchFromAppWithTwoInstancesGoesToThePreviousApp() async {
+        let harness = AppSwitcherTestHarness(itemCount: 2)
+        let secondInstance = harness.workspace.buildApp(index: 2)
+        secondInstance.bundleIdentifier = "test.app.0"
+        harness.workspace.runningApps.insert(secondInstance, at: 1)
+        harness.workspace.recentProcessIdentifiers = [0, 1, 2]
+
+        harness.press(tabKeyCode)
+        harness.releaseCommand()
+        await harness.drainMainQueue()
+
+        #expect(harness.workspace.activatedBundleIdentifiers == ["test.app.1"], "Quick switch did not go to the previous app")
         await harness.finish()
     }
 

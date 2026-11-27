@@ -30,21 +30,21 @@ final class SwitcherListLoader {
         return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items))
     }
 
-    /// Regular running apps with a window, most recently used first, for the switcher to list:
-    /// - first the apps the workspace tracks (the one frontmost when observing started, then each one activated since), most recent first
+    /// Regular running apps with a window, most recently active first, for the switcher to list. Each running process has its own place:
+    /// - first the processes the workspace tracks (the one frontmost when observing started, then each one activated since), most recent first
     /// - then the untracked ones, such as apps launched in the background, in the order the workspace lists them
-    /// Every running instance is listed; the instances of a tracked app sit together at its place, in workspace order.
-    /// E.g. running [A, B, C, D], tracked [C, gone, A] -> [C, A, B, D].
+    /// E.g. running [A, B, C, D], tracked [C, a menu bar app, A] -> [C, A, B, D].
     func getRunningAppsByRecency() -> [SwitcherApp] {
-        var positionsInTracker: [String: Int] = [:] // [bundleIdentifier] -> 0 for the most recent
-        for (position, bundleIdentifier) in workspace.getRecentlyActivatedBundleIdentifiers().enumerated() {
-            positionsInTracker[bundleIdentifier] = position
+        let trackedProcessIdentifiers = workspace.getRecentlyActiveProcessIdentifiers()
+        var positionsInTracker: [pid_t: Int] = [:] // [processIdentifier] -> 0 for the most recent
+        for (position, processIdentifier) in trackedProcessIdentifiers.enumerated() {
+            positionsInTracker[processIdentifier] = position
         }
-        let untrackedPosition = positionsInTracker.count
+        let untrackedPosition = trackedProcessIdentifiers.count
 
         let appsByRecency = workspace.getRunningApps().enumerated().sorted { first, second in
-            let firstKey = (positionsInTracker[first.element.bundleIdentifier] ?? untrackedPosition, first.offset)
-            let secondKey = (positionsInTracker[second.element.bundleIdentifier] ?? untrackedPosition, second.offset)
+            let firstKey = (positionsInTracker[first.element.processIdentifier] ?? untrackedPosition, first.offset)
+            let secondKey = (positionsInTracker[second.element.processIdentifier] ?? untrackedPosition, second.offset)
             return firstKey < secondKey
         }
 

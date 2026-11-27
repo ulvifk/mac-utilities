@@ -4,14 +4,14 @@ import AppKit
 /// Running apps and windows held in memory; records what the switcher asks of them and what it does to them.
 final class SwitcherFakeWorkspace: SwitcherWorkspace {
     var runningApps: [SwitcherFakeApp] = []
-    var recentBundleIdentifiers: [String] = []
+    var recentProcessIdentifiers: [pid_t] = []
     /// Listed for whichever app is asked.
     var windows: [SwitcherFakeWindow] = []
     var onBringToFront: (SwitcherFakeWindow) -> Void = { _ in }
 
     private(set) var runningAppQueryCount = 0
     private(set) var appsWithWindowsQueryCount = 0
-    private(set) var windowQueryCount = 0
+    private(set) var windowQueryProcessIdentifiers: [pid_t] = [] // of the apps whose windows were asked for, in order
 
     var activatedBundleIdentifiers: [String] = []
     var quitBundleIdentifiers: [String] = []
@@ -25,7 +25,7 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
     /// test.app.0, test.app.1, ..., each with a window of the same number.
     init(itemCount: Int) {
         runningApps = (0..<itemCount).map { buildApp(index: $0) }
-        recentBundleIdentifiers = runningApps.map { $0.bundleIdentifier }
+        recentProcessIdentifiers = runningApps.map { $0.processIdentifier }
         windows = (0..<itemCount).map { buildWindow(windowID: CGWindowID($0)) }
     }
 
@@ -52,8 +52,8 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
         return runningApps
     }
 
-    func getRecentlyActivatedBundleIdentifiers() -> [String] {
-        return recentBundleIdentifiers
+    func getRecentlyActiveProcessIdentifiers() -> [pid_t] {
+        return recentProcessIdentifiers
     }
 
     func getAppsWithWindows(_ apps: [SwitcherApp]) -> [SwitcherApp] {
@@ -66,7 +66,7 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
     }
 
     func getWindows(of app: SwitcherApp) -> [SwitcherWindow] {
-        windowQueryCount += 1
+        windowQueryProcessIdentifiers.append(app.processIdentifier)
         return windows
     }
 
