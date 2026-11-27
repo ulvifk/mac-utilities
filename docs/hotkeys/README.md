@@ -91,9 +91,13 @@ case and the spaces around it; text that is only spaces lists every app. While t
 text narrows the list to at least one app, one result is highlighted, the first one
 each time the text changes other than in the spaces around it. Up and Down move the
 highlight, stopping at the first and last result and scrolling it into view, and
-moving the pointer onto a row highlights it; a row that scrolls under a still
-pointer does not. The highlight stays where the keys or the pointer last put it.
-Click an app, or press Return for the highlighted one, to choose it. With no text,
+moving the pointer onto a row highlights it. Typing and the arrow keys put the
+highlight in the keyboard's hands until the pointer moves: a row that slides under
+the still pointer, as the keys scroll the list or the typed text changes it, does
+not take the highlight. Once the pointer moves it leads, and scrolling with the
+wheel or trackpad highlights each row that comes under it, until the next key. The
+highlight stays where the keys or the pointer last put it. Click an app, or press
+Return for the highlighted one, to choose it. With no text,
 nothing is highlighted until Down, Up or the pointer highlights a row, so Return
 does nothing until then.
 

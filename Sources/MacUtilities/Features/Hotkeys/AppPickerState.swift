@@ -9,10 +9,11 @@ import Combine
 ///   highlight; the search field writes its unchanged text back when Return commits it, just before Return picks the highlighted app.
 /// - Up and Down move the highlight one result and stop at either end; from no highlight, either one highlights the first result.
 /// - Hovering a row highlights it and the highlight stays there when the pointer leaves, so the pointer and the keys share one highlight.
-///   A hover report counts only when the pointer has moved since the keys last moved the highlight or since the previous hover report,
-///   whichever came later: as the keys scroll the list, the row sliding under a still pointer is reported as hovered, and must not take the
-///   highlight back from the keys. The pointer moving within the row it rests on is not reported, so the keyboard highlight stays until the
-///   pointer enters another row.
+/// - Keyboard input (a search text change, Up, Down) puts the highlight in the keyboard's hands until the pointer really moves. Each one
+///   records where the pointer rests; a hover report at that location is ignored, because when the keys scroll the list or change the
+///   results, the row that slides under the still pointer is reported as hovered. A report anywhere else is a real move: it highlights its
+///   row and the pointer leads, through wheel scrolling too, until the next keyboard input. The pointer moving within the row it rests on is
+///   not reported, so the keyboard highlight stays until the pointer enters another row.
 /// The apps are fixed for the picker's life, so the highlighted index always points into the results.
 final class AppPickerState: ObservableObject {
     let apps: [InstalledApp] // by name
@@ -20,7 +21,7 @@ final class AppPickerState: ObservableObject {
     @Published var isShown = false
     @Published private(set) var searchText = ""
     @Published private(set) var highlightedIndex: Int? // into results
-    private var lastKnownPointerLocation: CGPoint? // at the last key move or hover report; in screen coordinates, which scrolling does not change
+    private var pointerLocationAtKeyPress: CGPoint? // in screen coordinates, which scrolling does not change; nil while the pointer leads
 
     init(apps: [InstalledApp]) {
         self.apps = apps
@@ -36,14 +37,18 @@ final class AppPickerState: ObservableObject {
         return apps.filter { $0.name.localizedCaseInsensitiveContains(trimmedSearchText) }
     }
 
-    /// Opens the popover on an empty search with nothing highlighted.
+    /// Opens the popover on an empty search with nothing highlighted, the pointer leading.
     func show() {
         searchText = ""
         highlightedIndex = nil
+        pointerLocationAtKeyPress = nil
         isShown = true
     }
 
-    func changeSearchText(to newSearchText: String) {
+    /// The pointer location, here and for Up and Down, is the pointer's screen location while the key is pressed. An unchanged text, which
+    /// the field writes back when Return commits it, records it too but keeps the highlight.
+    func changeSearchText(to newSearchText: String, pointerLocation: CGPoint) {
+        pointerLocationAtKeyPress = pointerLocation
         let isSameSearch = getTrimmed(newSearchText) == getTrimmed(searchText)
         searchText = newSearchText
         if isSameSearch { return }
@@ -54,25 +59,24 @@ final class AppPickerState: ObservableObject {
         highlightFirstResult()
     }
 
-    /// Highlights the hovered result, unless the pointer is where it was at the last key move or hover report, which means the list scrolled
-    /// under a still pointer.
+    /// Highlights the hovered result and lets the pointer lead, unless the pointer is where it was at the last key press, which means the list
+    /// moved under a still pointer.
     func highlightHoveredResult(at index: Int, pointerLocation: CGPoint) {
-        if pointerLocation == lastKnownPointerLocation { return }
+        if pointerLocation == pointerLocationAtKeyPress { return }
 
-        lastKnownPointerLocation = pointerLocation
+        pointerLocationAtKeyPress = nil
         highlightedIndex = index
     }
 
-    /// The pointer location, in screen coordinates, is where the pointer rests while the key is pressed; see highlightHoveredResult.
     func moveHighlightUp(pointerLocation: CGPoint) {
-        lastKnownPointerLocation = pointerLocation
+        pointerLocationAtKeyPress = pointerLocation
         guard let highlightedIndex else { return highlightFirstResult() }
 
         self.highlightedIndex = max(highlightedIndex - 1, 0)
     }
 
     func moveHighlightDown(pointerLocation: CGPoint) {
-        lastKnownPointerLocation = pointerLocation
+        pointerLocationAtKeyPress = pointerLocation
         guard let highlightedIndex else { return highlightFirstResult() }
 
         self.highlightedIndex = min(highlightedIndex + 1, results.count - 1)
