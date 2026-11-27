@@ -4,16 +4,13 @@ import SwiftUI
 /// The sidebar and, beside it, the selected pane. Every pane is built once and kept, the others hidden, so switching only swaps which one is
 /// visible; a hidden pane takes no clicks or keys.
 final class SettingsSplitViewController: NSSplitViewController {
-    private let panes: [SettingsPane]
     private let sidebar: SettingsSidebarViewController
+    private let paneSelection: SettingsPaneSelection
     /// [pane identifier] -> the pane's view
     private let paneViews: [String: NSView]
 
-    private var selectedPaneIdentifier = generalPaneIdentifier
-    private var areSettingsVisible = false
-
-    init(panes: [SettingsPane]) {
-        self.panes = panes
+    init(panes: [SettingsPane], paneSelection: SettingsPaneSelection) {
+        self.paneSelection = paneSelection
         sidebar = SettingsSidebarViewController(panes: panes)
         paneViews = Dictionary(uniqueKeysWithValues: panes.map { ($0.identifier, buildPaneView($0)) })
         super.init(nibName: nil, bundle: nil)
@@ -33,36 +30,12 @@ final class SettingsSplitViewController: NSSplitViewController {
         showSelectedPane(paneIdentifier)
     }
 
-    func setSettingsVisible(_ isVisible: Bool) {
-        if areSettingsVisible == isVisible { return }
-
-        areSettingsVisible = isVisible
-        getPane(selectedPaneIdentifier).onWindowChanged(isVisible ? view.window! : nil)
-    }
-
-    func updateVisiblePane() {
-        if !areSettingsVisible { return }
-
-        getPane(selectedPaneIdentifier).onWindowChanged(view.window!)
-    }
-
-    /// The pane's title becomes the window's.
     private func showSelectedPane(_ paneIdentifier: String) {
-        if selectedPaneIdentifier != paneIdentifier {
-            getPane(selectedPaneIdentifier).onWindowChanged(nil)
-            selectedPaneIdentifier = paneIdentifier
-            getPane(paneIdentifier).onWindowChanged(areSettingsVisible ? view.window! : nil)
-        }
+        paneSelection.selectPane(paneIdentifier)
 
         for (identifier, paneView) in paneViews {
             paneView.isHidden = identifier != paneIdentifier
         }
-
-        view.window!.title = getPane(paneIdentifier).title
-    }
-
-    private func getPane(_ identifier: String) -> SettingsPane {
-        return panes.first { $0.identifier == identifier }!
     }
 
     private func buildSidebarItem() -> NSSplitViewItem {

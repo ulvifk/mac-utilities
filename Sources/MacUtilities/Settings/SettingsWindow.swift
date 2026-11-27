@@ -3,15 +3,18 @@ import SwiftUI
 
 /// The settings window, kept around across closes; its title follows the selected pane. The app is an accessory, so opening it activates the
 /// app; the system may turn that down and leave the window behind the frontmost app's, so it is also ordered front regardless.
-final class SettingsWindow: NSWindow, NSWindowDelegate, NSToolbarDelegate {
+final class SettingsWindow: NSWindow, NSToolbarDelegate {
+    private var paneSelection: SettingsPaneSelection!
     private var splitViewController: SettingsSplitViewController!
 
     init(controller: AppController) {
         super.init(contentRect: .zero, styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
 
-        splitViewController = SettingsSplitViewController(panes: buildPanes(controller: controller))
+        let panes = buildPanes(controller: controller)
+        paneSelection = SettingsPaneSelection(panes: panes, window: self)
+        splitViewController = SettingsSplitViewController(panes: panes, paneSelection: paneSelection)
         isReleasedWhenClosed = false
-        delegate = self
+        delegate = paneSelection
         toolbar = buildToolbar()
         toolbarStyle = .unifiedCompact
         contentViewController = splitViewController
@@ -28,31 +31,11 @@ final class SettingsWindow: NSWindow, NSWindowDelegate, NSToolbarDelegate {
         NSApp.activate()
         makeKeyAndOrderFront(nil)
         orderFrontRegardless()
-        splitViewController.setSettingsVisible(true)
+        paneSelection.setWindowVisible(true)
     }
 
     func showPane(_ paneIdentifier: String) {
         splitViewController.showPane(paneIdentifier)
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        splitViewController.setSettingsVisible(false)
-    }
-
-    func windowDidMiniaturize(_ notification: Notification) {
-        splitViewController.setSettingsVisible(false)
-    }
-
-    func windowDidDeminiaturize(_ notification: Notification) {
-        splitViewController.setSettingsVisible(true)
-    }
-
-    func windowDidMove(_ notification: Notification) {
-        splitViewController.updateVisiblePane()
-    }
-
-    func windowDidResize(_ notification: Notification) {
-        splitViewController.updateVisiblePane()
     }
 
     /// The separator tracking the sidebar's edge puts the title over the pane rather than over the sidebar.
