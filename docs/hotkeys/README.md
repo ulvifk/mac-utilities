@@ -85,9 +85,15 @@ The target is an app picker for the app actions, a text field for the command,
 nothing for keep-awake. Changing the action clears the target. The app picker shows
 the chosen app with its icon ("Choose App" until one is chosen); clicking it opens a
 search over every `.app` in `/Applications`, `/System/Applications`,
-`~/Applications` and their `Utilities` folders. Typing narrows the list to the apps
-whose name contains the text, ignoring case; click an app, or press Return for the
-first one, to choose it.
+`~/Applications` and their `Utilities` folders, with the cursor in its search field.
+Typing narrows the list to the apps whose name contains the text, ignoring case and
+the spaces around it; text that is only spaces lists every app. While there is text,
+one result is highlighted, the first one each time the text changes. Up and Down move
+the highlight, stopping at the first and last result and scrolling it into view, and
+the pointer highlights the row it rests on; the highlight stays where the keys or the
+pointer last put it. Click an app, or press Return for the highlighted one, to choose
+it. With no text, nothing is highlighted until Down, Up or the pointer highlights a
+row, so Return does nothing until then.
 
 The warning says another binding has the same key ("Same shortcut as another
 hotkey", on both rows), or names the macOS use of a reserved combo: Cmd+Space
@@ -110,5 +116,6 @@ it and its directory; `HotkeyBinding`, `KeyCombo`, `ModifierKey`, `HotkeyAction`
 labels; `HotkeysSettingsView` holds the sections of the settings pane, listing a
 `HotkeyBindingRow` per binding, built from `KeyRecorderField` (wrapping
 `KeyRecorderButton`, which draws a `KeyRecorderLabel`: the capsule, or the combo in
-the shared `KeycapsView`), `AppPicker` over `InstalledApps` and the warnings from
+the shared `KeycapsView`), `AppPicker` over `InstalledApps`, rendering `AppPickerState` (the search results and
+the highlight), and the warnings from
 `HotkeyConflicts`.
