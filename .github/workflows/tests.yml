@@ -8,6 +8,7 @@ on:
 jobs:
   tests:
     runs-on: macos-26
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - name: Build the release binary
