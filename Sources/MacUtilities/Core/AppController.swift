@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import os
 
 /// The app delegate. Starts the enabled features at launch and stops them as their switches change or the app quits, offers them every
 /// tapped event unless paused, and launches the app's interface once they run.
@@ -32,8 +33,9 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     /// Stops the enabled features at once, so no event reaches them while they clean up, then lets every feature finish its cleanup before
     /// AppKit goes on quitting.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Logger.core.notice("Quitting")
         for feature in enabledFeatures {
-            feature.stop()
+            stop(feature, because: .quit)
         }
         enabledFeatures = []
 
@@ -55,9 +57,10 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
         enabledFeatures = getEnabledFeatures()
 
         if enabled {
+            Logger.core.notice("Starting \(feature.displayName, privacy: .public): switched on")
             feature.start()
         } else {
-            feature.stop()
+            stop(feature, because: .switchedOff)
         }
     }
 
@@ -83,8 +86,14 @@ final class AppController: NSObject, NSApplicationDelegate, ObservableObject {
     private func startEnabledFeatures() {
         enabledFeatures = getEnabledFeatures()
         for feature in enabledFeatures {
+            Logger.core.notice("Starting \(feature.displayName, privacy: .public): launch")
             feature.start()
         }
+    }
+
+    private func stop(_ feature: Feature, because cause: FeatureStopCause) {
+        Logger.core.notice("Stopping \(feature.displayName, privacy: .public): \(cause.rawValue, privacy: .public)")
+        feature.stop(because: cause)
     }
 
     private func getEnabledFeatures() -> [Feature] {

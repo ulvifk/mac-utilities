@@ -17,7 +17,7 @@ protocol Feature {
     /// Called at launch while enabled, and when switched on.
     func start()
     /// Called when switched off, and on quit while enabled.
-    func stop()
+    func stop(because cause: FeatureStopCause)
     /// Finishes outstanding external effects, including cleanup owned by a disabled feature.
     @MainActor func prepareForTermination() async
     /// Returns true when the event is swallowed and must not reach the focused app.
@@ -32,7 +32,7 @@ protocol Feature {
 
 extension Feature {
     func start() {}
-    func stop() {}
+    func stop(because cause: FeatureStopCause) {}
     @MainActor func prepareForTermination() async {}
     func handle(type: CGEventType, event: CGEvent) -> Bool { false }
     func settingsWindowChanged(_ window: AppKit.NSWindow?) {}

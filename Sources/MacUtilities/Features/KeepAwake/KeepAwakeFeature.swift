@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import os
 import SwiftUI
 
 let keepAwakeSymbolName = "cup.and.saucer.fill"
@@ -31,6 +32,9 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     private var preferenceChanges: AnyCancellable?
     private var isTerminating = false
 
+    private var requestDropCause: KeepAwakeEndCause? // why requestedSession was last dropped; a session can end after its request
+    private var wasWaitingForPower = false
+
     init(preferences: KeepAwakePreferences, powerManagement: PowerManagement, clock: WallClock, setMenuBarSymbol: @escaping (String?) -> Void) {
         self.preferences = preferences
         self.powerManagement = powerManagement
@@ -44,14 +48,16 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         powerManagement.startObservingExternalPower { [unowned self] in updateSessionForChangedCondition() }
     }
 
-    func stop() {
-        requestedSession = nil
-        updateSession()
+    func stop(because cause: FeatureStopCause) {
+        switch cause {
+        case .switchedOff: dropRequest(because: .featureSwitchedOff)
+        case .quit: dropRequest(because: .quit)
+        }
     }
 
     @MainActor func prepareForTermination() async {
         isTerminating = true
-        stop()
+        dropRequest(because: .quit)
         await transition?.value
 
         deactivation?.cancel()
@@ -68,18 +74,21 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         return AnyView(KeepAwakeTile(feature: self, preferences: preferences))
     }
 
-    func toggle() {
+    func toggle(from source: KeepAwakeRequestSource) {
         if isTerminating { return }
         if isSleepRestorationRefused {
-            stop()
+            Logger.keepAwake.notice("Turn-off requested from \(source.rawValue, privacy: .public) while restoring sleep is refused; retrying now")
+            dropRequest(because: .toggledOff)
             return
         }
         if requestedSession != nil {
-            stop()
+            Logger.keepAwake.notice("Turn-off requested from \(source.rawValue, privacy: .public)")
+            dropRequest(because: .toggledOff)
             return
         }
 
         requestedSession = buildSessionFromPreferences()
+        logRequestedSession(from: source)
         updateSession()
     }
 
@@ -88,6 +97,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
 
         preferences.setAutoOff(autoOff)
         requestedSession = buildSessionFromPreferences()
+        logRequestedSession(from: .durationChip)
         updateSession()
     }
 
@@ -107,10 +117,14 @@ final class KeepAwakeFeature: Feature, ObservableObject {
         sleepRestorationRetry?.cancel()
         sleepRestorationRetry = nil
 
-        if isRequestedSessionExpired() { requestedSession = nil }
+        if isRequestedSessionExpired() {
+            requestDropCause = .deadlineReached
+            requestedSession = nil
+        }
         if let deactivationDate = requestedSession?.deactivationDate {
             deactivation = scheduleDeactivation(at: deactivationDate)
         }
+        logWaitingForPowerChange()
 
         if transition != nil { return }
         if session === getEligibleSession() {
@@ -141,10 +155,15 @@ final class KeepAwakeFeature: Feature, ObservableObject {
             }
 
             if let session {
+                let endCause = getEndCause(of: session)
                 let didRestoreSleep = await session.end()
                 if !didRestoreSleep {
-                    if session === getEligibleSession() { continue }
+                    if session === getEligibleSession() {
+                        Logger.keepAwake.notice("Session kept: restoring sleep was refused and the session is eligible again")
+                        continue
+                    }
 
+                    Logger.keepAwake.notice("Session kept: restoring sleep was refused while ending it (\(endCause.rawValue, privacy: .public)); retrying in \(Int(Self.sleepRestorationRetryInterval)) s")
                     isSleepRestorationRefused = true
                     sleepRestorationRetry = scheduleSleepRestorationRetry()
                     return
@@ -153,6 +172,7 @@ final class KeepAwakeFeature: Feature, ObservableObject {
                 self.session = nil
                 isSleepRestorationRefused = false
                 setMenuBarSymbol(nil)
+                Logger.keepAwake.notice("Session ended: \(endCause.rawValue, privacy: .public)")
                 if session.keepsAwakeWithLidClosed { didRestoreLidClosedSleep = true }
                 continue
             }
@@ -160,14 +180,16 @@ final class KeepAwakeFeature: Feature, ObservableObject {
             let nextSession = eligibleSession!
             let didBegin = await nextSession.begin()
             if !didBegin {
+                Logger.keepAwake.notice("Session refused: lid-closed sleep could not be disabled")
                 isPmsetRefused = true
-                if requestedSession === nextSession { stop() }
+                if requestedSession === nextSession { dropRequest(because: .activationRefused) }
                 continue
             }
 
             session = nextSession
             isPmsetRefused = false
             setMenuBarSymbol(keepAwakeSymbolName)
+            Logger.keepAwake.notice("Session began: auto-off \(nextSession.autoOff.rawValue, privacy: .public), keeps awake with the lid closed \(nextSession.keepsAwakeWithLidClosed, privacy: .public)")
         }
     }
 
@@ -177,10 +199,20 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     /// - Skipped when macOS's own rule keeps a closed lid awake, such as an external display on AC power; macOS then decides again on the next display or power change.
     /// - Skipped on Quit, so a log out, restart or shut down is never turned into a sleep.
     @MainActor private func sleepIfClosedLidIsLeftAwake() {
-        if isTerminating { return }
-        if session?.keepsAwakeWithLidClosed == true { return }
-        if !powerManagement.isClosedLidCausingSleep() { return }
+        if isTerminating {
+            Logger.keepAwake.notice("Not putting the Mac to sleep after the lid-closed session: quitting")
+            return
+        }
+        if session?.keepsAwakeWithLidClosed == true {
+            Logger.keepAwake.notice("Not putting the Mac to sleep after the lid-closed session: the next session keeps the lid awake")
+            return
+        }
+        if !powerManagement.isClosedLidCausingSleep() {
+            Logger.keepAwake.notice("Not putting the Mac to sleep after the lid-closed session: the lid is open or a closed lid does not sleep the Mac")
+            return
+        }
 
+        Logger.keepAwake.notice("Putting the Mac to sleep: the lid-closed session ended and macOS would sleep the Mac with the lid closed")
         powerManagement.sleepMac()
     }
 
@@ -193,6 +225,38 @@ final class KeepAwakeFeature: Feature, ObservableObject {
             keepsAwakeWithLidClosed: preferences.keepsAwakeWithLidClosed,
             powerManagement: powerManagement
         )
+    }
+
+    /// Drops the request. The cause is recorded only when there was a request, so a session still restoring sleep keeps the cause it ended for.
+    private func dropRequest(because cause: KeepAwakeEndCause) {
+        if requestedSession != nil { requestDropCause = cause }
+        requestedSession = nil
+        updateSession()
+    }
+
+    /// Why the published session is no longer the eligible one.
+    private func getEndCause(of session: KeepAwakeSession) -> KeepAwakeEndCause {
+        guard let requestedSession else { return requestDropCause! }
+        if requestedSession !== session { return .replaced }
+        if isRequestedSessionExpired() { return .deadlineReached }
+        return .notConnectedToPower
+    }
+
+    private func logRequestedSession(from source: KeepAwakeRequestSource) {
+        let session = requestedSession!
+        Logger.keepAwake.notice("Session requested from \(source.rawValue, privacy: .public): auto-off \(session.autoOff.rawValue, privacy: .public), keeps awake with the lid closed \(session.keepsAwakeWithLidClosed, privacy: .public), only while connected to power \(self.preferences.onlyWhileConnectedToPower, privacy: .public)")
+    }
+
+    private func logWaitingForPowerChange() {
+        let isWaiting = isWaitingForPower
+        if isWaiting == wasWaitingForPower { return }
+
+        wasWaitingForPower = isWaiting
+        if isWaiting {
+            Logger.keepAwake.notice("Waiting for power: the session is held back while not connected to power")
+        } else {
+            Logger.keepAwake.notice("No longer waiting for power")
+        }
     }
 
     private func getEligibleSession() -> KeepAwakeSession? {
@@ -217,13 +281,16 @@ final class KeepAwakeFeature: Feature, ObservableObject {
     }
 
     private func scheduleDeactivation(at date: Date) -> DispatchWorkItem {
-        let deactivation = DispatchWorkItem { [unowned self] in stop() }
+        let deactivation = DispatchWorkItem { [unowned self] in dropRequest(because: .deadlineReached) }
         clock.schedule(deactivation, at: date)
         return deactivation
     }
 
     private func scheduleSleepRestorationRetry() -> DispatchWorkItem {
-        let retry = DispatchWorkItem { [unowned self] in updateSession() }
+        let retry = DispatchWorkItem { [unowned self] in
+            Logger.keepAwake.notice("Retrying to restore sleep")
+            updateSession()
+        }
         clock.schedule(retry, at: clock.now().addingTimeInterval(Self.sleepRestorationRetryInterval))
         return retry
     }

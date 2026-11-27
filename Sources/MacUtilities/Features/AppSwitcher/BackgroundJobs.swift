@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 private let launchctlPath = "/bin/launchctl"
 private let lsappinfoPath = "/usr/bin/lsappinfo"
@@ -22,6 +23,7 @@ func removeBackgroundJobs(of apps: [NSRunningApplication]) {
             waitingProcessIdentifiers = removeFinishedJobs(of: waitingProcessIdentifiers)
             if waitingProcessIdentifiers.isEmpty { return }
         }
+        Logger.appSwitcher.notice("Batch Quit stopped waiting for quit apps and their background jobs: pids \(waitingProcessIdentifiers, privacy: .public)")
     }
 }
 
@@ -48,6 +50,7 @@ private func removeFinishedJobs(of processIdentifiers: [pid_t]) -> [pid_t] {
                 continue
             }
             runTool(launchctlPath, ["remove", label])
+            Logger.appSwitcher.notice("Batch Quit removed background job \(label, privacy: .public) of quit app pid \(processIdentifier, privacy: .public)")
         }
 
         if hasUnfinishedJob { waitingProcessIdentifiers.append(processIdentifier) }

@@ -18,11 +18,11 @@ func buildLidClosedSleepWatchdog(watching processIdentifier: Int32) -> Process {
     return watchdog
 }
 
-/// Launches the process and returns whether it exited with status 0, leaving the main thread free while it runs.
-@MainActor func runProcess(_ process: Process) async -> Bool {
+/// Launches the process and returns its exit status, leaving the main thread free while it runs.
+@MainActor func runProcess(_ process: Process) async -> Int32 {
     return await withCheckedContinuation { continuation in
         process.terminationHandler = { process in
-            continuation.resume(returning: process.terminationStatus == 0)
+            continuation.resume(returning: process.terminationStatus)
         }
         try! process.run()
     }

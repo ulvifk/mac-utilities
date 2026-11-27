@@ -12,7 +12,7 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview()
 
         harness.settings.appGlassStore.objectWillChange.send()
-        harness.feature.stop()
+        harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         await harness.drainMainQueue()
 

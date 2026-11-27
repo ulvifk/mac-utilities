@@ -47,7 +47,7 @@ final class KeepAwakeHarness {
 
     /// Turns the feature on with the toggle and completes the lid command.
     func activate(_ feature: KeepAwakeFeature) async throws {
-        feature.toggle()
+        feature.toggle(from: .popoverToggle)
         try await completeCommand(disabled: true)
         try await waitUntil { !feature.isChangingSession }
         try #require(feature.session != nil, "Successful activation did not publish a session")

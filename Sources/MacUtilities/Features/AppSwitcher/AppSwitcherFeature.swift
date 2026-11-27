@@ -1,4 +1,5 @@
 import AppKit
+import os
 import SwiftUI
 
 /// Replaces Cmd+Tab with the switcher panel, filtered to the whitelist when the filter is on, and Cmd+` with the same panel listing the
@@ -47,7 +48,7 @@ final class AppSwitcherFeature: Feature {
         smokeTest?.run()
     }
 
-    func stop() {
+    func stop(because cause: FeatureStopCause) {
         featureSession.renew()
 
         workspace.stopObserving()
@@ -158,6 +159,7 @@ final class AppSwitcherFeature: Feature {
     private func open(_ opening: SwitcherOpening) {
         let list = opening.listsWindows ? listLoader.loadWindowList(of: workspace.getFrontmostApp()) : listLoader.loadAppList()
         if list.isEmpty {
+            Logger.appSwitcher.notice("Switcher not shown: no \(opening.listsWindows ? "windows" : "apps", privacy: .public) to list")
             dismissSwitcher()
             return
         }

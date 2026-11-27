@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 /// A running app with a bundle identifier, as the workspace has it.
 final class RunningApp: SwitcherApp {
@@ -29,14 +30,17 @@ final class RunningApp: SwitcherApp {
     }
 
     func activate() {
-        runningApplication.activate(options: [.activateAllWindows])
+        if runningApplication.activate(options: [.activateAllWindows]) { return }
+        Logger.appSwitcher.error("\(self.name, privacy: .public) (\(self.bundleIdentifier, privacy: .public)) refused to activate")
     }
 
     func hide() {
-        runningApplication.hide()
+        if runningApplication.hide() { return }
+        Logger.appSwitcher.error("\(self.name, privacy: .public) (\(self.bundleIdentifier, privacy: .public)) refused to hide")
     }
 
     func terminate() {
-        runningApplication.terminate()
+        if runningApplication.terminate() { return }
+        Logger.appSwitcher.error("\(self.name, privacy: .public) (\(self.bundleIdentifier, privacy: .public)) refused to quit")
     }
 }
