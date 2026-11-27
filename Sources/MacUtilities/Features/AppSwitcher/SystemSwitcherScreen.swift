@@ -1,18 +1,23 @@
 import AppKit
 import ScreenCaptureKit
 
-/// Captures what each window shows, covered ones included, and hands every thumbnail to `onCaptured` on the main thread as it arrives. Minimized
-/// windows and those on another Space draw nothing and are left out. Needs Screen Recording: without it the listing fails, as does the capture of a
-/// window closed meanwhile, and the task ends there, leaving the app's icon in place.
-func captureThumbnails(of windowIDs: [CGWindowID], onCaptured: @escaping (CGWindowID, NSImage) -> Void) {
-    if windowIDs.isEmpty { return }
+/// NSScreen.main, its windows captured with ScreenCaptureKit. Capturing needs Screen Recording: without it the listing fails, as does the capture
+/// of a window closed meanwhile, and the task ends there, leaving the app's icon in place.
+final class SystemSwitcherScreen: SwitcherScreen {
+    var visibleSize: NSSize {
+        return NSScreen.main!.visibleFrame.size
+    }
 
-    _ = Task { @MainActor in
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    func captureThumbnails(of windowIDs: [CGWindowID], onCaptured: @escaping (CGWindowID, NSImage) -> Void) {
+        if windowIDs.isEmpty { return }
 
-        for window in content.windows where windowIDs.contains(window.windowID) {
-            _ = Task { @MainActor in
-                onCaptured(window.windowID, try await captureThumbnail(of: window))
+        _ = Task { @MainActor in
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+            for window in content.windows where windowIDs.contains(window.windowID) {
+                _ = Task { @MainActor in
+                    onCaptured(window.windowID, try await captureThumbnail(of: window))
+                }
             }
         }
     }

@@ -8,12 +8,13 @@ final class GlassStore: ObservableObject {
     private let darknessKey: String
     /// Until the darkness slider is moved.
     private let defaultDarkness: CGFloat
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
-    init(keyPrefix: String, defaultDarkness: CGFloat) {
+    init(keyPrefix: String, defaultDarkness: CGFloat, defaults: UserDefaults) {
         frostedKey = keyPrefix + "Frosted"
         darknessKey = keyPrefix + "Darkness"
         self.defaultDarkness = defaultDarkness
+        self.defaults = defaults
     }
 
     var isFrosted: Bool {

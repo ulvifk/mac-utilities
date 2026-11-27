@@ -3,10 +3,11 @@ import Foundation
 
 final class SwitcherCardStore: ObservableObject {
     private let key: String
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
-    init(key: String) {
+    init(key: String, defaults: UserDefaults) {
         self.key = key
+        self.defaults = defaults
     }
 
     var showsCards: Bool {

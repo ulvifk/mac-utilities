@@ -5,7 +5,11 @@ import Foundation
 final class WhitelistStore: AppListStore {
     private let filterEnabledKey = "filterEnabled"
     private let whitelistKey = "whitelist"
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
 
     var isFilterEnabled: Bool {
         return defaults.bool(forKey: filterEnabledKey)

@@ -6,7 +6,11 @@ import Foundation
 final class BatchQuitStore: AppListStore {
     private let batchQuitListKey = "batchQuitList"
     private let quitsUnlistedAppsKey = "batchQuitUnlistedApps"
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
 
     /// Quit the apps off the list and keep the listed ones, rather than the other way round.
     var quitsUnlistedApps: Bool {

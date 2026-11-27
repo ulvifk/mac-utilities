@@ -3,7 +3,11 @@ import Foundation
 /// The panel width chosen by dragging its edge, in UserDefaults; nil until the panel has been resized once.
 final class PanelWidthStore {
     private let widthKey = "panelWidth"
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
 
     var width: CGFloat? {
         return defaults.object(forKey: widthKey) as? CGFloat
