@@ -11,6 +11,7 @@ struct AppSwitcherEventTests {
             "Sources/MacUtilities/Features/AppSwitcher/SwitcherAppearanceStore.swift",
             "Sources/MacUtilities/Core/Feature.swift",
             "Sources/MacUtilities/Core/KeyMatching.swift",
+            "Sources/MacUtilities/Features/AppSwitcher/SwitcherShortcut.swift",
             "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/AppSwitcherFakes.swift",
             "Tests/MacUtilitiesTests/Fixtures/AppSwitcher/main.swift",
         ]

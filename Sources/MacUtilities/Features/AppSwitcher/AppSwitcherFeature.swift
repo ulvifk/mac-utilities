@@ -91,7 +91,7 @@ final class AppSwitcherFeature: Feature {
 
     func handle(type: CGEventType, event: CGEvent) -> Bool {
         if type == .keyDown {
-            return handleKeyDown(event)
+            return handleKeyDown(getSwitcherShortcut(keyCode: event.getIntegerValueField(.keyboardEventKeycode), flags: event.flags))
         }
 
         if type == .flagsChanged {
@@ -238,29 +238,27 @@ final class AppSwitcherFeature: Feature {
     // MARK: events
 
     /// Never does real work: macOS disables a tap whose callback is slow, and the keystroke then falls through to the Dock.
-    private func handleKeyDown(_ event: CGEvent) -> Bool {
+    private func handleKeyDown(_ shortcut: SwitcherShortcut?) -> Bool {
+        guard let shortcut else { return false }
+
         if panel.isVisible {
-            return handleKeyDownWhileVisible(event)
+            return handleShortcutWhileVisible(shortcut)
         }
 
-        if isOpening {
-            if isCancelShortcut(event) {
-                dismissSwitcher()
-                return true
-            }
-        }
-
-        if isSwitcherShortcut(event) {
-            requestOpening(listingWindows: false, backward: event.flags.contains(.maskShift))
+        switch shortcut {
+        case .cancel:
+            if !isOpening { return false }
+            dismissSwitcher()
             return true
-        }
-
-        if isWindowSwitcherShortcut(event) {
-            requestOpening(listingWindows: true, backward: event.flags.contains(.maskShift))
+        case .switchApps(let backward):
+            requestOpening(listingWindows: false, backward: backward)
             return true
+        case .switchWindows(let backward):
+            requestOpening(listingWindows: true, backward: backward)
+            return true
+        default:
+            return false
         }
-
-        return false
     }
 
     /// Presses arriving before the panel is up only advance the selection it opens with.
@@ -306,65 +304,54 @@ final class AppSwitcherFeature: Feature {
         showPanel()
     }
 
-    private func handleKeyDownWhileVisible(_ event: CGEvent) -> Bool {
-        if isListedSwitcherShortcut(event) {
-            advanceSelection(backward: event.flags.contains(.maskShift))
+    /// The other list's switching shortcut is swallowed while the panel is open: passed on, Cmd+Tab would open the system switcher over the
+    /// panel and Cmd+` would cycle the windows of the app behind it. While windows are listed the app shortcuts are swallowed too: passed on,
+    /// they would act on the app behind the panel.
+    private func handleShortcutWhileVisible(_ shortcut: SwitcherShortcut) -> Bool {
+        switch shortcut {
+        case .switchApps(let backward):
+            if !isListingWindows { advanceSelection(backward: backward) }
             return true
-        }
-
-        if isAnySwitcherShortcut(event) {
+        case .switchWindows(let backward):
+            if isListingWindows { advanceSelection(backward: backward) }
             return true
-        }
-
-        if isForwardShortcut(event) {
+        case .selectNext:
             advanceSelection(backward: false)
             return true
-        }
-
-        if isBackwardShortcut(event) {
+        case .selectPrevious:
             advanceSelection(backward: true)
             return true
-        }
-
-        if isRowUpShortcut(event) {
+        case .selectRowAbove:
             moveSelectionBetweenRows(up: true)
             return true
-        }
-
-        if isRowDownShortcut(event) {
+        case .selectRowBelow:
             moveSelectionBetweenRows(up: false)
             return true
-        }
-
-        if isCancelShortcut(event) {
+        case .cancel:
             dismissSwitcher()
             return true
+        case .toggleWhitelisted, .toggleFilter, .batchQuit, .quit, .hide:
+            if !isListingWindows { handleAppShortcut(shortcut) }
+            return true
         }
+    }
 
-        if isListingWindows {
-            return isAppShortcut(event)
-        }
-
-        if isWhitelistToggleShortcut(event) {
+    private func handleAppShortcut(_ shortcut: SwitcherShortcut) {
+        switch shortcut {
+        case .toggleWhitelisted:
             let bundleIdentifier = candidates[selectedIndex].bundleIdentifier!
             let listed = !whitelistStore.isListed(bundleIdentifier)
             whitelistStore.setListed(bundleIdentifier, listed)
             panel.update(state: buildState())
             showFeedback(listed ? .addedToWhitelist : .removedFromWhitelist)
-            return true
-        }
-
-        if isFilterToggleShortcut(event) {
+        case .toggleFilter:
             let session = switcherSession
             DispatchQueue.main.async {
                 if self.switcherSession != session { return }
 
                 self.toggleFilterAndRefreshCandidates()
             }
-            return true
-        }
-
-        if isBatchQuitShortcut(event) {
+        case .batchQuit:
             let session = switcherSession
             let activeFeatureSession = featureSession
             DispatchQueue.main.async {
@@ -375,22 +362,15 @@ final class AppSwitcherFeature: Feature {
 
                 self.panel.showFeedback(.quittingApps(count: quitCount))
             }
-            return true
-        }
-
-        if isQuitShortcut(event) {
+        case .quit:
             let app = candidates[selectedIndex]
             app.terminate()
             showFeedback(.quittingApp(name: getAppName(app)))
-            return true
-        }
-
-        if isHideShortcut(event) {
+        case .hide:
             hideSelectedApp()
-            return true
+        default:
+            preconditionFailure("\(shortcut) is not an app shortcut")
         }
-
-        return false
     }
 
     /// A second press on a hidden app does nothing.
@@ -424,82 +404,6 @@ final class AppSwitcherFeature: Feature {
         if !panel.isVisible { return }
 
         activateSelection()
-    }
-
-    private func isSwitcherShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: tabKeyCode)
-    }
-
-    private func isWindowSwitcherShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: graveKeyCode)
-    }
-
-    /// Cmd+Tab while apps are listed, Cmd+` while windows are.
-    private func isListedSwitcherShortcut(_ event: CGEvent) -> Bool {
-        if isListingWindows { return isWindowSwitcherShortcut(event) }
-        return isSwitcherShortcut(event)
-    }
-
-    /// The other list's one is swallowed while the panel is open: passed on, Cmd+Tab would open the system switcher over the panel and Cmd+`
-    /// would cycle the windows of the app behind it.
-    private func isAnySwitcherShortcut(_ event: CGEvent) -> Bool {
-        if isSwitcherShortcut(event) { return true }
-        return isWindowSwitcherShortcut(event)
-    }
-
-    /// Swallowed while windows are listed: passed on, they would act on the app behind the panel.
-    private func isAppShortcut(_ event: CGEvent) -> Bool {
-        if isWhitelistToggleShortcut(event) { return true }
-        if isFilterToggleShortcut(event) { return true }
-        if isBatchQuitShortcut(event) { return true }
-        if isQuitShortcut(event) { return true }
-        if isHideShortcut(event) { return true }
-        return false
-    }
-
-    private func isForwardShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: rightArrowKeyCode)
-    }
-
-    private func isBackwardShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: leftArrowKeyCode)
-    }
-
-    private func isRowUpShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: upArrowKeyCode)
-    }
-
-    private func isRowDownShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: downArrowKeyCode)
-    }
-
-    private func isWhitelistToggleShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: wKeyCode)
-    }
-
-    private func isFilterToggleShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: fKeyCode)
-    }
-
-    /// Cmd+Shift+Q is also a Cmd+Q, so it is asked first.
-    private func isBatchQuitShortcut(_ event: CGEvent) -> Bool {
-        return isShortcut(event, keyCode: qKeyCode, modifiers: [.maskCommand, .maskShift])
-    }
-
-    private func isQuitShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: qKeyCode)
-    }
-
-    private func isHideShortcut(_ event: CGEvent) -> Bool {
-        return isCommandShortcut(event, keyCode: hKeyCode)
-    }
-
-    private func isCancelShortcut(_ event: CGEvent) -> Bool {
-        return isKey(event, keyCode: escapeKeyCode)
-    }
-
-    private func isCommandShortcut(_ event: CGEvent, keyCode: Int64) -> Bool {
-        return isShortcut(event, keyCode: keyCode, modifiers: .maskCommand)
     }
 
     // MARK: switching
