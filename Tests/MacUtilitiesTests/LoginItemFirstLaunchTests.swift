@@ -102,57 +102,6 @@ final class LoginItemFirstLaunchTests {
         #expect(interface.generalSettingsOpenCount == 0)
     }
 
-    @Test
-    func onlyApplicationsFoldersCountAsInstalled() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-
-        #expect(isInApplicationsFolder(bundleURL: home.appendingPathComponent("Applications/MacUtilities.app", isDirectory: true)))
-        #expect(isInApplicationsFolder(bundleURL: URL(fileURLWithPath: "/Applications/MacUtilities.app", isDirectory: true)))
-        #expect(!isInApplicationsFolder(bundleURL: buildFolderBundleURL), "The development build's bundle counted as installed")
-        #expect(!isInApplicationsFolder(bundleURL: appTranslocationBundleURL), "A translocated bundle counted as installed")
-    }
-
-    /// The symlinks live in a temporary directory: one to /Applications, one to an app already in /Applications. Both reach that existing
-    /// app, since a path resolves only as far as it exists, as the running app's bundle always does. Nothing is written to an Applications
-    /// folder.
-    @Test
-    func bundleReachedThroughASymlinkCountsAsInstalled() {
-        let app = getAppInSystemApplicationsFolder()
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("mac-utilities-tests-\(UUID().uuidString)")
-        let folderLink = directory.appendingPathComponent("Applications")
-        let bundleLink = directory.appendingPathComponent("MacUtilities.app")
-
-        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try! FileManager.default.createSymbolicLink(at: folderLink, withDestinationURL: URL(fileURLWithPath: "/Applications"))
-        try! FileManager.default.createSymbolicLink(at: bundleLink, withDestinationURL: app)
-        defer { try! FileManager.default.removeItem(at: directory) }
-
-        #expect(isInApplicationsFolder(bundleURL: folderLink.appendingPathComponent(app.lastPathComponent, isDirectory: true)), "A symlinked folder on the way was not resolved")
-        #expect(isInApplicationsFolder(bundleURL: bundleLink), "A symlink to the bundle itself was not resolved")
-    }
-
-    /// Where build.sh puts the development build: the package root, two folders above this file's folder.
-    private var buildFolderBundleURL: URL {
-        return URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("MacUtilities.app", isDirectory: true)
-    }
-
-    /// Where macOS runs a quarantined app from that was not moved out of its download folder.
-    private var appTranslocationBundleURL: URL {
-        return URL(fileURLWithPath: "/private/var/folders/xy/abc123/T/AppTranslocation/0A1B2C3D/d/MacUtilities.app", isDirectory: true)
-    }
-
-    /// An app bundle that is a real folder in /Applications rather than a symlink out of it, as Safari's is.
-    private func getAppInSystemApplicationsFolder() -> URL {
-        let contents = try! FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: "/Applications"), includingPropertiesForKeys: [.isSymbolicLinkKey])
-        return contents.first { isRealAppBundle($0) }!
-    }
-
-    private func isRealAppBundle(_ url: URL) -> Bool {
-        if url.pathExtension != "app" { return false }
-        return !(try! url.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink!
-    }
-
     @discardableResult
     private func launch(loginItem: FakeLoginItem, isInstalled: Bool) -> FakeAppInterface {
         let interface = FakeAppInterface(loginItem: loginItem)

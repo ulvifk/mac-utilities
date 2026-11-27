@@ -23,7 +23,10 @@ let controller = AppController(
     preferences: preferences,
     eventTap: SystemEventTap(),
     loginItem: loginItem,
-    isInstalled: isInApplicationsFolder(bundleURL: Bundle.main.bundleURL),
+    isInstalled: isInApplicationsFolder(
+        bundleURL: Bundle.main.bundleURL,
+        applicationsFolders: FileManager.default.urls(for: .applicationDirectory, in: [.userDomainMask, .localDomainMask])
+    ),
     interface: interface
 )
 application.setActivationPolicy(.accessory)
