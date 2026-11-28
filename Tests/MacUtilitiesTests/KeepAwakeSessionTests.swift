@@ -11,17 +11,17 @@ struct KeepAwakeSessionTests {
         let session = harness.buildSession()
         let begin = Task { await session.begin() }
         try await harness.completeCommand(disabled: true)
-        #expect(await begin.value, "Session activation failed")
+        #expect(try await waitForResult(of: begin), "Session activation failed")
 
         let failure = Task { await session.end() }
         try await harness.completeCommand(disabled: false, succeeds: false)
-        #expect(!(await failure.value), "Failed restoration must report failure")
+        #expect(!(try await waitForResult(of: failure)), "Failed restoration must report failure")
         #expect(power.assertionReleaseCount == 0, "Failed restoration released the assertion")
         #expect(power.watchdogTerminationCount == 0, "Failed restoration stopped the watchdog")
 
         let retry = Task { await session.end() }
         try await harness.completeCommand(disabled: false)
-        #expect(await retry.value, "The next restoration should succeed")
+        #expect(try await waitForResult(of: retry), "The next restoration should succeed")
         #expect(power.assertionReleaseCount == 1, "Successful restoration did not release the assertion once")
         #expect(power.watchdogTerminationCount == 1, "Successful restoration did not stop the watchdog once")
     }

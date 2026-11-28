@@ -44,7 +44,7 @@ struct AppSwitcherFeatureTests {
         for backward in scenario.backwardPresses {
             harness.press(Self.getSwitchingKeyCode(listingWindows: listingWindows), modifiers: backward ? [.maskCommand, .maskShift] : .maskCommand)
         }
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.last?.list.selectedIndex == scenario.expectedSelection)
         if let state = harness.log.shownStates.last {
@@ -62,7 +62,7 @@ struct AppSwitcherFeatureTests {
         harness.press(Self.getSwitchingKeyCode(listingWindows: listingWindows))
         harness.press(escapeKeyCode, modifiers: [])
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.isEmpty, "Canceled opening showed a panel")
         harness.expectNoActivation()
@@ -70,37 +70,37 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test(arguments: [false, true])
-    func cancelAndReopen(listingWindows: Bool) async {
+    func cancelAndReopen(listingWindows: Bool) async throws {
         let harness = AppSwitcherTestHarness()
         let keyCode = Self.getSwitchingKeyCode(listingWindows: listingWindows)
 
         harness.press(keyCode)
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(keyCode, modifiers: [.maskCommand, .maskShift])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 1, "Canceled work showed an extra panel")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 2, "Canceled presses changed new selection")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 2, "Canceled presses changed new selection")
         harness.expectNoActivation()
         await harness.finish()
     }
 
     @Test(arguments: [false, true])
-    func stopOpeningAndRestart(listingWindows: Bool) async {
+    func stopOpeningAndRestart(listingWindows: Bool) async throws {
         let harness = AppSwitcherTestHarness()
         let keyCode = Self.getSwitchingKeyCode(listingWindows: listingWindows)
 
         harness.press(keyCode)
         harness.feature.stop(because: .switchedOff)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.shownStates.isEmpty, "Disabled feature showed a panel")
 
         harness.feature.start()
         harness.press(keyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 1, "Restart opened stale work")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 1, "Restart lost opening selection")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 1, "Restart lost opening selection")
         harness.expectNoActivation()
         await harness.finish()
     }
@@ -111,7 +111,7 @@ struct AppSwitcherFeatureTests {
 
         harness.press(Self.getSwitchingKeyCode(listingWindows: listingWindows), modifiers: [.maskCommand, .maskShift])
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.isEmpty, "Quick release showed a panel")
         harness.expectActivation(listingWindows: listingWindows, selection: 2)
@@ -123,9 +123,9 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(Self.getSwitchingKeyCode(listingWindows: listingWindows))
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(!harness.panel.isVisible, "Released panel stayed visible")
         harness.expectActivation(listingWindows: listingWindows, selection: 1)
@@ -133,14 +133,14 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func untrackedAppsFollowTrackedOnes() async {
+    func untrackedAppsFollowTrackedOnes() async throws {
         let harness = AppSwitcherTestHarness()
         harness.workspace.recentProcessIdentifiers = [2, 0]
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
-        #expect(harness.log.shownStates.last!.bundleIdentifiers == ["test.app.2", "test.app.0", "test.app.1"])
+        #expect(try #require(harness.log.shownStates.last).bundleIdentifiers == ["test.app.2", "test.app.0", "test.app.1"])
         await harness.finish()
     }
 
@@ -155,7 +155,7 @@ struct AppSwitcherFeatureTests {
 
         harness.press(tabKeyCode)
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.activatedBundleIdentifiers == ["test.app.1"], "Quick switch did not go to the previous app")
         await harness.finish()
@@ -168,10 +168,10 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(fKeyCode)
         harness.press(escapeKeyCode, modifiers: [])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 1, "Canceled filter reopened the panel")
         #expect(!harness.settings.whitelistStore.isFilterEnabled, "Canceled filter changed the preference")
@@ -180,40 +180,40 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func staleFilterInNewSession() async {
+    func staleFilterInNewSession() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(fKeyCode)
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(tabKeyCode, modifiers: [.maskCommand, .maskShift])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 2, "Old filter rebuilt a new session")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 2, "Old filter changed the new selection")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 2, "Old filter changed the new selection")
         #expect(!harness.settings.whitelistStore.isFilterEnabled, "Old filter changed a new session's preference")
         await harness.finish()
     }
 
     @Test
-    func normalFilter() async {
+    func normalFilter() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(fKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.settings.whitelistStore.isFilterEnabled, "Filter was not applied")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 1, "Filter lost the selected app")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 1, "Filter lost the selected app")
         #expect(harness.log.feedback.count == 1, "Filter feedback was lost")
         await harness.finish()
     }
 
     /// Running and tracked [test.app.0 #0, test.app.1 #1, test.app.0 #2], #2 selected.
     @Test
-    func filterKeepsTheSelectedInstance() async {
+    func filterKeepsTheSelectedInstance() async throws {
         let harness = AppSwitcherTestHarness(itemCount: 2)
         let secondInstance = harness.workspace.buildApp(index: 2)
         secondInstance.bundleIdentifier = "test.app.0"
@@ -222,11 +222,11 @@ struct AppSwitcherFeatureTests {
 
         harness.press(tabKeyCode)
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(fKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
-        #expect(harness.log.shownStates.last!.list.selectedApp.processIdentifier == 2, "Filter moved the selection to another instance")
+        #expect(try #require(harness.log.shownStates.last).list.selectedApp.processIdentifier == 2, "Filter moved the selection to another instance")
         await harness.finish()
     }
 
@@ -235,12 +235,12 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(fKeyCode)
         harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 2, "Disabled filter reopened or rebuilt the panel")
         #expect(!harness.settings.whitelistStore.isFilterEnabled, "Disabled filter changed the preference")
@@ -252,11 +252,11 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(wKeyCode)
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.feedback.isEmpty, "Old feedback reached the new session")
         await harness.finish()
@@ -267,10 +267,10 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(qKeyCode)
         harness.press(escapeKeyCode, modifiers: [])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.quitBundleIdentifiers == ["test.app.1"], "Accepted quit was lost")
         #expect(harness.log.feedback.isEmpty, "Quit feedback outlived the switcher")
@@ -282,11 +282,11 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(qKeyCode, modifiers: [.maskCommand, .maskShift])
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.batchQuitCount == 1, "Accepted batch quit was lost")
         #expect(harness.log.feedback.isEmpty, "Batch quit feedback reached the new session")
@@ -298,9 +298,9 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(qKeyCode, modifiers: [.maskCommand, .maskShift])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.batchQuitCount == 1, "Batch quit did not run")
         #expect(harness.log.feedback.count == 1, "Batch quit feedback was lost")
@@ -312,10 +312,10 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(qKeyCode, modifiers: [.maskCommand, .maskShift])
         harness.feature.stop(because: .switchedOff)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.batchQuitCount == 0, "Disabled feature ran batch quit")
         #expect(harness.log.feedback.isEmpty, "Disabled feature showed batch quit feedback")
@@ -329,12 +329,12 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.releaseCommand()
         harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.expectNoActivation()
         #expect(harness.log.shownStates.count == 2, "Stopped activation reopened a panel")
@@ -342,17 +342,17 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func committedWindowActivationBeforeNextSession() async {
+    func committedWindowActivationBeforeNextSession() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.releaseCommand()
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.expectActivation(listingWindows: true, selection: 1)
-        #expect(!harness.log.shownStates.last!.list.isListingWindows, "Committed window activation changed the new list")
+        #expect(try !#require(harness.log.shownStates.last).list.isListingWindows, "Committed window activation changed the new list")
         await harness.finish()
     }
 
@@ -361,11 +361,11 @@ struct AppSwitcherFeatureTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.releaseCommand()
         harness.press(graveKeyCode, modifiers: [.maskCommand, .maskShift])
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.raisedWindowIDs == [1, 2], "Consecutive gestures dropped a committed activation")
         #expect(harness.log.shownStates.count == 1, "Second quick gesture showed a panel")
@@ -373,40 +373,40 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func staleThumbnailInNewSession() async {
+    func staleThumbnailInNewSession() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        await letMainQueueRun()
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         let newThumbnail = NSImage(size: NSSize(width: 2, height: 2))
-        harness.screen.thumbnailRequests[1].onCaptured(1, newThumbnail)
+        try harness.screen.getThumbnailRequest(at: 1).onCaptured(1, newThumbnail)
         oldCapture.onCaptured(1, NSImage(size: NSSize(width: 1, height: 1)))
         #expect(harness.log.updatedStates.count == 1, "Old thumbnail redrew a new session")
-        #expect(harness.log.updatedStates.last!.thumbnails[1] === newThumbnail, "Old thumbnail replaced the new capture")
+        #expect(try #require(harness.log.updatedStates.last).thumbnails[1] === newThumbnail, "Old thumbnail replaced the new capture")
 
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
-        #expect(harness.log.shownStates.last!.thumbnails[1] === newThumbnail, "Accepted thumbnail was not cached")
+        await letMainQueueRun()
+        #expect(try #require(harness.log.shownStates.last).thumbnails[1] === newThumbnail, "Accepted thumbnail was not cached")
         await harness.finish()
     }
 
     @Test
-    func stoppedThumbnailAndRestart() async {
+    func stoppedThumbnailAndRestart() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        await letMainQueueRun()
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
         harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         oldCapture.onCaptured(1, NSImage(size: NSSize(width: 1, height: 1)))
 
         #expect(harness.log.updatedStates.isEmpty, "Stopped capture redrew a restarted panel")

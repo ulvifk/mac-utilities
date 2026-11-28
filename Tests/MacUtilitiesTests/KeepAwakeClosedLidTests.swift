@@ -15,7 +15,7 @@ struct KeepAwakeClosedLidTests {
 
         feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(power.sleepCount == (closedLidCausesSleep ? 1 : 0), closedLidCausesSleep ? "Turning off left a closed lid awake" : "Turning off slept a Mac that macOS keeps awake")
     }
 
@@ -28,9 +28,9 @@ struct KeepAwakeClosedLidTests {
         let feature = harness.buildFeature()
         try await harness.activate(feature)
 
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(power.sleepCount == 1, "Unplugging left a closed lid awake")
     }
 
@@ -45,7 +45,7 @@ struct KeepAwakeClosedLidTests {
 
         harness.clock.advance(by: 30 * 60)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(power.sleepCount == 1, "Expiring left a closed lid awake")
     }
 
@@ -59,12 +59,12 @@ struct KeepAwakeClosedLidTests {
 
         feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: false, succeeds: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(power.sleepCount == 0, "A failed restoration slept the Mac with sleep still disabled")
 
         feature.toggle(from: .popoverToggle)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(power.sleepCount == 1, "A successful retry left a closed lid awake")
     }
 
@@ -80,7 +80,7 @@ struct KeepAwakeClosedLidTests {
         feature.turnOn(for: .oneHour)
         try await harness.completeCommand(disabled: false)
         if keepsLidAwake { try await harness.completeCommand(disabled: true) }
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session?.autoOff == .oneHour, "The replacement session did not begin")
         #expect(power.sleepCount == (keepsLidAwake ? 0 : 1), keepsLidAwake ? "A replacement that keeps the lid awake slept the Mac" : "A replacement without the lid option left a closed lid awake")
     }
@@ -94,9 +94,9 @@ struct KeepAwakeClosedLidTests {
         let feature = harness.buildFeature()
 
         feature.toggle(from: .popoverToggle)
-        try await harness.waitUntil { feature.session != nil }
+        try await waitUntil { feature.session != nil }
         feature.toggle(from: .popoverToggle)
-        try await harness.waitUntil { feature.session == nil && !feature.isChangingSession }
+        try await waitUntil { feature.session == nil && !feature.isChangingSession }
         #expect(power.sleepCount == 0, "Ending a session that never held the lid awake slept the Mac")
     }
 
@@ -111,11 +111,11 @@ struct KeepAwakeClosedLidTests {
 
         feature.stop(because: .quit)
         try await harness.completeCommand(disabled: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
         #expect(feature.session == nil, "Quit did not restore sleep")
         #expect(power.sleepCount == 0, "Quit slept the Mac before its cleanup began")
 
-        await Task { await feature.prepareForTermination() }.value
+        try await waitForResult(of: Task { await feature.prepareForTermination() })
         #expect(power.sleepCount == 0, "Quit slept the Mac")
     }
 
@@ -129,11 +129,11 @@ struct KeepAwakeClosedLidTests {
         try await harness.activate(feature)
         feature.stop(because: .switchedOff)
         try await harness.completeCommand(disabled: false, succeeds: false)
-        try await harness.waitUntil { !feature.isChangingSession }
+        try await waitUntil { !feature.isChangingSession }
 
         let termination = Task { await feature.prepareForTermination() }
         try await harness.completeCommand(disabled: false)
-        await termination.value
+        try await waitForResult(of: termination)
         #expect(feature.session == nil, "Quit did not finish the switched-off feature's restoration")
         #expect(power.sleepCount == 0, "Quit slept the Mac")
     }

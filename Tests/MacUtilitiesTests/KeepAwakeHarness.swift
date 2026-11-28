@@ -39,30 +39,17 @@ final class KeepAwakeHarness {
     }
 
     /// Waits for the oldest pmset command, which must be the given one, and completes it.
-    func completeCommand(disabled: Bool, succeeds: Bool = true) async throws {
-        try await waitUntil { !power.pendingCommands.isEmpty }
-        try #require(power.pendingCommands[0].disabled == disabled, "Power commands ran out of order")
+    func completeCommand(disabled: Bool, succeeds: Bool = true, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        try await waitUntil({ !power.pendingCommands.isEmpty }, sourceLocation: sourceLocation)
+        try #require(power.pendingCommands[0].disabled == disabled, "Power commands ran out of order", sourceLocation: sourceLocation)
         power.completeOldestCommand(succeeds: succeeds)
     }
 
     /// Turns the feature on with the toggle and completes the lid command.
-    func activate(_ feature: KeepAwakeFeature) async throws {
+    func activate(_ feature: KeepAwakeFeature, sourceLocation: SourceLocation = #_sourceLocation) async throws {
         feature.toggle(from: .popoverToggle)
-        try await completeCommand(disabled: true)
-        try await waitUntil { !feature.isChangingSession }
-        try #require(feature.session != nil, "Successful activation did not publish a session")
-    }
-
-    /// Lets queued main queue work, such as preference change deliveries and finished transitions, run for a moment.
-    func letMainQueueRun() async throws {
-        try await Task.sleep(nanoseconds: 20_000_000)
-    }
-
-    func waitUntil(_ condition: () -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
-        let deadline = Date(timeIntervalSinceNow: 5)
-        while !condition() {
-            try #require(Date() < deadline, "Timed out waiting for a transition", sourceLocation: sourceLocation)
-            try await Task.sleep(nanoseconds: 1_000_000)
-        }
+        try await completeCommand(disabled: true, sourceLocation: sourceLocation)
+        try await waitUntil({ !feature.isChangingSession }, sourceLocation: sourceLocation)
+        try #require(feature.session != nil, "Successful activation did not publish a session", sourceLocation: sourceLocation)
     }
 }

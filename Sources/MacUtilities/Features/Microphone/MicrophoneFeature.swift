@@ -73,7 +73,6 @@ final class MicrophoneFeature: Feature, ObservableObject {
 
     var canSelect: Bool {
         if !isEnabled { return false }
-        if isTerminating { return false }
         if transition != nil { return false }
         return !inputDevices.isEmpty
     }

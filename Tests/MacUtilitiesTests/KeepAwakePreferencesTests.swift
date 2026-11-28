@@ -15,23 +15,25 @@ struct KeepAwakePreferencesTests {
     }
 
     @Test
-    func enabledPowerOptionIsLoadedByTheNextLaunch() {
-        withTestDefaults { defaults in
+    func enabledPowerOptionIsLoadedByTheNextLaunch() throws {
+        try withTestDefaults { defaults in
             buildPreferences(defaults).setOnlyWhileConnectedToPower(true)
 
             #expect(buildPreferences(defaults).onlyWhileConnectedToPower, "A new launch did not load the enabled power option")
-            #expect(defaults.readStoredValues()[powerOnlyKey] as? Bool == true, "The enabled power option did not reach the disk")
+            let storedValues = try defaults.readStoredValues()
+            #expect(storedValues[powerOnlyKey] as? Bool == true, "The enabled power option did not reach the disk")
         }
     }
 
     @Test
-    func disabledPowerOptionIsLoadedByTheNextLaunch() {
-        withTestDefaults { defaults in
+    func disabledPowerOptionIsLoadedByTheNextLaunch() throws {
+        try withTestDefaults { defaults in
             buildPreferences(defaults).setOnlyWhileConnectedToPower(true)
             buildPreferences(defaults).setOnlyWhileConnectedToPower(false)
 
             #expect(!buildPreferences(defaults).onlyWhileConnectedToPower, "A new launch did not load the disabled power option")
-            #expect(defaults.readStoredValues()[powerOnlyKey] as? Bool == false, "The disabled power option did not reach the disk")
+            let storedValues = try defaults.readStoredValues()
+            #expect(storedValues[powerOnlyKey] as? Bool == false, "The disabled power option did not reach the disk")
         }
     }
 
@@ -39,9 +41,9 @@ struct KeepAwakePreferencesTests {
         return KeepAwakePreferences(defaults: defaults.buildUserDefaults())
     }
 
-    private func withTestDefaults(_ body: (TestDefaults) -> Void) {
+    private func withTestDefaults(_ body: (TestDefaults) throws -> Void) rethrows {
         let defaults = TestDefaults()
         defer { defaults.remove() }
-        body(defaults)
+        try body(defaults)
     }
 }

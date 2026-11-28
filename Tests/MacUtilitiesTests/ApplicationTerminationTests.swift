@@ -15,7 +15,7 @@ struct ApplicationTerminationTests {
             }
             CFRunLoopWakeUp(CFRunLoopGetMain())
 
-            try await Task.sleep(for: .seconds(3))
+            try await Task.sleep(for: outsideEventTimeLimit)
             Issue.record("Timed out waiting for AppKit termination")
             exit(3)
         }

@@ -1,4 +1,5 @@
 import AppKit
+import Testing
 @testable import MacUtilities
 
 /// Running apps and windows held in memory; records what the switcher asks of them and what it does to them.
@@ -19,8 +20,8 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
     var raisedWindowIDs: [CGWindowID] = []
     private(set) var batchQuitCount = 0
 
-    private(set) var onAppTerminated: ((pid_t) -> Void)?
-    private(set) var onAppHiddenOrShown: (() -> Void)?
+    private var onAppTerminated: ((pid_t) -> Void)?
+    private var onAppHiddenOrShown: (() -> Void)?
 
     /// test.app.0, test.app.1, ..., each with a window of the same number.
     init(itemCount: Int) {
@@ -45,6 +46,18 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
     func stopObserving() {
         onAppTerminated = nil
         onAppHiddenOrShown = nil
+    }
+
+    /// Reports that the app quit to the observer, as NSWorkspace does.
+    func notifyAppTerminated(_ processIdentifier: pid_t, sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let onAppTerminated = try #require(onAppTerminated, "Nothing observed app terminations", sourceLocation: sourceLocation)
+        onAppTerminated(processIdentifier)
+    }
+
+    /// Reports that an app was hidden or shown to the observer, as NSWorkspace does.
+    func notifyAppHiddenOrShown(sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let onAppHiddenOrShown = try #require(onAppHiddenOrShown, "Nothing observed apps being hidden or shown", sourceLocation: sourceLocation)
+        onAppHiddenOrShown()
     }
 
     func getRunningApps() -> [SwitcherApp] {

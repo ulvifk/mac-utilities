@@ -55,12 +55,12 @@ final class SwitcherAppearanceTests {
 
     /// On the panel, as the preview shows it: only the preview's look changes while it is shown.
     @Test(arguments: [false, true])
-    func darknessReusesAllViews(listingWindows: Bool) {
+    func darknessReusesAllViews(listingWindows: Bool) throws {
         let panel = SwitcherTestGlassPanel()
         let state = buildState(listingWindows: listingWindows, cardGlass: cardGlass)
         panel.showPreview(state: state, glassStore: panelGlass, beside: buildSettingsWindow())
-        let glass = panel.contentView as! NSGlassEffectView
-        let container = glass.contentView!
+        let glass = try getGlass(of: panel)
+        let container = try #require(glass.contentView)
         let cells = getCells(in: container)
         #expect(cells.count == 2, "Panel did not build the initial cells")
 
@@ -69,30 +69,30 @@ final class SwitcherAppearanceTests {
             panel.updateGlass(state: state, glassStore: panelGlass)
 
             #expect(panel.contentView === glass, "Darkness change replaced the glass")
-            #expect(glass.tintColor!.alphaComponent == panelGlass.darkness, "Darkness change was not applied")
+            #expect(try #require(glass.tintColor).alphaComponent == panelGlass.darkness, "Darkness change was not applied")
             expectSameViews(glass: glass, container: container, cells: cells)
         }
     }
 
     /// The panel shows the new glass the content moved into, and tells AppKit it has the active appearance only while Clear.
     @Test(arguments: [false, true])
-    func frostedReusesContentAndCells(listingWindows: Bool) {
+    func frostedReusesContentAndCells(listingWindows: Bool) throws {
         let panel = SwitcherTestGlassPanel()
         let state = buildState(listingWindows: listingWindows, cardGlass: cardGlass)
         panel.showPreview(state: state, glassStore: panelGlass, beside: buildSettingsWindow())
-        let container = (panel.contentView as! NSGlassEffectView).contentView!
+        let container = try #require(getGlass(of: panel).contentView)
         let cells = getCells(in: container)
         #expect(panel._hasActiveAppearance(), "Clear panel did not ask for the active appearance")
 
         for frosted in [true, false, true] {
-            let previousGlass = panel.contentView!
+            let previousGlass = try #require(panel.contentView)
             panelGlass.setFrosted(frosted)
             panel.updateGlass(state: state, glassStore: panelGlass)
-            let glass = panel.contentView as! NSGlassEffectView
+            let glass = try getGlass(of: panel)
 
             #expect(glass !== previousGlass, "Frosted change did not show a new effect wrapper")
             #expect(panel._hasActiveAppearance() == !frosted, "Frosted appearance did not change")
-            #expect(glass.tintColor!.alphaComponent == panelGlass.darkness, "Frosted change lost the tint")
+            #expect(try #require(glass.tintColor).alphaComponent == panelGlass.darkness, "Frosted change lost the tint")
             expectSameViews(glass: glass, container: container, cells: cells)
         }
     }
@@ -100,8 +100,8 @@ final class SwitcherAppearanceTests {
     // MARK: cards
 
     @Test(arguments: [false, true])
-    func cardDarknessReusesCardAndImage(listingWindows: Bool) {
-        let cardViews = buildCardViews(listingWindows: listingWindows)
+    func cardDarknessReusesCardAndImage(listingWindows: Bool) throws {
+        let cardViews = try buildCardViews(listingWindows: listingWindows)
         let content = cardViews.content
 
         for step in 0..<20 {
@@ -110,23 +110,24 @@ final class SwitcherAppearanceTests {
 
             #expect(content.glass === cardViews.glass, "Card darkness replaced panel glass")
             expectSameViews(glass: content.glass, container: cardViews.container, cells: cardViews.cells)
-            #expect(cardViews.cell.subviews[0] === cardViews.card, "Card darkness replaced the card")
-            #expect(cardViews.card.subviews[1] === cardViews.tint, "Card darkness replaced the tint")
-            #expect(NSColor(cgColor: cardViews.tint.layer!.backgroundColor!)!.alphaComponent == cardGlass.darkness, "Card darkness was not applied")
+            #expect(try getElement(cardViews.cell.subviews, at: 0) === cardViews.card, "Card darkness replaced the card")
+            #expect(try getElement(cardViews.card.subviews, at: 1) === cardViews.tint, "Card darkness replaced the tint")
+            let tintColor = try #require(cardViews.tint.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) }, "The card tint has no color")
+            #expect(tintColor.alphaComponent == cardGlass.darkness, "Card darkness was not applied")
             #expect(cardViews.imageView.image === cardViews.image, "Card darkness lost the image")
-            #expect(cardViews.border.layer!.borderWidth == selectedCardBorderWidth, "Card darkness lost the selection")
+            #expect(try #require(cardViews.border.layer).borderWidth == selectedCardBorderWidth, "Card darkness lost the selection")
         }
     }
 
     @Test(arguments: [false, true])
-    func cardLookReusesCardAndImage(listingWindows: Bool) {
-        let cardViews = buildCardViews(listingWindows: listingWindows)
+    func cardLookReusesCardAndImage(listingWindows: Bool) throws {
+        let cardViews = try buildCardViews(listingWindows: listingWindows)
 
         for frosted in [true, false, true] {
             cardGlass.setFrosted(frosted)
             cardViews.content.updateGlass(state: cardViews.state, glassStore: panelGlass)
 
-            #expect(cardViews.card.subviews[0] === cardViews.blur, "Card look replaced the blur")
+            #expect(try getElement(cardViews.card.subviews, at: 0) === cardViews.blur, "Card look replaced the blur")
             #expect(cardViews.blur.isHidden == !frosted, "Card look did not update the blur")
             #expect(cardViews.blur.state == .active, "Card blur lost its active state")
             #expect(cardViews.imageView.image === cardViews.image, "Card look lost the image")
@@ -135,8 +136,8 @@ final class SwitcherAppearanceTests {
     }
 
     @Test(arguments: [false, true])
-    func cardsToggleReusesCellAndImage(listingWindows: Bool) {
-        let cardViews = buildCardViews(listingWindows: listingWindows)
+    func cardsToggleReusesCellAndImage(listingWindows: Bool) throws {
+        let cardViews = try buildCardViews(listingWindows: listingWindows)
         let content = cardViews.content
 
         content.updateGlass(state: buildState(listingWindows: listingWindows, cardGlass: nil), glassStore: panelGlass)
@@ -146,46 +147,47 @@ final class SwitcherAppearanceTests {
         content.updateGlass(state: cardViews.state, glassStore: panelGlass)
         #expect(!cardViews.card.isHidden, "Cards-on did not show the card")
         #expect(cardViews.imageView.image === cardViews.image, "Cards-on lost the image")
-        #expect(cardViews.border.layer!.borderWidth == selectedCardBorderWidth, "Cards-on lost the selection")
+        #expect(try #require(cardViews.border.layer).borderWidth == selectedCardBorderWidth, "Cards-on lost the selection")
         expectSameViews(glass: content.glass, container: cardViews.container, cells: cardViews.cells)
     }
 
     @Test(arguments: [false, true])
-    func selectionMovesBetweenCards(listingWindows: Bool) {
-        let cardViews = buildCardViews(listingWindows: listingWindows)
+    func selectionMovesBetweenCards(listingWindows: Bool) throws {
+        let cardViews = try buildCardViews(listingWindows: listingWindows)
 
         cardViews.content.update(state: buildState(listingWindows: listingWindows, cardGlass: cardGlass, selectedIndex: 1))
 
-        #expect(cardViews.border.layer!.borderWidth == cardBorderWidth, "Previous card kept the selected border")
-        #expect(cardViews.cells[1].card.subviews[2].layer!.borderWidth == selectedCardBorderWidth, "New selection did not get its border")
+        #expect(try #require(cardViews.border.layer).borderWidth == cardBorderWidth, "Previous card kept the selected border")
+        let selectedBorder = try getElement(getElement(cardViews.cells, at: 1).card.subviews, at: 2)
+        #expect(try #require(selectedBorder.layer).borderWidth == selectedCardBorderWidth, "New selection did not get its border")
     }
 
     // MARK: openings
 
     @Test
-    func newOpeningBuildsNewModeContent() {
+    func newOpeningBuildsNewModeContent() throws {
         let content = SwitcherPanelContent()
 
         content.rebuild(state: buildState(listingWindows: true, cardGlass: nil), glassStore: panelGlass, showsHintsAtOnce: false)
-        let windowContainer = content.glass.contentView!
+        let windowContainer = try #require(content.glass?.contentView)
         content.hideHintBand()
         content.rebuild(state: buildState(listingWindows: false, cardGlass: nil), glassStore: panelGlass, showsHintsAtOnce: false)
-        let appContainer = content.glass.contentView!
+        let appContainer = try #require(content.glass?.contentView)
 
         #expect(appContainer !== windowContainer, "New opening reused the old mode's content")
         #expect(getCells(in: appContainer).allSatisfy { $0 is IconCellView }, "New opening kept window cells")
     }
 
     @Test
-    func dimmingRefreshesExistingIcons() {
+    func dimmingRefreshesExistingIcons() throws {
         let apps = [workspace.buildApp(index: 0), workspace.buildApp(index: 1)]
         apps[0].isHidden = true
         let content = SwitcherPanelContent()
         content.rebuild(state: buildState(apps: apps, dimHiddenApps: true, whitelisted: []), glassStore: panelGlass, showsHintsAtOnce: false)
-        let container = content.glass.contentView!
+        let container = try #require(content.glass?.contentView)
         let cells = getCells(in: container)
-        let hiddenCell = cells[0] as! IconCellView
-        let visibleCell = cells[1] as! IconCellView
+        let hiddenCell = try #require(getElement(cells, at: 0) as? IconCellView)
+        let visibleCell = try #require(getElement(cells, at: 1) as? IconCellView)
         #expect(hiddenCell.icon.alphaValue == 0.4, "Hidden icon did not start dimmed")
 
         for dimHiddenApps in [false, true, false] {
@@ -214,14 +216,14 @@ final class SwitcherAppearanceTests {
 
     /// Shown beside the settings window at the size of its content, then following the window with the same views.
     @Test(arguments: [false, true])
-    func previewPanelFollowsSettings(listingWindows: Bool) {
+    func previewPanelFollowsSettings(listingWindows: Bool) throws {
         let settingsWindow = buildSettingsWindow()
         let screenFrame = settingsWindow.screen!.visibleFrame
         let previewPanel = SwitcherTestGlassPanel()
         previewPanel.showPreview(state: buildState(listingWindows: listingWindows, cardGlass: cardGlass, itemCount: listingWindows ? 1 : 2),
                                  glassStore: panelGlass, beside: settingsWindow)
-        let glass = previewPanel.contentView as! NSGlassEffectView
-        let container = glass.contentView!
+        let glass = try getGlass(of: previewPanel)
+        let container = try #require(glass.contentView)
         let cells = getCells(in: container)
         let originalSize = previewPanel.frame.size
 
@@ -261,8 +263,8 @@ final class SwitcherAppearanceTests {
 
                 previewPanel.showPreview(state: buildState(listingWindows: listingWindows, cardGlass: nil, itemCount: 2), glassStore: panelGlass,
                                          beside: settingsWindow)
-                let container = (previewPanel.contentView as! NSGlassEffectView).contentView!
-                let hintBand = container.subviews.first { $0 is HintBandView }!
+                let container = try #require(getGlass(of: previewPanel).contentView)
+                let hintBand = try #require(container.subviews.first { $0 is HintBandView }, "Preview built no hint band")
                 #expect(container.bounds.contains(hintBand.frame), "Preview did not reserve the hint band before placement")
                 shownPreviews.append((previewPanel, settingsWindow, previewPanel.frame, placement))
             }
@@ -313,6 +315,16 @@ final class SwitcherAppearanceTests {
         return NSWindow(contentRect: NSRect(x: 360, y: 180, width: 720, height: 540), styleMask: .titled, backing: .buffered, defer: false)
     }
 
+    private func getGlass(of panel: NSWindow, sourceLocation: SourceLocation = #_sourceLocation) throws -> NSGlassEffectView {
+        return try #require(panel.contentView as? NSGlassEffectView, "The panel does not show the glass", sourceLocation: sourceLocation)
+    }
+
+    /// The element at that index of views the content built.
+    private func getElement<Element>(_ elements: [Element], at index: Int, sourceLocation: SourceLocation = #_sourceLocation) throws -> Element {
+        try #require(index < elements.count, "The content built fewer views", sourceLocation: sourceLocation)
+        return elements[index]
+    }
+
     private func getCells(in container: NSView) -> [SwitcherCellView] {
         return container.subviews.compactMap { $0 as? SwitcherCellView }
     }
@@ -337,25 +349,29 @@ final class SwitcherAppearanceTests {
     }
 
     /// The first cell's card and its parts, with a known image in the cell's image view.
-    private func buildCardViews(listingWindows: Bool) -> SwitcherCardViews {
+    private func buildCardViews(listingWindows: Bool) throws -> SwitcherCardViews {
         let content = SwitcherPanelContent()
         let state = buildState(listingWindows: listingWindows, cardGlass: cardGlass)
         content.rebuild(state: state, glassStore: panelGlass, showsHintsAtOnce: false)
-        let glass = content.glass!
-        let container = glass.contentView!
+        let glass = try #require(content.glass)
+        let container = try #require(glass.contentView)
         let cells = getCells(in: container)
-        let cell = cells[0]
+        let cell = try getElement(cells, at: 0)
         let card = cell.card
-        let imageView = cell.subviews[1] as! NSImageView
+        let imageView = try #require(getElement(cell.subviews, at: 1) as? NSImageView)
         let image = NSImage(size: NSSize(width: 32, height: 32))
         imageView.image = image
 
         #expect(card.frame == alignToPixels(listingWindows ? windowCardFrameInCell : iconCardFrameInCell), "Card does not frame its content")
-        #expect(card.subviews[2].frame == card.bounds, "Card border did not resize with the card")
+        let border = try getElement(card.subviews, at: 2)
+        #expect(border.frame == card.bounds, "Card border did not resize with the card")
+
+        let blur = try #require(getElement(card.subviews, at: 0) as? NSVisualEffectView)
+        let tint = try getElement(card.subviews, at: 1)
 
         return SwitcherCardViews(
             content: content, state: state, glass: glass, container: container, cells: cells, cell: cell, card: card,
-            blur: card.subviews[0] as! NSVisualEffectView, tint: card.subviews[1], border: card.subviews[2], imageView: imageView, image: image
+            blur: blur, tint: tint, border: border, imageView: imageView, image: image
         )
     }
 }

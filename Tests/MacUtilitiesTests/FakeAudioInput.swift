@@ -1,4 +1,5 @@
 import CoreAudio
+import Testing
 @testable import MacUtilities
 
 final class FakeAudioInput: AudioInput {
@@ -37,13 +38,20 @@ final class FakeAudioInput: AudioInput {
         return noErr
     }
 
-    @MainActor func completeSelection() {
-        let inputChange = inputChange!
+    /// Confirms the pending selection, as CoreAudio does once the default input changed.
+    @MainActor func completeSelection(sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let inputChange = try #require(inputChange, "No selection was pending", sourceLocation: sourceLocation)
         self.inputChange = nil
 
         defaultInputDeviceID = inputChange.deviceID
         onChange?()
         inputChange.continuation.resume(returning: noErr)
+    }
+
+    /// Reports a change of the Mac's inputs to the observer, as CoreAudio does.
+    func notifyInputChange(sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let onChange = try #require(onChange, "Nothing observed the inputs", sourceLocation: sourceLocation)
+        onChange()
     }
 
     func startObserving(_ onChange: @escaping () -> Void) {

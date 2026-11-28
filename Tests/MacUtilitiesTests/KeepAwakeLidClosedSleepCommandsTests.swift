@@ -22,22 +22,22 @@ struct KeepAwakeLidClosedSleepCommandsTests {
         process.standardInput = input
         defer { try! input.fileHandleForWriting.close() }
 
-        var didFinish = false
-        let command = Task { @MainActor in
-            let status = await runProcess(process)
+        var status: Int32?
+        Task { @MainActor in
+            let finishedStatus = await runProcess(process)
             dispatchPrecondition(condition: .onQueue(.main)) // the command must return on the main thread
-            didFinish = true
-            return status
+            status = finishedStatus
         }
-        while !process.isRunning { await Task.yield() }
+        try await waitUntil { process.isRunning }
 
         var mainQueueProgressed = false
         DispatchQueue.main.async { mainQueueProgressed = true }
-        while !mainQueueProgressed { try await Task.sleep(nanoseconds: 1_000_000) }
-        #expect(!didFinish, "The power command finished before its process terminated")
+        try await waitUntil { mainQueueProgressed }
+        #expect(status == nil, "The power command finished before its process terminated")
 
         input.fileHandleForWriting.write("\(exitStatus)\n".data(using: .utf8)!)
-        #expect(await command.value == exitStatus, "The command ignored its termination status")
+        try await waitForOutsideEvent { status != nil }
+        #expect(status == exitStatus, "The command ignored its termination status")
     }
 
     /// Runs the watchdog's own process against an app that has already exited, with a sudo that fails twice before succeeding.
