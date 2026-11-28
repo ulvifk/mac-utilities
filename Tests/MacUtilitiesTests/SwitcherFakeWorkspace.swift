@@ -9,10 +9,13 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
     /// Listed for whichever app is asked.
     var windows: [SwitcherFakeWindow] = []
     var onBringToFront: (SwitcherFakeWindow) -> Void = { _ in }
+    /// [bundle URL] -> badge text, as the Dock would report it.
+    var dockBadges: [URL: String] = [:]
 
     private(set) var runningAppQueryCount = 0
     private(set) var appsWithWindowsQueryCount = 0
     private(set) var windowQueryProcessIdentifiers: [pid_t] = [] // of the apps whose windows were asked for, in order
+    private(set) var dockBadgeQueryCount = 0
 
     var activatedBundleIdentifiers: [String] = []
     var quitBundleIdentifiers: [String] = []
@@ -83,6 +86,11 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
         return windows
     }
 
+    func getDockBadges() -> [URL: String] {
+        dockBadgeQueryCount += 1
+        return dockBadges
+    }
+
     /// Two apps asked to quit.
     func runBatchQuit() -> Int {
         batchQuitCount += 1
@@ -93,6 +101,8 @@ final class SwitcherFakeWorkspace: SwitcherWorkspace {
 final class SwitcherFakeApp: SwitcherApp {
     var bundleIdentifier: String
     let processIdentifier: pid_t
+    /// /Applications/Test 0.app for test.app.0; a second instance of an app shares its first's.
+    var bundleURL: URL?
     let name = "Test App"
     let icon: NSImage? = NSImage(size: NSSize(width: 68, height: 68))
     var isHidden = false
@@ -102,6 +112,7 @@ final class SwitcherFakeApp: SwitcherApp {
     init(index: Int, workspace: SwitcherFakeWorkspace) {
         bundleIdentifier = "test.app.\(index)"
         processIdentifier = pid_t(index)
+        bundleURL = URL(fileURLWithPath: "/Applications/Test \(index).app", isDirectory: true)
         self.workspace = workspace
     }
 

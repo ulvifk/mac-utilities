@@ -520,4 +520,21 @@ struct AppSwitcherPreviewTests {
         #expect(try #require(harness.log.shownStates.last).list.count == 2, "Preview kept a terminated app")
         await harness.finish()
     }
+
+    /// The preview reads the Dock when it loads its list, and switching the badges off loads it afresh without asking the Dock.
+    @Test
+    func dockBadgesSwitchReloadsList() async throws {
+        let harness = AppSwitcherTestHarness()
+        harness.workspace.dockBadges = [try #require(harness.workspace.runningApps[1].bundleURL): "4"]
+        await harness.showPreview()
+        #expect(try #require(harness.log.shownStates.last).list.appBadges == [1: "4"], "Preview did not show the Dock badge")
+
+        harness.settings.dockBadgeStore.setShowsBadges(false)
+        await letMainQueueRun()
+
+        #expect(harness.log.shownStates.count == 2, "Switching the badges off did not reload the preview")
+        #expect(try #require(harness.log.shownStates.last).list.appBadges.isEmpty, "Preview kept the badges after they were switched off")
+        #expect(harness.workspace.dockBadgeQueryCount == 1, "Switched-off badges read the Dock")
+        await harness.finish()
+    }
 }

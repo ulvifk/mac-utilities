@@ -213,7 +213,7 @@ final class SwitcherPanelContent {
     }
 
     private func buildIconCell(app: SwitcherApp, index: Int) -> SwitcherCellView {
-        let cell = IconCellView(app: app, cardGlass: state.cardGlass)
+        let cell = IconCellView(app: app, badgeText: state.list.appBadges[app.processIdentifier], cardGlass: state.cardGlass)
 
         cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.list.items.isWhitelistOnly, dimHiddenApps: state.dimHiddenApps)
         cell.card.showSelected(index == state.list.selectedIndex)

@@ -90,6 +90,14 @@ let badgeSymbolSpacing: CGFloat = 3
 let badgeColor = NSColor.systemGreen.withAlphaComponent(0.85)
 /// On the Whitelist capsule and on the feedback about the filter.
 let whitelistSymbolName = "line.3.horizontal.decrease"
+/// The red capsule with an app's Dock badge, its top-right corner on the highlight's, the way the Dock overlaps its icons' corner: below the
+/// whitelist dot and above the name. A single character makes it a circle; longer text widens it up to the maximum, then truncates.
+let dockBadgeHeight: CGFloat = 18
+/// Beside the text, so a digit makes a circle.
+let dockBadgeHorizontalPadding: CGFloat = 5
+let dockBadgeFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
+let dockBadgeMaxWidth: CGFloat = 44
+let dockBadgeColor = NSColor.systemRed
 /// Hidden apps stay listed, dimmed like in the native switcher, so they can be brought back.
 let hiddenIconAlpha: CGFloat = 0.4
 /// After Cmd+Q the icon fades and shrinks out while the rest slide into place, over this long.

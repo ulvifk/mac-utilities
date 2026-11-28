@@ -201,6 +201,70 @@ final class SwitcherAppearanceTests {
         }
     }
 
+    // MARK: Dock badges
+
+    /// In the plain and the card layout, with the whitelist filter on and off: a badged app's cell has the capsule with the Dock's text at its
+    /// icon's top right, clear of the whitelist dot and the name band; an app without a badge has none.
+    @Test(arguments: [false, true], [false, true])
+    func badgedAppsShowTheirDockBadge(showsCards: Bool, whitelistOnly: Bool) throws {
+        let apps = (0..<3).map { workspace.buildApp(index: $0) }
+        let content = SwitcherPanelContent()
+        let state = buildState(apps: apps, appBadges: [0: "•", 2: "12"], cardGlass: showsCards ? cardGlass : nil, whitelistOnly: whitelistOnly)
+        content.rebuild(state: state, glassStore: panelGlass, showsHintsAtOnce: false)
+
+        let circleCell = try getIconCell(in: content, at: 0)
+        let unbadgedCell = try getIconCell(in: content, at: 1)
+        let capsuleCell = try getIconCell(in: content, at: 2)
+        let circle = try getDockBadge(in: circleCell)
+        let capsule = try getDockBadge(in: capsuleCell)
+
+        #expect(try getText(of: circle) == "•", "Wrong badge text")
+        #expect(try getText(of: capsule) == "12", "Wrong badge text")
+        #expect(unbadgedCell.subviews.allSatisfy { !($0 is DockBadgeView) }, "An app without a badge shows one")
+        #expect(circle.frame.width == circle.frame.height, "One character is not a circle")
+        #expect(capsule.frame.width > capsule.frame.height, "Two characters did not widen the badge")
+        for badge in [circle, capsule] {
+            #expect(!badge.isHidden && badge.alphaValue == 1, "Badge is not visible")
+            #expect(circleCell.bounds.contains(badge.frame), "Badge leaves its cell")
+            #expect(badge.frame.maxX == iconCardFrameInCell.maxX && badge.frame.maxY == iconCardFrameInCell.maxY, "Badge is not at the icon's top right")
+            #expect(!badge.frame.intersects(circleCell.dot.frame), "Badge covers the whitelist dot")
+            #expect(badge.frame.minY > nameBandHeight, "Badge reaches into the name band")
+        }
+    }
+
+    @Test
+    func longBadgeTextIsTruncated() throws {
+        let app = workspace.buildApp(index: 0)
+        let content = SwitcherPanelContent()
+        content.rebuild(state: buildState(apps: [app], appBadges: [0: "1234567890"], cardGlass: nil, whitelistOnly: false), glassStore: panelGlass,
+                        showsHintsAtOnce: false)
+        let cell = try getIconCell(in: content, at: 0)
+        let badge = try getDockBadge(in: cell)
+        let label = try #require(badge.subviews.first as? NSTextField)
+
+        #expect(badge.frame.width == dockBadgeMaxWidth, "Long text widened the badge past its maximum")
+        #expect(label.fittingSize.width > label.frame.width, "Long text fits, so nothing is truncated")
+        #expect(label.lineBreakMode == .byTruncatingTail, "Long text is cut off without an ellipsis")
+    }
+
+    /// The badge dims with its hidden app's icon, and comes back with it.
+    @Test
+    func badgeDimsWithItsHiddenApp() throws {
+        let app = workspace.buildApp(index: 0)
+        app.isHidden = true
+        let content = SwitcherPanelContent()
+        content.rebuild(state: buildState(apps: [app], appBadges: [0: "3"], cardGlass: nil, whitelistOnly: false), glassStore: panelGlass,
+                        showsHintsAtOnce: false)
+        let cell = try getIconCell(in: content, at: 0)
+        let badge = try getDockBadge(in: cell)
+        #expect(badge.alphaValue == hiddenIconAlpha, "Badge of a hidden app is not dimmed")
+
+        app.isHidden = false
+        content.update(state: buildState(apps: [app], appBadges: [0: "3"], cardGlass: nil, whitelistOnly: false))
+
+        #expect(badge.alphaValue == 1, "Badge stayed dimmed after its app was shown")
+    }
+
     // MARK: preview placement
 
     @Test(arguments: placementScenarios)
@@ -309,6 +373,33 @@ final class SwitcherAppearanceTests {
             dimHiddenApps: dimHiddenApps,
             whitelisted: whitelisted
         )
+    }
+
+    private func buildState(apps: [SwitcherFakeApp], appBadges: [pid_t: String], cardGlass: GlassStore?, whitelistOnly: Bool) -> SwitcherState {
+        return SwitcherState(
+            list: SwitcherList(items: .apps(apps, whitelistOnly: whitelistOnly), cellsPerRow: apps.count, appBadges: appBadges),
+            thumbnails: [:],
+            cardGlass: cardGlass,
+            isFilterEnabled: whitelistOnly,
+            dimHiddenApps: true,
+            whitelisted: Set(apps.map { $0.bundleIdentifier })
+        )
+    }
+
+    private func getIconCell(in content: SwitcherPanelContent, at index: Int, sourceLocation: SourceLocation = #_sourceLocation) throws -> IconCellView {
+        let container = try #require(content.glass?.contentView, "The content has no container", sourceLocation: sourceLocation)
+        let cell = try getElement(getCells(in: container), at: index, sourceLocation: sourceLocation)
+        return try #require(cell as? IconCellView, "Not an app cell", sourceLocation: sourceLocation)
+    }
+
+    private func getDockBadge(in cell: IconCellView, sourceLocation: SourceLocation = #_sourceLocation) throws -> DockBadgeView {
+        let badges = cell.subviews.compactMap { $0 as? DockBadgeView }
+        try #require(badges.count == 1, "The cell does not have one Dock badge", sourceLocation: sourceLocation)
+        return badges[0]
+    }
+
+    private func getText(of badge: DockBadgeView, sourceLocation: SourceLocation = #_sourceLocation) throws -> String {
+        return try #require(badge.subviews.first as? NSTextField, "The badge has no text", sourceLocation: sourceLocation).stringValue
     }
 
     private func buildSettingsWindow() -> NSWindow {

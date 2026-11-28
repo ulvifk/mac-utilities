@@ -7,11 +7,14 @@ struct SwitcherList {
     /// Fixed when the list is loaded or the panel resized, so the panel's rows and the row navigation agree even if the screen changes later.
     let cellsPerRow: Int
     let selectedIndex: Int
+    /// [processIdentifier] -> the text of the app's Dock badge, read when the list was loaded; only badged apps. Empty for windows.
+    let appBadges: [pid_t: String]
 
-    init(items: SwitcherItems, cellsPerRow: Int, selectedIndex: Int = 0) {
+    init(items: SwitcherItems, cellsPerRow: Int, selectedIndex: Int = 0, appBadges: [pid_t: String] = [:]) {
         self.items = items
         self.cellsPerRow = cellsPerRow
         self.selectedIndex = selectedIndex
+        self.appBadges = appBadges
     }
 
     var count: Int {
@@ -34,7 +37,7 @@ struct SwitcherList {
     }
 
     func selecting(_ index: Int) -> SwitcherList {
-        return SwitcherList(items: items, cellsPerRow: cellsPerRow, selectedIndex: index)
+        return SwitcherList(items: items, cellsPerRow: cellsPerRow, selectedIndex: index, appBadges: appBadges)
     }
 
     /// Steps any number of items at once, wrapping around both ends; e.g. 5 items with 0 selected: by -1 -> 4, by 7 -> 2.
@@ -54,7 +57,7 @@ struct SwitcherList {
     }
 
     func rewrapping(cellsPerRow: Int) -> SwitcherList {
-        return SwitcherList(items: items, cellsPerRow: cellsPerRow, selectedIndex: selectedIndex)
+        return SwitcherList(items: items, cellsPerRow: cellsPerRow, selectedIndex: selectedIndex, appBadges: appBadges)
     }
 
     /// The selection stays on its app; when that is the one removed, it moves to the next, or to the new last app when it was the last.
@@ -69,7 +72,8 @@ struct SwitcherList {
         return SwitcherList(
             items: .apps(remainingApps, whitelistOnly: whitelistOnly),
             cellsPerRow: cellsPerRow,
-            selectedIndex: max(0, min(shiftedIndex, remainingApps.count - 1))
+            selectedIndex: max(0, min(shiftedIndex, remainingApps.count - 1)),
+            appBadges: appBadges
         )
     }
 

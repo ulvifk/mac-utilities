@@ -4,6 +4,8 @@ import AppKit
 protocol SwitcherApp: AnyObject {
     var bundleIdentifier: String { get }
     var processIdentifier: pid_t { get }
+    /// Where the app's bundle is, which the Dock names its item by; nil for an app that is not a bundle.
+    var bundleURL: URL? { get }
     /// The localized name, or the bundle identifier for an app without one.
     var name: String { get }
     var icon: NSImage? { get }

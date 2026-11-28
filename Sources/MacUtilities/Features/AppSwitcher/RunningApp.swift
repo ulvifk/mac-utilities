@@ -17,6 +17,10 @@ final class RunningApp: SwitcherApp {
         return runningApplication.processIdentifier
     }
 
+    var bundleURL: URL? {
+        return runningApplication.bundleURL
+    }
+
     var name: String {
         return getAppName(runningApplication)
     }

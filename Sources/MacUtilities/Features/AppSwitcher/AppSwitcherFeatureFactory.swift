@@ -5,7 +5,10 @@ enum AppSwitcherFeatureFactory {
     /// With APP_SWITCHER_SMOKE_TEST in the environment the feature runs the smoke test when it starts.
     static func buildFeature(settings: SwitcherSettings, workspace: SwitcherWorkspace, screen: SwitcherScreen, panel: SwitcherPanel, previewPanel: SwitcherPanel,
                       environment: [String: String]) -> AppSwitcherFeature {
-        let listLoader = SwitcherListLoader(workspace: workspace, screen: screen, whitelistStore: settings.whitelistStore, panelWidthStore: settings.panelWidthStore)
+        let listLoader = SwitcherListLoader(
+            workspace: workspace, screen: screen, whitelistStore: settings.whitelistStore, panelWidthStore: settings.panelWidthStore,
+            dockBadgeStore: settings.dockBadgeStore
+        )
         let thumbnailCache = WindowThumbnailCache(screen: screen)
         let smokeTest = environment["APP_SWITCHER_SMOKE_TEST"] == nil ? nil : AppSwitcherSmokeTest(
             panel: GlassSwitcherPanel(), settings: settings, listLoader: listLoader, workspace: workspace, thumbnailCache: thumbnailCache,
@@ -44,6 +47,7 @@ enum AppSwitcherFeatureFactory {
             whitelistStore: WhitelistStore(defaults: defaults),
             batchQuitStore: BatchQuitStore(defaults: defaults),
             appearanceStore: SwitcherAppearanceStore(defaults: defaults),
+            dockBadgeStore: DockBadgeStore(defaults: defaults),
             appGlassStore: GlassStore(keyPrefix: "appGlass", defaultDarkness: defaultGlassDarkness, defaults: defaults),
             windowGlassStore: GlassStore(keyPrefix: "windowGlass", defaultDarkness: defaultGlassDarkness, defaults: defaults),
             appCardStore: SwitcherCardStore(key: "appCards", defaults: defaults),
