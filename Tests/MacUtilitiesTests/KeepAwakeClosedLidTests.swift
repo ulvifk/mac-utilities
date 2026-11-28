@@ -28,7 +28,7 @@ struct KeepAwakeClosedLidTests {
         let feature = harness.buildFeature()
         try await harness.activate(feature)
 
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false)
         try await waitUntil { !feature.isChangingSession }
         #expect(power.sleepCount == 1, "Unplugging left a closed lid awake")

@@ -55,10 +55,10 @@ struct AppSwitcherPreviewTests {
     }
 
     @Test
-    func staleThumbnailAfterSwitcherOpens() async {
+    func staleThumbnailAfterSwitcherOpens() async throws {
         let harness = AppSwitcherTestHarness()
         await harness.showPreview(listingWindows: true)
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
 
         harness.press(graveKeyCode)
         await letMainQueueRun()
@@ -70,33 +70,33 @@ struct AppSwitcherPreviewTests {
     }
 
     @Test
-    func staleThumbnailInNextPreview() async {
+    func staleThumbnailInNextPreview() async throws {
         let harness = AppSwitcherTestHarness()
         await harness.showPreview(listingWindows: true)
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
 
         await harness.setPreviewMode(listingWindows: false)
         await harness.setPreviewMode(listingWindows: true)
         oldCapture.onCaptured(0, NSImage(size: NSSize(width: 1, height: 1)))
 
         #expect(harness.log.updatedStates.isEmpty, "Old preview capture redrew a later preview")
-        harness.screen.thumbnailRequests[1].onCaptured(0, NSImage(size: NSSize(width: 2, height: 2)))
+        try harness.screen.getThumbnailRequest(at: 1).onCaptured(0, NSImage(size: NSSize(width: 2, height: 2)))
         #expect(harness.log.updatedStates.count == 1, "New preview capture was lost")
         await harness.finish()
     }
 
     @Test
-    func continuousWindowLook() async {
+    func continuousWindowLook() async throws {
         let harness = AppSwitcherTestHarness()
         await harness.showPreview(listingWindows: true)
 
         harness.settings.windowGlassStore.objectWillChange.send()
         await letMainQueueRun()
-        harness.screen.thumbnailRequests[0].onCaptured(0, NSImage(size: NSSize(width: 2, height: 2)))
+        try harness.screen.getThumbnailRequest(at: 0).onCaptured(0, NSImage(size: NSSize(width: 2, height: 2)))
 
         #expect(harness.log.updatedStates.count == 1, "Continuous preview lost its capture")
         #expect(harness.screen.thumbnailRequests.count == 1, "Continuous preview repeated thumbnail capture")
-        #expect(harness.screen.thumbnailRequests[0].windowIDs == [0, 1, 2], "Preview did not capture the full window list")
+        #expect(try harness.screen.getThumbnailRequest(at: 0).windowIDs == [0, 1, 2], "Preview did not capture the full window list")
         await harness.finish()
     }
 
@@ -175,7 +175,7 @@ struct AppSwitcherPreviewTests {
         #expect(harness.workspace.windowQueryProcessIdentifiers.count == 1, "Mode change did not load windows")
         #expect(harness.log.shownStates.count == 2, "Mode change did not rebuild for windows")
         #expect(try #require(harness.log.shownStates.last).windowIDs == [9], "Mode change kept stale windows")
-        #expect(harness.screen.thumbnailRequests[0].windowIDs == [9], "Mode change captured the old windows")
+        #expect(try harness.screen.getThumbnailRequest(at: 0).windowIDs == [9], "Mode change captured the old windows")
         await harness.finish()
     }
 
@@ -253,10 +253,10 @@ struct AppSwitcherPreviewTests {
     }
 
     @Test
-    func settingsExitResetsAndRejectsQueuedChanges() async {
+    func settingsExitResetsAndRejectsQueuedChanges() async throws {
         let harness = AppSwitcherTestHarness()
         await harness.showPreview(listingWindows: true)
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
 
         harness.settings.windowGlassStore.objectWillChange.send()
         harness.feature.settingsWindowChanged(nil)
@@ -428,7 +428,7 @@ struct AppSwitcherPreviewTests {
 
     /// Clicks passing through the preview to the pane are set where the system's preview panel is built, AppSwitcherFeatureFactory.
     @Test
-    func geometryKeepsCheckedList() async throws {
+    func geometryKeepsCheckedList() async {
         let harness = AppSwitcherTestHarness()
         await harness.showPreview()
 
@@ -480,12 +480,12 @@ struct AppSwitcherPreviewTests {
     }
 
     @Test
-    func hideAndUnhideRefreshIcons() async {
+    func hideAndUnhideRefreshIcons() async throws {
         let harness = AppSwitcherTestHarness()
         await harness.showPreview()
 
-        harness.workspace.onAppHiddenOrShown!()
-        harness.workspace.onAppHiddenOrShown!()
+        try harness.workspace.notifyAppHiddenOrShown()
+        try harness.workspace.notifyAppHiddenOrShown()
 
         #expect(harness.log.updatedStates.count == 2, "Preview missed hide or unhide notification")
         await harness.finish()
@@ -515,7 +515,7 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview()
 
         let terminated = harness.workspace.runningApps.removeLast()
-        harness.workspace.onAppTerminated!(terminated.processIdentifier)
+        try harness.workspace.notifyAppTerminated(terminated.processIdentifier)
 
         #expect(try #require(harness.log.shownStates.last).list.count == 2, "Preview kept a terminated app")
         await harness.finish()

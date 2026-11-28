@@ -378,13 +378,13 @@ struct AppSwitcherFeatureTests {
 
         harness.press(graveKeyCode)
         await letMainQueueRun()
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(graveKeyCode)
         await letMainQueueRun()
 
         let newThumbnail = NSImage(size: NSSize(width: 2, height: 2))
-        harness.screen.thumbnailRequests[1].onCaptured(1, newThumbnail)
+        try harness.screen.getThumbnailRequest(at: 1).onCaptured(1, newThumbnail)
         oldCapture.onCaptured(1, NSImage(size: NSSize(width: 1, height: 1)))
         #expect(harness.log.updatedStates.count == 1, "Old thumbnail redrew a new session")
         #expect(try #require(harness.log.updatedStates.last).thumbnails[1] === newThumbnail, "Old thumbnail replaced the new capture")
@@ -397,12 +397,12 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func stoppedThumbnailAndRestart() async {
+    func stoppedThumbnailAndRestart() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
         await letMainQueueRun()
-        let oldCapture = harness.screen.thumbnailRequests[0]
+        let oldCapture = try harness.screen.getThumbnailRequest(at: 0)
         harness.feature.stop(because: .switchedOff)
         harness.feature.start()
         harness.press(graveKeyCode)

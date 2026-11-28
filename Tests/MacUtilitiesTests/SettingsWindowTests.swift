@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct SettingsWindowTests {
     @Test
-    func featurePaneReportsTheWindowToItsFeature() {
+    func featurePaneReportsTheWindowToItsFeature() throws {
         _ = NSApplication.shared.setActivationPolicy(.prohibited)
         let feature = WindowRecordingFeature()
         let loginItem = FakeLoginItem()
@@ -26,7 +26,8 @@ struct SettingsWindowTests {
         #expect(window.title == feature.displayName, "The window's title did not follow the selected pane")
         #expect(feature.reportedWindows == [nil], "A window that was never opened was reported to the feature")
 
-        window.delegate!.windowDidDeminiaturize!(Notification(name: NSWindow.didDeminiaturizeNotification, object: window))
+        let windowDidDeminiaturize = try #require(window.delegate?.windowDidDeminiaturize, "The window has no delegate that follows deminiaturizing")
+        windowDidDeminiaturize(Notification(name: NSWindow.didDeminiaturizeNotification, object: window))
         #expect(feature.reportedWindows == [nil, window], "The window on screen was not reported to the feature of the selected pane")
         #expect(!window.isVisible)
     }

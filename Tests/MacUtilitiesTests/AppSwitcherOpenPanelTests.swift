@@ -15,7 +15,7 @@ struct AppSwitcherOpenPanelTests {
     func selectedAppQuits() async throws {
         let harness = await openAppSwitcher()
 
-        harness.workspace.onAppTerminated!(1)
+        try harness.workspace.notifyAppTerminated(1)
 
         #expect(harness.log.appRemovals.map { $0.index } == [1], "Quit app's cell was not removed")
         #expect(try #require(harness.log.appRemovals.last).state.bundleIdentifiers == ["test.app.0", "test.app.2"], "Quit app is still listed")
@@ -29,7 +29,7 @@ struct AppSwitcherOpenPanelTests {
     func earlierAppQuits() async throws {
         let harness = await openAppSwitcher()
 
-        harness.workspace.onAppTerminated!(0)
+        try harness.workspace.notifyAppTerminated(0)
 
         #expect(harness.log.appRemovals.map { $0.index } == [0], "Quit app's cell was not removed")
         #expect(try #require(harness.log.appRemovals.last).state.bundleIdentifiers == ["test.app.1", "test.app.2"], "Quit app is still listed")
@@ -43,7 +43,7 @@ struct AppSwitcherOpenPanelTests {
     func selectedLastListedAppQuits() async throws {
         let harness = await openAppSwitcher(backward: true)
 
-        harness.workspace.onAppTerminated!(2)
+        try harness.workspace.notifyAppTerminated(2)
 
         #expect(harness.log.appRemovals.map { $0.index } == [2], "Quit app's cell was not removed")
         #expect(try #require(harness.log.appRemovals.last).state.list.selectedIndex == 1, "Selection did not move to the new last app")
@@ -53,10 +53,10 @@ struct AppSwitcherOpenPanelTests {
     }
 
     @Test
-    func onlyAppQuits() async {
+    func onlyAppQuits() async throws {
         let harness = await openAppSwitcher(itemCount: 1)
 
-        harness.workspace.onAppTerminated!(0)
+        try harness.workspace.notifyAppTerminated(0)
 
         #expect(harness.log.appRemovals.isEmpty, "Last app's removal was drawn instead of closing")
         #expect(!harness.panel.isVisible, "Switcher stayed open without apps")
@@ -66,10 +66,10 @@ struct AppSwitcherOpenPanelTests {
     }
 
     @Test
-    func unlistedAppQuits() async {
+    func unlistedAppQuits() async throws {
         let harness = await openAppSwitcher()
 
-        harness.workspace.onAppTerminated!(99)
+        try harness.workspace.notifyAppTerminated(99)
 
         #expect(harness.log.appRemovals.isEmpty, "Unlisted app's quit removed a cell")
         #expect(harness.panel.isVisible, "Unlisted app's quit closed the switcher")
@@ -79,10 +79,10 @@ struct AppSwitcherOpenPanelTests {
     // MARK: apps quitting while windows are listed
 
     @Test
-    func listedWindowsAppQuits() async {
+    func listedWindowsAppQuits() async throws {
         let harness = await openWindowSwitcher()
 
-        harness.workspace.onAppTerminated!(0)
+        try harness.workspace.notifyAppTerminated(0)
 
         #expect(!harness.panel.isVisible, "Switcher stayed open on the quit app's windows")
         harness.releaseCommand()
@@ -92,10 +92,10 @@ struct AppSwitcherOpenPanelTests {
     }
 
     @Test
-    func otherAppQuitsWhileWindowsAreListed() async {
+    func otherAppQuitsWhileWindowsAreListed() async throws {
         let harness = await openWindowSwitcher()
 
-        harness.workspace.onAppTerminated!(1)
+        try harness.workspace.notifyAppTerminated(1)
 
         #expect(harness.panel.isVisible, "Another app's quit closed the window list")
         harness.releaseCommand()
@@ -125,7 +125,7 @@ struct AppSwitcherOpenPanelTests {
 
     /// The system hides the app a moment later and says so; the second press then finds it hidden.
     @Test
-    func hideAndSecondPress() async {
+    func hideAndSecondPress() async throws {
         let harness = await openAppSwitcher()
 
         harness.press(hKeyCode)
@@ -134,7 +134,7 @@ struct AppSwitcherOpenPanelTests {
         #expect(getFeedbackTexts(harness) == [SwitcherFeedback.hidden.text], "Cmd+H feedback was lost")
 
         harness.workspace.runningApps[1].isHidden = true
-        harness.workspace.onAppHiddenOrShown!()
+        try harness.workspace.notifyAppHiddenOrShown()
         #expect(harness.log.updatedStates.count == 1, "Hidden app was not redrawn")
 
         harness.press(hKeyCode)

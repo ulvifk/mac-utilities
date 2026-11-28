@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 
 /// A defaults domain of its own for one test, so no test touches the app's real preferences. The domain is a plist in a temporary directory
 /// rather than a name: a named domain leaves an empty plist in ~/Library/Preferences that cfprefsd writes whenever it gets to it, which no
@@ -16,9 +17,10 @@ final class TestDefaults {
     }
 
     /// What the domain holds on disk, which is what the next launch of the app would load.
-    func readStoredValues() -> [String: Any] {
+    func readStoredValues(sourceLocation: SourceLocation = #_sourceLocation) throws -> [String: Any] {
         buildUserDefaults().synchronize()
-        return NSDictionary(contentsOf: directory.appendingPathComponent("preferences.plist")) as! [String: Any]
+        let storedValues = NSDictionary(contentsOf: directory.appendingPathComponent("preferences.plist")) as? [String: Any]
+        return try #require(storedValues, "Nothing was stored in the defaults domain", sourceLocation: sourceLocation)
     }
 
     func remove() {

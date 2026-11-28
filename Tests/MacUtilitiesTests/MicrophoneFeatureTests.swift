@@ -89,7 +89,7 @@ struct MicrophoneFeatureTests {
         try await waitForInputChange(feature)
 
         audioInput.defaultInputDeviceID = headset.id
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         feature.stop(because: .switchedOff)
         try await waitForInputChange(feature)
 
@@ -107,13 +107,13 @@ struct MicrophoneFeatureTests {
         try await waitForInputChange(feature)
 
         audioInput.devices = [builtIn]
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         #expect(!feature.isActive)
         #expect(feature.canSelect)
 
         audioInput.defaultInputDeviceID = builtIn.id
         audioInput.devices = [builtIn, iPhone]
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
 
         #expect(feature.canSelect)
         #expect(!feature.isActive)
@@ -248,11 +248,11 @@ struct MicrophoneFeatureTests {
 
         feature.selectInput(iPhone.uid)
         try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id] }
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         #expect(feature.statusText == "Switching microphone…")
         #expect(!feature.canSelect)
 
-        audioInput.completeSelection()
+        try audioInput.completeSelection()
         try await waitForInputChange(feature)
         #expect(feature.isActive)
         #expect(feature.canSelect)
@@ -276,12 +276,12 @@ struct MicrophoneFeatureTests {
 
         feature.stop(because: .switchedOff)
         #expect(audioInput.onChange != nil)
-        audioInput.completeSelection()
+        try audioInput.completeSelection()
         try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
         #expect(audioInput.onChange != nil)
         #expect(feature.isActive)
 
-        audioInput.completeSelection()
+        try audioInput.completeSelection()
         try await waitForInputChange(feature)
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
         #expect(audioInput.onChange == nil)
@@ -306,11 +306,11 @@ struct MicrophoneFeatureTests {
         try await waitUntil { terminationStarted }
         #expect(!didTerminate)
 
-        audioInput.completeSelection()
+        try audioInput.completeSelection()
         try await waitUntil { audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id] }
         #expect(!didTerminate)
 
-        audioInput.completeSelection()
+        try audioInput.completeSelection()
         try await waitForResult(of: termination)
         #expect(didTerminate)
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
@@ -339,7 +339,7 @@ struct MicrophoneFeatureTests {
         #expect(!feature.canSelect)
         #expect(feature.statusText == "Switching microphone…")
 
-        audioInput.completeSelection()
+        try audioInput.completeSelection()
         try await waitForInputChange(feature)
         #expect(feature.defaultInput == builtIn)
         #expect(feature.canSelect)
@@ -357,7 +357,7 @@ struct MicrophoneFeatureTests {
         let reassignedHeadset = AudioInputDevice(id: iPhone.id, uid: headset.uid, name: headset.name)
         audioInput.devices = [builtIn, reconnectedIPhone, reassignedHeadset]
         audioInput.defaultInputDeviceID = reassignedHeadset.id
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
 
         feature.stop(because: .switchedOff)
         try await waitForInputChange(feature)
@@ -376,7 +376,7 @@ struct MicrophoneFeatureTests {
         let reconnectedIPhone = AudioInputDevice(id: 4, uid: iPhone.uid, name: iPhone.name)
         audioInput.devices = [builtIn, reconnectedIPhone]
         audioInput.defaultInputDeviceID = reconnectedIPhone.id
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         #expect(feature.canSelect)
 
         feature.restorePreviousInput()
@@ -435,7 +435,7 @@ struct MicrophoneFeatureTests {
         try await waitForInputChange(feature)
 
         audioInput.defaultInputDeviceID = headset.id
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         #expect(feature.defaultInput == headset)
         #expect(!feature.canRestore)
         feature.selectInput(builtIn.uid)
@@ -447,18 +447,18 @@ struct MicrophoneFeatureTests {
     }
 
     @Test
-    func deviceListRefreshesWithoutChangingCurrentInput() async {
+    func deviceListRefreshesWithoutChangingCurrentInput() async throws {
         let audioInput = FakeAudioInput(devices: [builtIn], defaultInputDeviceID: builtIn.id)
         let feature = MicrophoneFeature(audioInput: audioInput)
         feature.start()
 
         audioInput.devices = [builtIn, headset, iPhone]
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         #expect(feature.inputDevices == [builtIn, headset, iPhone])
         #expect(feature.defaultInput == builtIn)
 
         audioInput.devices = [builtIn, iPhone]
-        audioInput.onChange!()
+        try audioInput.notifyInputChange()
         #expect(feature.inputDevices == [builtIn, iPhone])
         #expect(audioInput.selectedDeviceIDs.isEmpty)
     }

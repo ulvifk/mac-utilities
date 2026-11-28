@@ -1,5 +1,6 @@
 import Foundation
 import IOKit.pwr_mgt
+import Testing
 @testable import MacUtilities
 
 /// Records what Keep Awake asks of macOS. Lid-closed sleep commands stay pending until the test completes them, in order.
@@ -69,8 +70,9 @@ final class FakePowerManagement: PowerManagement {
     }
 
     /// Plugs or unplugs external power and notifies the observer, as the IOKit run loop source does.
-    func setExternalPowerConnected(_ connected: Bool) {
+    func setExternalPowerConnected(_ connected: Bool, sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let onExternalPowerChange = try #require(onExternalPowerChange, "Nothing observed external power", sourceLocation: sourceLocation)
         isExternalPowerConnected = connected
-        onExternalPowerChange!()
+        onExternalPowerChange()
     }
 }

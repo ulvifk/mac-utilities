@@ -305,7 +305,7 @@ struct KeepAwakeFeatureTests {
         if changesPreference {
             harness.preferences.setOnlyWhileConnectedToPower(true)
         } else {
-            power.setExternalPowerConnected(false)
+            try power.setExternalPowerConnected(false)
         }
         await letMainQueueRun()
         #expect(power.commandHistory == [true, false], "A condition change after Quit ran a power command")

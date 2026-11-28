@@ -21,14 +21,14 @@ struct KeepAwakePowerTests {
         let session = try #require(feature.session)
         let deadline = session.deactivationDate
 
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         if keepsLidAwake { try await harness.completeCommand(disabled: false) }
         try await waitUntil { feature.session == nil }
         #expect(feature.isWaitingForPower, "Unplugging lost the user's enabled session")
         #expect(power.assertionReleaseCount == 1, "Unplugging did not release the power assertion")
         #expect(power.watchdogTerminationCount == (keepsLidAwake ? 1 : 0), "Unplugging did not stop the restored watchdog")
 
-        power.setExternalPowerConnected(true)
+        try power.setExternalPowerConnected(true)
         if keepsLidAwake { try await harness.completeCommand(disabled: true) }
         try await waitUntil { feature.session != nil }
         #expect(feature.session === session, "Reconnecting replaced the suspended session")
@@ -52,7 +52,7 @@ struct KeepAwakePowerTests {
         let power = harness.power
         harness.preferences.setOnlyWhileConnectedToPower(true)
         let feature = harness.buildFeature()
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
 
         if usesDurationChip {
             feature.turnOn(for: .oneHour)
@@ -65,7 +65,7 @@ struct KeepAwakePowerTests {
         #expect(power.commandHistory.isEmpty, "Battery activation disabled lid sleep")
         #expect(power.watchdogLaunchCount == 0, "Battery activation launched a watchdog")
 
-        power.setExternalPowerConnected(true)
+        try power.setExternalPowerConnected(true)
         try await harness.completeCommand(disabled: true)
         try await waitUntil { !feature.isChangingSession }
         #expect(feature.session != nil, "Reconnecting did not honor battery enablement")
@@ -81,7 +81,7 @@ struct KeepAwakePowerTests {
         harness.preferences.setOnlyWhileConnectedToPower(true)
         let feature = harness.buildFeature()
         try await harness.activate(feature)
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false)
         try await waitUntil { !feature.isChangingSession }
 
@@ -93,7 +93,7 @@ struct KeepAwakePowerTests {
         }
         #expect(!feature.isWaitingForPower, "Turning off retained suspended enablement")
 
-        power.setExternalPowerConnected(true)
+        try power.setExternalPowerConnected(true)
         await letMainQueueRun()
         #expect(feature.session == nil, "Reconnecting enabled a manually disabled session")
         #expect(power.commandHistory == [true, false], "Reconnecting ran commands for a disabled session")
@@ -107,7 +107,7 @@ struct KeepAwakePowerTests {
         harness.preferences.setAutoOff(.thirtyMinutes)
         let feature = harness.buildFeature()
         try await harness.activate(feature)
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false)
         try await waitUntil { !feature.isChangingSession }
         #expect(feature.isWaitingForPower)
@@ -115,7 +115,7 @@ struct KeepAwakePowerTests {
         harness.clock.advance(by: 30 * 60)
         #expect(!feature.isWaitingForPower, "An expired session still waited for power")
 
-        power.setExternalPowerConnected(true)
+        try power.setExternalPowerConnected(true)
         await letMainQueueRun()
         #expect(feature.session == nil, "Reconnecting restarted an expired session")
         #expect(power.commandHistory == [true, false], "Reconnecting disabled sleep after expiration")
@@ -126,7 +126,7 @@ struct KeepAwakePowerTests {
         let harness = KeepAwakeHarness()
         let power = harness.power
         let feature = harness.buildFeature()
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.activate(feature)
         let session = feature.session
 
@@ -152,7 +152,7 @@ struct KeepAwakePowerTests {
         feature.turnOn(for: .oneHour)
         try await waitUntil { power.pendingCommands.count == 1 }
 
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: true)
         try await harness.completeCommand(disabled: false)
         try await waitUntil { !feature.isChangingSession }
@@ -171,10 +171,10 @@ struct KeepAwakePowerTests {
         let feature = harness.buildFeature()
         try await harness.activate(feature)
         let session = feature.session
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await waitUntil { power.pendingCommands.count == 1 }
 
-        power.setExternalPowerConnected(true)
+        try power.setExternalPowerConnected(true)
         try await harness.completeCommand(disabled: false)
         try await harness.completeCommand(disabled: true)
         try await waitUntil { !feature.isChangingSession }
@@ -190,7 +190,7 @@ struct KeepAwakePowerTests {
         let feature = harness.buildFeature()
         try await harness.activate(feature)
 
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await harness.completeCommand(disabled: false, succeeds: false)
         try await waitUntil { !feature.isChangingSession }
         #expect(feature.isSleepRestorationRefused, "Unplugging hid restoration failure")
@@ -222,7 +222,7 @@ struct KeepAwakePowerTests {
         let session = feature.session
         let deadline = session?.deactivationDate
 
-        power.setExternalPowerConnected(false)
+        try power.setExternalPowerConnected(false)
         try await waitUntil { power.pendingCommands.count == 1 }
         if !beforeRestorationFails {
             try await harness.completeCommand(disabled: false, succeeds: false)
@@ -231,7 +231,7 @@ struct KeepAwakePowerTests {
         }
 
         if reconnectsPower {
-            power.setExternalPowerConnected(true)
+            try power.setExternalPowerConnected(true)
         } else {
             harness.preferences.setOnlyWhileConnectedToPower(false)
         }
