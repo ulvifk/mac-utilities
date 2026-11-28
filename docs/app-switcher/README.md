@@ -97,10 +97,10 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   not followed while the switcher is open. The badge dims with a hidden app's icon but
   stays red when the icon turns gray, and stays while only the whitelist is listed.
   "Show Dock badges" in settings defaults to on; with it off neither the switcher nor
-  the preview reads the Dock. Only the Dock's app items are asked. If the Dock cannot be
-  read (not running or restarting, Accessibility not granted, a question left unanswered
-  for 0.1 seconds, or the whole read taking longer than 0.2 seconds) the switcher opens
-  without badges and logs the failure.
+  the preview reads the Dock. Only the Dock's app items are asked for a badge. If the
+  Dock cannot be read (not running or restarting, Accessibility not granted, a question
+  left unanswered for 0.1 seconds, or the whole read taking longer than 0.2 seconds) the
+  switcher opens without badges and logs the failure.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.

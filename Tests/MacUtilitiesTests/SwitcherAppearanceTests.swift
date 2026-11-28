@@ -260,7 +260,7 @@ final class SwitcherAppearanceTests {
         let cell = try getIconCell(in: content, at: 0)
         let badge = try getDockBadge(in: cell)
 
-        #expect(!(cell.icon.contentFilters.isEmpty), "Icon taken off the whitelist is not gray")
+        #expect(!cell.icon.contentFilters.isEmpty, "Icon taken off the whitelist is not gray")
         #expect(badge.contentFilters.isEmpty, "Badge turned gray with its icon")
         #expect(badge.layer?.backgroundColor == NSColor.systemRed.cgColor, "Badge is not red")
         #expect(!badge.isHidden && badge.alphaValue == 1, "Badge is not visible")

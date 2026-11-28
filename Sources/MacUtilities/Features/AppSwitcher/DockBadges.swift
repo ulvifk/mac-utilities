@@ -16,7 +16,7 @@ private let dockReadTimeLimit: TimeInterval = 0.2
 /// icon. There is no public API for another app's badge, so it is read from the accessibility tree: the Dock's AXList holds one item per
 /// Dock tile, and an app's item (subrole AXApplicationDockItem) has its bundle as AXURL and its badge as AXStatusLabel, which has no value
 /// without a badge.
-/// - other items (separator, Trash, folders, minimized windows) are not asked; an app item without a badge is left out
+/// - other items (separator, Trash, folders, minimized windows) are asked only for their subrole; an app item without a badge is left out
 /// - two running instances of an app have one item each with the same URL; the last one read wins
 /// - when the Dock is not running, accessibility is not granted, the Dock goes away mid-read or does not answer in time, the failure is
 ///   logged once and there are no badges at all
