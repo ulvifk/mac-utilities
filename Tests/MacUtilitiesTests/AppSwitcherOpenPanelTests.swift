@@ -12,41 +12,41 @@ struct AppSwitcherOpenPanelTests {
     // MARK: apps quitting
 
     @Test
-    func selectedAppQuits() async {
+    func selectedAppQuits() async throws {
         let harness = await openAppSwitcher()
 
         harness.workspace.onAppTerminated!(1)
 
         #expect(harness.log.appRemovals.map { $0.index } == [1], "Quit app's cell was not removed")
-        #expect(harness.log.appRemovals.last!.state.bundleIdentifiers == ["test.app.0", "test.app.2"], "Quit app is still listed")
-        #expect(harness.log.appRemovals.last!.state.list.selectedIndex == 1, "Selection did not move on to the next app")
+        #expect(try #require(harness.log.appRemovals.last).state.bundleIdentifiers == ["test.app.0", "test.app.2"], "Quit app is still listed")
+        #expect(try #require(harness.log.appRemovals.last).state.list.selectedIndex == 1, "Selection did not move on to the next app")
         harness.releaseCommand()
         harness.expectActivation(listingWindows: false, selection: 2)
         await harness.finish()
     }
 
     @Test
-    func earlierAppQuits() async {
+    func earlierAppQuits() async throws {
         let harness = await openAppSwitcher()
 
         harness.workspace.onAppTerminated!(0)
 
         #expect(harness.log.appRemovals.map { $0.index } == [0], "Quit app's cell was not removed")
-        #expect(harness.log.appRemovals.last!.state.bundleIdentifiers == ["test.app.1", "test.app.2"], "Quit app is still listed")
-        #expect(harness.log.appRemovals.last!.state.list.selectedIndex == 0, "Selection left the selected app")
+        #expect(try #require(harness.log.appRemovals.last).state.bundleIdentifiers == ["test.app.1", "test.app.2"], "Quit app is still listed")
+        #expect(try #require(harness.log.appRemovals.last).state.list.selectedIndex == 0, "Selection left the selected app")
         harness.releaseCommand()
         harness.expectActivation(listingWindows: false, selection: 1)
         await harness.finish()
     }
 
     @Test
-    func selectedLastListedAppQuits() async {
+    func selectedLastListedAppQuits() async throws {
         let harness = await openAppSwitcher(backward: true)
 
         harness.workspace.onAppTerminated!(2)
 
         #expect(harness.log.appRemovals.map { $0.index } == [2], "Quit app's cell was not removed")
-        #expect(harness.log.appRemovals.last!.state.list.selectedIndex == 1, "Selection did not move to the new last app")
+        #expect(try #require(harness.log.appRemovals.last).state.list.selectedIndex == 1, "Selection did not move to the new last app")
         harness.releaseCommand()
         harness.expectActivation(listingWindows: false, selection: 1)
         await harness.finish()
@@ -107,18 +107,18 @@ struct AppSwitcherOpenPanelTests {
     // MARK: app shortcuts
 
     @Test
-    func whitelistToggle() async {
+    func whitelistToggle() async throws {
         let harness = await openAppSwitcher()
 
         harness.press(wKeyCode)
         await letMainQueueRun()
         #expect(harness.settings.whitelistStore.isListed("test.app.1"), "Cmd+W did not whitelist the selected app")
-        #expect(harness.log.updatedStates.last!.whitelisted == ["test.app.1"], "Cmd+W did not mark the app")
+        #expect(try #require(harness.log.updatedStates.last).whitelisted == ["test.app.1"], "Cmd+W did not mark the app")
 
         harness.press(wKeyCode)
         await letMainQueueRun()
         #expect(!harness.settings.whitelistStore.isListed("test.app.1"), "Second Cmd+W did not take the app off the whitelist")
-        #expect(harness.log.updatedStates.last!.whitelisted.isEmpty, "Second Cmd+W did not unmark the app")
+        #expect(try #require(harness.log.updatedStates.last).whitelisted.isEmpty, "Second Cmd+W did not unmark the app")
         #expect(getFeedbackTexts(harness) == [SwitcherFeedback.addedToWhitelist.text, SwitcherFeedback.removedFromWhitelist.text], "Wrong whitelist feedback")
         await harness.finish()
     }
@@ -188,12 +188,12 @@ struct AppSwitcherOpenPanelTests {
 
     /// Five apps, three to a row, the bottom row of two centered under the top one.
     @Test
-    func arrowsAndSwitchingMoveTheAppSelection() async {
+    func arrowsAndSwitchingMoveTheAppSelection() async throws {
         let harness = AppSwitcherTestHarness(itemCount: 5)
         harness.settings.panelWidthStore.setWidth(Self.threeAppCellWidth)
         harness.press(tabKeyCode)
         await letMainQueueRun()
-        #expect(harness.log.shownStates.last!.list.cellsPerRow == 3, "Panel width did not give three apps to a row")
+        #expect(try #require(harness.log.shownStates.last).list.cellsPerRow == 3, "Panel width did not give three apps to a row")
 
         harness.press(rightArrowKeyCode)
         harness.press(leftArrowKeyCode)
@@ -258,19 +258,19 @@ struct AppSwitcherOpenPanelTests {
     }
 
     @Test
-    func edgeDragRewrapsTheCells() async {
+    func edgeDragRewrapsTheCells() async throws {
         let harness = await openAppSwitcher(itemCount: 5)
-        #expect(harness.log.shownStates.last!.list.cellsPerRow > 3, "Default width already held only three apps to a row")
+        #expect(try #require(harness.log.shownStates.last).list.cellsPerRow > 3, "Default width already held only three apps to a row")
 
         harness.panel.onWidthDragged(Self.threeAppCellWidth)
 
         #expect(harness.settings.panelWidthStore.width == Self.threeAppCellWidth, "Dragged width was not remembered")
         #expect(harness.log.resizedStates.count == 1, "Drag did not resize the panel")
-        #expect(harness.log.resizedStates.last!.list.cellsPerRow == 3, "Drag did not re-wrap the cells")
-        #expect(harness.log.resizedStates.last!.list.selectedIndex == 1, "Drag moved the selection")
+        #expect(try #require(harness.log.resizedStates.last).list.cellsPerRow == 3, "Drag did not re-wrap the cells")
+        #expect(try #require(harness.log.resizedStates.last).list.selectedIndex == 1, "Drag moved the selection")
 
         harness.press(downArrowKeyCode)
-        #expect(harness.log.updatedStates.last!.list.selectedIndex == 3, "Row navigation did not follow the new rows")
+        #expect(try #require(harness.log.updatedStates.last).list.selectedIndex == 3, "Row navigation did not follow the new rows")
         await harness.finish()
     }
 

@@ -70,7 +70,7 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test(arguments: [false, true])
-    func cancelAndReopen(listingWindows: Bool) async {
+    func cancelAndReopen(listingWindows: Bool) async throws {
         let harness = AppSwitcherTestHarness()
         let keyCode = Self.getSwitchingKeyCode(listingWindows: listingWindows)
 
@@ -80,13 +80,13 @@ struct AppSwitcherFeatureTests {
         await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 1, "Canceled work showed an extra panel")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 2, "Canceled presses changed new selection")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 2, "Canceled presses changed new selection")
         harness.expectNoActivation()
         await harness.finish()
     }
 
     @Test(arguments: [false, true])
-    func stopOpeningAndRestart(listingWindows: Bool) async {
+    func stopOpeningAndRestart(listingWindows: Bool) async throws {
         let harness = AppSwitcherTestHarness()
         let keyCode = Self.getSwitchingKeyCode(listingWindows: listingWindows)
 
@@ -100,7 +100,7 @@ struct AppSwitcherFeatureTests {
         await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 1, "Restart opened stale work")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 1, "Restart lost opening selection")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 1, "Restart lost opening selection")
         harness.expectNoActivation()
         await harness.finish()
     }
@@ -133,14 +133,14 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func untrackedAppsFollowTrackedOnes() async {
+    func untrackedAppsFollowTrackedOnes() async throws {
         let harness = AppSwitcherTestHarness()
         harness.workspace.recentProcessIdentifiers = [2, 0]
 
         harness.press(tabKeyCode)
         await letMainQueueRun()
 
-        #expect(harness.log.shownStates.last!.bundleIdentifiers == ["test.app.2", "test.app.0", "test.app.1"])
+        #expect(try #require(harness.log.shownStates.last).bundleIdentifiers == ["test.app.2", "test.app.0", "test.app.1"])
         await harness.finish()
     }
 
@@ -180,7 +180,7 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func staleFilterInNewSession() async {
+    func staleFilterInNewSession() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
@@ -191,13 +191,13 @@ struct AppSwitcherFeatureTests {
         await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 2, "Old filter rebuilt a new session")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 2, "Old filter changed the new selection")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 2, "Old filter changed the new selection")
         #expect(!harness.settings.whitelistStore.isFilterEnabled, "Old filter changed a new session's preference")
         await harness.finish()
     }
 
     @Test
-    func normalFilter() async {
+    func normalFilter() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(tabKeyCode)
@@ -206,14 +206,14 @@ struct AppSwitcherFeatureTests {
         await letMainQueueRun()
 
         #expect(harness.settings.whitelistStore.isFilterEnabled, "Filter was not applied")
-        #expect(harness.log.shownStates.last!.list.selectedIndex == 1, "Filter lost the selected app")
+        #expect(try #require(harness.log.shownStates.last).list.selectedIndex == 1, "Filter lost the selected app")
         #expect(harness.log.feedback.count == 1, "Filter feedback was lost")
         await harness.finish()
     }
 
     /// Running and tracked [test.app.0 #0, test.app.1 #1, test.app.0 #2], #2 selected.
     @Test
-    func filterKeepsTheSelectedInstance() async {
+    func filterKeepsTheSelectedInstance() async throws {
         let harness = AppSwitcherTestHarness(itemCount: 2)
         let secondInstance = harness.workspace.buildApp(index: 2)
         secondInstance.bundleIdentifier = "test.app.0"
@@ -226,7 +226,7 @@ struct AppSwitcherFeatureTests {
         harness.press(fKeyCode)
         await letMainQueueRun()
 
-        #expect(harness.log.shownStates.last!.list.selectedApp.processIdentifier == 2, "Filter moved the selection to another instance")
+        #expect(try #require(harness.log.shownStates.last).list.selectedApp.processIdentifier == 2, "Filter moved the selection to another instance")
         await harness.finish()
     }
 
@@ -342,7 +342,7 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func committedWindowActivationBeforeNextSession() async {
+    func committedWindowActivationBeforeNextSession() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
@@ -352,7 +352,7 @@ struct AppSwitcherFeatureTests {
         await letMainQueueRun()
 
         harness.expectActivation(listingWindows: true, selection: 1)
-        #expect(!harness.log.shownStates.last!.list.isListingWindows, "Committed window activation changed the new list")
+        #expect(try !#require(harness.log.shownStates.last).list.isListingWindows, "Committed window activation changed the new list")
         await harness.finish()
     }
 
@@ -373,7 +373,7 @@ struct AppSwitcherFeatureTests {
     }
 
     @Test
-    func staleThumbnailInNewSession() async {
+    func staleThumbnailInNewSession() async throws {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
@@ -387,12 +387,12 @@ struct AppSwitcherFeatureTests {
         harness.screen.thumbnailRequests[1].onCaptured(1, newThumbnail)
         oldCapture.onCaptured(1, NSImage(size: NSSize(width: 1, height: 1)))
         #expect(harness.log.updatedStates.count == 1, "Old thumbnail redrew a new session")
-        #expect(harness.log.updatedStates.last!.thumbnails[1] === newThumbnail, "Old thumbnail replaced the new capture")
+        #expect(try #require(harness.log.updatedStates.last).thumbnails[1] === newThumbnail, "Old thumbnail replaced the new capture")
 
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(graveKeyCode)
         await letMainQueueRun()
-        #expect(harness.log.shownStates.last!.thumbnails[1] === newThumbnail, "Accepted thumbnail was not cached")
+        #expect(try #require(harness.log.shownStates.last).thumbnails[1] === newThumbnail, "Accepted thumbnail was not cached")
         await harness.finish()
     }
 
