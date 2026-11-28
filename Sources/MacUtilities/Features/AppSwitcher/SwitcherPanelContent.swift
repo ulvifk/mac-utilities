@@ -74,7 +74,7 @@ final class SwitcherPanelContent {
         let layout = layout
 
         switch state.list.items {
-        case .apps(let apps, _):
+        case .apps(let apps, _, _):
             showAppStatus(apps, layout: layout)
         case .windows(let windows, _):
             showWindowStatus(windows)
@@ -193,9 +193,9 @@ final class SwitcherPanelContent {
         var cells: [SwitcherCellView] = []
 
         switch state.list.items {
-        case .apps(let apps, _):
+        case .apps(let apps, _, let badges):
             for (index, app) in apps.enumerated() {
-                cells.append(buildIconCell(app: app, index: index))
+                cells.append(buildIconCell(app: app, badgeText: badges[app.processIdentifier], index: index))
             }
         case .windows(let windows, let app):
             for (index, window) in windows.enumerated() {
@@ -212,8 +212,8 @@ final class SwitcherPanelContent {
         return cells
     }
 
-    private func buildIconCell(app: SwitcherApp, index: Int) -> SwitcherCellView {
-        let cell = IconCellView(app: app, cardGlass: state.cardGlass)
+    private func buildIconCell(app: SwitcherApp, badgeText: String?, index: Int) -> SwitcherCellView {
+        let cell = IconCellView(app: app, badgeText: badgeText, cardGlass: state.cardGlass)
 
         cell.showStatus(app: app, whitelisted: isWhitelisted(app), isFiltered: state.list.items.isWhitelistOnly, dimHiddenApps: state.dimHiddenApps)
         cell.card.showSelected(index == state.list.selectedIndex)

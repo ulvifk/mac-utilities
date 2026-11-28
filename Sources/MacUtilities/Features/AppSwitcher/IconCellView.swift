@@ -1,12 +1,14 @@
 import AppKit
 import CoreImage
 
-/// An app icon with its card and whitelist marker.
+/// An app icon with its card, whitelist marker and Dock badge.
 final class IconCellView: SwitcherCellView {
     let icon = NSImageView()
     let dot = NSView()
+    /// Nil for an app without a badge.
+    private var dockBadge: DockBadgeView?
 
-    convenience init(app: SwitcherApp, cardGlass: GlassStore?) {
+    convenience init(app: SwitcherApp, badgeText: String?, cardGlass: GlassStore?) {
         self.init(frame: .zero)
 
         card.frame = alignToPixels(iconCardFrameInCell)
@@ -26,6 +28,11 @@ final class IconCellView: SwitcherCellView {
         addSubview(card)
         addSubview(icon)
         addSubview(dot)
+        if let badgeText {
+            let badge = buildDockBadge(text: badgeText)
+            addSubview(badge)
+            dockBadge = badge
+        }
 
         card.updateGlass(cardGlass)
     }
@@ -35,6 +42,7 @@ final class IconCellView: SwitcherCellView {
         if dimHiddenApps {
             icon.alphaValue = app.isHidden ? hiddenIconAlpha : 1
         }
+        dockBadge?.alphaValue = icon.alphaValue
 
         if isFiltered {
             dot.isHidden = true
@@ -44,6 +52,18 @@ final class IconCellView: SwitcherCellView {
 
         dot.isHidden = !whitelisted
         icon.contentFilters = []
+    }
+
+    /// Its top-right corner on the highlight's.
+    private func buildDockBadge(text: String) -> DockBadgeView {
+        let badge = DockBadgeView(text: text)
+        let size = badge.frame.size
+
+        badge.frame = alignToPixels(NSRect(
+            x: iconCardFrameInCell.maxX - size.width, y: iconCardFrameInCell.maxY - size.height, width: size.width, height: size.height
+        ))
+
+        return badge
     }
 
     private func buildGrayscaleFilter() -> CIFilter {

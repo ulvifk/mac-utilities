@@ -28,7 +28,7 @@ struct SwitcherList {
 
     /// Only asked while apps are listed.
     var selectedApp: SwitcherApp {
-        guard case .apps(let apps, _) = items else { preconditionFailure("Windows are listed") }
+        guard case .apps(let apps, _, _) = items else { preconditionFailure("Windows are listed") }
 
         return apps[selectedIndex]
     }
@@ -57,17 +57,19 @@ struct SwitcherList {
         return SwitcherList(items: items, cellsPerRow: cellsPerRow, selectedIndex: selectedIndex)
     }
 
-    /// The selection stays on its app; when that is the one removed, it moves to the next, or to the new last app when it was the last.
-    /// Removing the only app leaves an empty list.
+    /// The selection stays on its app; when that is the one removed, it moves to the next, or to the new last app when it was the last. The
+    /// removed app's badge goes with it. Removing the only app leaves an empty list.
     func removingApp(at index: Int) -> SwitcherList {
-        guard case .apps(let apps, let whitelistOnly) = items else { preconditionFailure("Windows are listed") }
+        guard case .apps(let apps, let whitelistOnly, let badges) = items else { preconditionFailure("Windows are listed") }
 
         var remainingApps = apps
-        remainingApps.remove(at: index)
+        let removedApp = remainingApps.remove(at: index)
+        var remainingBadges = badges
+        remainingBadges[removedApp.processIdentifier] = nil
         let shiftedIndex = index < selectedIndex ? selectedIndex - 1 : selectedIndex
 
         return SwitcherList(
-            items: .apps(remainingApps, whitelistOnly: whitelistOnly),
+            items: .apps(remainingApps, whitelistOnly: whitelistOnly, badges: remainingBadges),
             cellsPerRow: cellsPerRow,
             selectedIndex: max(0, min(shiftedIndex, remainingApps.count - 1))
         )
@@ -75,7 +77,7 @@ struct SwitcherList {
 
     /// The app with this process identifier, or the first app when it is not listed.
     func selectingApp(processIdentifier: pid_t) -> SwitcherList {
-        guard case .apps(let apps, _) = items else { preconditionFailure("Windows are listed") }
+        guard case .apps(let apps, _, _) = items else { preconditionFailure("Windows are listed") }
 
         return selecting(apps.firstIndex { $0.processIdentifier == processIdentifier } ?? 0)
     }

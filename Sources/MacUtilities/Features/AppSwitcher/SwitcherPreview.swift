@@ -2,8 +2,8 @@ import AppKit
 import Combine
 
 /// The switcher drawn live beside the settings pane while Show preview is checked and the pane has focus, listing as the switcher would. It
-/// keeps its list and views while only the look changes, loads afresh when the mode or the whitelist changes, and steps aside while the
-/// switcher is up.
+/// keeps its list and views while only the look changes, loads afresh when the mode, the whitelist or the Dock badges switch changes, and
+/// steps aside while the switcher is up.
 final class SwitcherPreview {
     private let panel: SwitcherPanel
     private let settings: SwitcherSettings
@@ -33,6 +33,7 @@ final class SwitcherPreview {
             observeSettingsFocusChanges(),
             observeChanges(of: settings.whitelistStore, reloadingList: true),
             observeChanges(of: settings.appearanceStore),
+            observeChanges(of: settings.dockBadgeStore, reloadingList: true),
             observeChanges(of: settings.appGlassStore),
             observeChanges(of: settings.windowGlassStore),
             observeChanges(of: settings.appCardStore),

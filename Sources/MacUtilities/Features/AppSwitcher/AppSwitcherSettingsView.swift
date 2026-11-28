@@ -17,11 +17,12 @@ private let appShortcuts: [(String, [[String]])] = [
     ("Batch Quit", [["⇧", "⌘", "Q"]]),
 ]
 
-/// Settings for filtering, glass, app and window cards, Batch Quit, and shortcuts.
+/// Settings for filtering, glass, app and window cards, Dock badges, Batch Quit, and shortcuts.
 struct AppSwitcherSettingsView: View {
     @ObservedObject private var whitelistStore: WhitelistStore
     @ObservedObject private var batchQuitStore: BatchQuitStore
     @ObservedObject private var appearanceStore: SwitcherAppearanceStore
+    @ObservedObject private var dockBadgeStore: DockBadgeStore
     private let appGlassStore: GlassStore
     private let windowGlassStore: GlassStore
     @ObservedObject private var appCardStore: SwitcherCardStore
@@ -36,6 +37,7 @@ struct AppSwitcherSettingsView: View {
         whitelistStore = settings.whitelistStore
         batchQuitStore = settings.batchQuitStore
         appearanceStore = settings.appearanceStore
+        dockBadgeStore = settings.dockBadgeStore
         appGlassStore = settings.appGlassStore
         windowGlassStore = settings.windowGlassStore
         appCardStore = settings.appCardStore
@@ -59,6 +61,7 @@ struct AppSwitcherSettingsView: View {
 
         Section {
             Toggle("Dim hidden apps", isOn: buildDimHiddenAppsBinding())
+            Toggle("Show Dock badges", isOn: buildDockBadgesBinding())
             Toggle("Show preview", isOn: $previewStore.isShown)
                 .toggleStyle(.checkbox)
             Picker("Preview", selection: $previewStore.isListingWindows) {
@@ -78,7 +81,7 @@ struct AppSwitcherSettingsView: View {
         } header: {
             Text("Glass")
         } footer: {
-            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Show preview shows the full switcher while this pane has focus.")
+            Text("Clear shows what is behind the panel, Frosted blurs it away; the slider darkens the tint. Dock badges show the count an app's Dock icon shows, read when the switcher opens. Show preview shows the full switcher while this pane has focus.")
         }
 
         Section {
@@ -153,6 +156,13 @@ struct AppSwitcherSettingsView: View {
         return Binding(
             get: { appearanceStore.dimHiddenApps },
             set: { appearanceStore.setDimHiddenApps($0) }
+        )
+    }
+
+    private func buildDockBadgesBinding() -> Binding<Bool> {
+        return Binding(
+            get: { dockBadgeStore.showsBadges },
+            set: { dockBadgeStore.setShowsBadges($0) }
         )
     }
 

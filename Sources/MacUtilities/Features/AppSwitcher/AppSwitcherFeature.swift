@@ -90,7 +90,7 @@ final class AppSwitcherFeature: Feature {
         guard case .open(let list) = phase else { return }
 
         switch list.items {
-        case .apps(let apps, _):
+        case .apps(let apps, _, _):
             guard let index = apps.firstIndex(where: { $0.processIdentifier == processIdentifier }) else { return }
             removeApp(at: index, from: list)
         case .windows(_, let app):
@@ -360,7 +360,7 @@ final class AppSwitcherFeature: Feature {
 
             // Dismissal queues preview restoration after the window raise.
             dismissSwitcher()
-        case .apps(let apps, _):
+        case .apps(let apps, _, _):
             dismissSwitcher()
             apps[list.selectedIndex].activate()
         }

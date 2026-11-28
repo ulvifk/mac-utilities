@@ -1,4 +1,4 @@
-import Darwin
+import Foundation
 
 /// The running apps and their windows as the system has them, and the changes to them the switcher follows.
 protocol SwitcherWorkspace {
@@ -17,4 +17,7 @@ protocol SwitcherWorkspace {
     func getWindows(of app: SwitcherApp) -> [SwitcherWindow]
     /// Asks the apps Batch Quit targets to quit; returns how many were asked.
     func runBatchQuit() -> Int
+    /// [bundle URL] -> the badge text the Dock shows on the app's item, verbatim, e.g. "3", "12" or "•". Apps without a Dock item or a badge
+    /// are left out, and every app is when the Dock cannot be read.
+    func getDockBadges() -> [URL: String]
 }

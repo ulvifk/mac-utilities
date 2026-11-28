@@ -6,7 +6,8 @@ let smokeCapturePath = "/tmp/app-switcher-smoke.png"
 /// Colorful window behind the panel, so the capture shows what the glass is blurring. APP_SWITCHER_SMOKE_DARK=1 makes it a dark gray-blue instead.
 var captureBackdrop: NSWindow?
 
-/// Opens a switcher panel once without a keyboard, prints its geometry, captures it to smokeCapturePath once the hints have come in and exits:
+/// Opens a switcher panel once without a keyboard, prints its geometry, the Dock badges and how long one read of the Dock takes, captures it to
+/// smokeCapturePath once the hints have come in and exits:
 /// - APP_SWITCHER_SMOKE_INDEX picks the selected item, 1 by default
 /// - APP_SWITCHER_SMOKE_FILTER=1 or 0 writes the filter preference first
 /// - APP_SWITCHER_SMOKE_WINDOWS=1 lists the frontmost app's windows instead of the apps
@@ -20,6 +21,9 @@ final class AppSwitcherSmokeTest {
 
     /// The shown one; nil until the panel shows.
     private var list: SwitcherList?
+    /// Of a read of the Dock just before the list is loaded, whether the badges are switched on or not.
+    private var dockBadges: [URL: String] = [:]
+    private var dockReadMilliseconds = 0.0
     /// Never renewed: the smoke test exits once it has captured the panel.
     private let session = SwitcherSession()
 
@@ -47,6 +51,10 @@ final class AppSwitcherSmokeTest {
 
     private func showPanel() {
         let listingWindows = environment["APP_SWITCHER_SMOKE_WINDOWS"] == "1"
+        let dockReadStart = Date()
+        dockBadges = workspace.getDockBadges()
+        dockReadMilliseconds = Date().timeIntervalSince(dockReadStart) * 1000
+
         let loadedList = listingWindows ? listLoader.loadWindowList(of: workspace.getFrontmostApp()) : listLoader.loadAppList()
         let list = loadedList.selecting(Int(environment["APP_SWITCHER_SMOKE_INDEX"] ?? "1")!)
 
@@ -62,14 +70,21 @@ final class AppSwitcherSmokeTest {
     private func printAndCapturePanel() {
         let list = list!
         var appNames: [String] = []
+        var listedBadges: [String: String] = [:] // [app name] -> its badge as listed
         var windowTitles: [String] = []
         switch list.items {
-        case .apps(let apps, _): appNames = apps.map { $0.name }
-        case .windows(let windows, _): windowTitles = windows.map { $0.title }
+        case .apps(let apps, _, let badges):
+            appNames = apps.map { $0.name }
+            for app in apps {
+                listedBadges[app.name] = badges[app.processIdentifier]
+            }
+        case .windows(let windows, _):
+            windowTitles = windows.map { $0.title }
         }
 
         print("smoke: frame=\(panel.frame) visible=\(panel.isVisible) alpha=\(panel.alphaValue) apps=\(appNames.count) windows=\(windowTitles.count) selected=\(list.selectedIndex)")
         print("smoke: candidates=\(appNames) windows=\(windowTitles) thumbnails=\(thumbnailCache.thumbnails.count)")
+        print("smoke: dockBadges=\(dockBadges) dockReadMs=\(String(format: "%.1f", dockReadMilliseconds)) showsBadges=\(settings.dockBadgeStore.showsBadges) listedBadges=\(listedBadges)")
         writeCapture(around: panel, path: smokeCapturePath)
     }
 

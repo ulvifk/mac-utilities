@@ -5,6 +5,7 @@ struct SwitcherSettings {
     let whitelistStore: WhitelistStore
     let batchQuitStore: BatchQuitStore
     let appearanceStore: SwitcherAppearanceStore
+    let dockBadgeStore: DockBadgeStore
     let appGlassStore: GlassStore
     let windowGlassStore: GlassStore
     let appCardStore: SwitcherCardStore

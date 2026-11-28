@@ -60,4 +60,8 @@ final class SystemSwitcherWorkspace: SwitcherWorkspace {
     func runBatchQuit() -> Int {
         return MacUtilities.runBatchQuit(batchQuitStore)
     }
+
+    func getDockBadges() -> [URL: String] {
+        return MacUtilities.getDockBadges()
+    }
 }

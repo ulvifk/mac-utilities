@@ -39,7 +39,7 @@ final class SwitcherListTests {
 
     @Test
     func removingTheOnlyAppLeavesAnEmptyList() {
-        let list = SwitcherList(items: .apps([workspace.buildApp(index: 0)], whitelistOnly: true), cellsPerRow: 1)
+        let list = SwitcherList(items: .apps([workspace.buildApp(index: 0)], whitelistOnly: true, badges: [:]), cellsPerRow: 1)
 
         let remaining = list.removingApp(at: 0)
 
@@ -161,24 +161,101 @@ final class SwitcherListTests {
         #expect(list.cellsPerRow == 2)
     }
 
+    // MARK: Dock badges
+
+    /// test.app.1 and test.app.3 have no badged Dock item, and a Dock item of an app that is not running matches nothing.
+    @Test
+    func loadsEachAppsDockBadgeByBundleURL() {
+        workspace.dockBadges = [
+            getBundleURL(ofAppAt: 0): "3",
+            getBundleURL(ofAppAt: 2): "•",
+            getBundleURL(ofAppAt: 4): "12",
+            URL(fileURLWithPath: "/Applications/Not Running.app", isDirectory: true): "9",
+        ]
+
+        let list = buildLoader(defaults: testDefaults.buildUserDefaults()).loadAppList()
+
+        #expect(list.appBadges == [0: "3", 2: "•", 4: "12"])
+        #expect(workspace.dockBadgeQueryCount == 1)
+    }
+
+    @Test
+    func eachInstanceOfAnAppGetsItsBundlesBadge() {
+        let secondInstance = workspace.buildApp(index: 5)
+        secondInstance.bundleIdentifier = "test.app.1"
+        secondInstance.bundleURL = getBundleURL(ofAppAt: 1)
+        workspace.runningApps.append(secondInstance)
+        workspace.dockBadges = [getBundleURL(ofAppAt: 1): "2"]
+
+        let list = buildLoader(defaults: testDefaults.buildUserDefaults()).loadAppList()
+
+        #expect(list.appBadges == [1: "2", 5: "2"])
+    }
+
+    @Test
+    func filteredListHasTheListedAppsBadges() {
+        let defaults = testDefaults.buildUserDefaults()
+        let whitelistStore = WhitelistStore(defaults: defaults)
+        whitelistStore.setListed("test.app.2", true)
+        whitelistStore.setFilterEnabled(true)
+        workspace.dockBadges = [getBundleURL(ofAppAt: 0): "3", getBundleURL(ofAppAt: 2): "•"]
+
+        let list = buildLoader(defaults: defaults).loadAppList()
+
+        #expect(list.appBadges == [2: "•"])
+    }
+
+    @Test
+    func badgesSwitchedOffDoNotAskTheDock() {
+        let defaults = testDefaults.buildUserDefaults()
+        DockBadgeStore(defaults: defaults).setShowsBadges(false)
+        workspace.dockBadges = [getBundleURL(ofAppAt: 0): "3"]
+
+        let list = buildLoader(defaults: defaults).loadAppList()
+
+        #expect(list.appBadges.isEmpty)
+        #expect(workspace.dockBadgeQueryCount == 0, "Switched-off badges read the Dock")
+    }
+
+    @Test
+    func windowListDoesNotAskTheDock() {
+        workspace.dockBadges = [getBundleURL(ofAppAt: 0): "3"]
+
+        let list = buildLoader(defaults: testDefaults.buildUserDefaults()).loadWindowList(of: workspace.runningApps[0])
+
+        #expect(list.appBadges.isEmpty)
+        #expect(workspace.dockBadgeQueryCount == 0, "Listing windows read the Dock")
+    }
+
+    @Test
+    func removingAnAppTakesItsBadgeAlong() {
+        let list = SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false, badges: [0: "3", 1: "5", 2: "•"]), cellsPerRow: 5)
+
+        #expect(list.removingApp(at: 1).appBadges == [0: "3", 2: "•"])
+    }
+
     // MARK: helpers
 
+    private func getBundleURL(ofAppAt index: Int) -> URL {
+        return URL(fileURLWithPath: "/Applications/Test \(index).app", isDirectory: true)
+    }
+
     private func buildAppList(cellsPerRow: Int) -> SwitcherList {
-        return SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false), cellsPerRow: cellsPerRow)
+        return SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false, badges: [:]), cellsPerRow: cellsPerRow)
     }
 
     private func buildLoader(defaults: UserDefaults) -> SwitcherListLoader {
         return SwitcherListLoader(workspace: workspace, screen: SwitcherFakeScreen(), whitelistStore: WhitelistStore(defaults: defaults),
-                                  panelWidthStore: PanelWidthStore(defaults: defaults))
+                                  panelWidthStore: PanelWidthStore(defaults: defaults), dockBadgeStore: DockBadgeStore(defaults: defaults))
     }
 
     private func getBundleIdentifiers(_ list: SwitcherList) -> [String] {
-        guard case .apps(let apps, _) = list.items else { return [] }
+        guard case .apps(let apps, _, _) = list.items else { return [] }
         return apps.map { $0.bundleIdentifier }
     }
 
     private func getProcessIdentifiers(_ list: SwitcherList) -> [pid_t] {
-        guard case .apps(let apps, _) = list.items else { return [] }
+        guard case .apps(let apps, _, _) = list.items else { return [] }
         return apps.map { $0.processIdentifier }
     }
 }

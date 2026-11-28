@@ -6,19 +6,23 @@ final class SwitcherListLoader {
     private let screen: SwitcherScreen
     private let whitelistStore: WhitelistStore
     private let panelWidthStore: PanelWidthStore
+    private let dockBadgeStore: DockBadgeStore
 
-    init(workspace: SwitcherWorkspace, screen: SwitcherScreen, whitelistStore: WhitelistStore, panelWidthStore: PanelWidthStore) {
+    init(workspace: SwitcherWorkspace, screen: SwitcherScreen, whitelistStore: WhitelistStore, panelWidthStore: PanelWidthStore,
+         dockBadgeStore: DockBadgeStore) {
         self.workspace = workspace
         self.screen = screen
         self.whitelistStore = whitelistStore
         self.panelWidthStore = panelWidthStore
+        self.dockBadgeStore = dockBadgeStore
     }
 
-    /// The running apps by recency; while the filter is on only the whitelisted ones, unless none of them has a window.
+    /// The running apps by recency, with their Dock badges; while the filter is on only the whitelisted ones, unless none of them has a window.
     func loadAppList() -> SwitcherList {
         let apps = getRunningAppsByRecency()
         let whitelistedApps = getWhitelistedApps(apps)
-        let items = whitelistedApps.isEmpty ? SwitcherItems.apps(apps, whitelistOnly: false) : .apps(whitelistedApps, whitelistOnly: true)
+        let listedApps = whitelistedApps.isEmpty ? apps : whitelistedApps
+        let items = SwitcherItems.apps(listedApps, whitelistOnly: !whitelistedApps.isEmpty, badges: getAppBadges(listedApps))
 
         return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items))
     }
@@ -58,6 +62,22 @@ final class SwitcherListLoader {
         let panelWidth = panelWidthStore.width ?? screenSize.width * defaultPanelWidthFraction
 
         return getCellMetrics(listingWindows: items.isListingWindows).getCellsPerRow(itemCount: items.count, panelWidth: panelWidth, screenSize: screenSize)
+    }
+
+    /// [processIdentifier] -> the badge the Dock shows for the app's bundle, for the apps that have one; each instance of an app gets the one
+    /// badge of its bundle. Empty while the badges are switched off, without asking the Dock.
+    private func getAppBadges(_ apps: [SwitcherApp]) -> [pid_t: String] {
+        if !dockBadgeStore.showsBadges { return [:] }
+
+        let dockBadges = workspace.getDockBadges()
+        var appBadges: [pid_t: String] = [:]
+        for app in apps {
+            guard let bundleURL = app.bundleURL else { continue }
+            guard let badge = dockBadges[bundleURL] else { continue }
+            appBadges[app.processIdentifier] = badge
+        }
+
+        return appBadges
     }
 
     /// Empty while the filter is off.

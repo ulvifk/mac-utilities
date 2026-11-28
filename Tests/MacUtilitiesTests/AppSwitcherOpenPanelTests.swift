@@ -287,6 +287,40 @@ struct AppSwitcherOpenPanelTests {
         await harness.finish()
     }
 
+    // MARK: Dock badges
+
+    /// Read once, on the main-queue turn that loads the list, not on the tap callback.
+    @Test
+    func openingReadsTheDockBadgesOnce() async throws {
+        let harness = AppSwitcherTestHarness()
+        harness.workspace.dockBadges = [try #require(harness.workspace.runningApps[1].bundleURL): "4"]
+
+        harness.press(tabKeyCode)
+        #expect(harness.workspace.dockBadgeQueryCount == 0, "The tap callback read the Dock")
+        await letMainQueueRun()
+        harness.press(tabKeyCode)
+        await letMainQueueRun()
+
+        #expect(try #require(harness.log.shownStates.last).list.appBadges == [1: "4"], "Shown state lacks the Dock badge")
+        #expect(try #require(harness.log.updatedStates.last).list.appBadges == [1: "4"], "Moving the selection lost the Dock badge")
+        #expect(harness.workspace.dockBadgeQueryCount == 1, "The Dock was read more than once for one opening")
+        await harness.finish()
+    }
+
+    @Test
+    func switchedOffBadgesDoNotReadTheDock() async throws {
+        let harness = AppSwitcherTestHarness()
+        harness.workspace.dockBadges = [try #require(harness.workspace.runningApps[1].bundleURL): "4"]
+        harness.settings.dockBadgeStore.setShowsBadges(false)
+
+        harness.press(tabKeyCode)
+        await letMainQueueRun()
+
+        #expect(try #require(harness.log.shownStates.last).list.appBadges.isEmpty, "Switched-off badges were shown")
+        #expect(harness.workspace.dockBadgeQueryCount == 0, "Switched-off badges read the Dock")
+        await harness.finish()
+    }
+
     // MARK: helpers
 
     /// Cmd+Tab, or Cmd+Shift+Tab, with the panel up on the apps.
