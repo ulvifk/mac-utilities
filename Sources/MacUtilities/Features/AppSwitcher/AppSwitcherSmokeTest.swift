@@ -73,10 +73,10 @@ final class AppSwitcherSmokeTest {
         var listedBadges: [String: String] = [:] // [app name] -> its badge as listed
         var windowTitles: [String] = []
         switch list.items {
-        case .apps(let apps, _):
+        case .apps(let apps, _, let badges):
             appNames = apps.map { $0.name }
             for app in apps {
-                listedBadges[app.name] = list.appBadges[app.processIdentifier]
+                listedBadges[app.name] = badges[app.processIdentifier]
             }
         case .windows(let windows, _):
             windowTitles = windows.map { $0.title }

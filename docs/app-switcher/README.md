@@ -10,21 +10,21 @@ It also replaces Cmd+`, the native "next window of the same app", with the same 
 listing the frontmost app's windows as thumbnails; see [Windows](#windows). With the
 feature off, Cmd+` behaves as macOS has it.
 
-The App Switcher pane of the settings window toggles the filter, manages the
-whitelist, switches the Dock badges on or off, picks the panel's glass (Clear or Frosted, and a slider from light to
-dark for its black tint) in one row for the apps and one for the windows, switches the
-cards around apps and windows on or off and picks each kind's own look and darkness,
-sets up Batch Quit and runs it, and lists the in-switcher shortcuts as keycaps, the
-switching ones apart from the ones acting on apps. Each section has a line under it
-saying what its settings mean. The whitelist and the Batch Quit list
-are each picked with a button counting their listed apps that are running; it opens a
-checklist of the running regular apps (for Batch Quit all but Finder), the ones
-listed at that moment on top above a divider, which stays open while several are
-checked and keeps its rows in place meanwhile. A listed app that is not running stays
-on its list but only shows in the checklist while it runs. Batch Quit quits either
-the listed apps or the unlisted ones, set with Quit: Listed apps / Unlisted apps, its
-list's row named "Apps to quit" or "Apps to keep" by the mode. Changes made there and
-with the shortcuts below show up in each other on the spot.
+The App Switcher pane of the settings window toggles the filter, manages the whitelist,
+switches the Dock badges on or off, picks the panel's glass (Clear or Frosted, and a
+slider from light to dark for its black tint) in one row for the apps and one for the
+windows, switches the cards around apps and windows on or off and picks each kind's own
+look and darkness, sets up Batch Quit and runs it, and lists the in-switcher shortcuts
+as keycaps, the switching ones apart from the ones acting on apps. Each section has a
+line under it saying what its settings mean. The whitelist and the Batch Quit list are
+each picked with a button counting their listed apps that are running; it opens a
+checklist of the running regular apps (for Batch Quit all but Finder), the ones listed
+at that moment on top above a divider, which stays open while several are checked and
+keeps its rows in place meanwhile. A listed app that is not running stays on its list
+but only shows in the checklist while it runs. Batch Quit quits either the listed apps
+or the unlisted ones, set with Quit: Listed apps / Unlisted apps, its list's row named
+"Apps to quit" or "Apps to keep" by the mode. Changes made there and with the shortcuts
+below show up in each other on the spot.
 
 While the feature is on, the menu bar popover has a Batch Quit tile too, named Quit
 Listed Apps or Quit Unlisted Apps by the mode. Clicking it runs Batch Quit; for 1.2
@@ -90,15 +90,17 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
   not saved across launches.
 - An app whose Dock icon has a badge shows the same text, as the Dock reports it ("3",
   "12", "•"), in a red capsule at its icon's top right: a circle for one character,
-  wider for more, and cut off with an ellipsis past about four digits. Each instance of
-  an app shows the badge of its bundle. Apps not in the Dock, and windows, have none.
-  The badges are read once each time the apps are listed (Cmd+Tab, Cmd+F, the
-  preview), not followed while the switcher is open. The badge dims with a hidden app's
-  icon but stays red when the icon turns gray, and stays while only the whitelist is
-  listed. "Show Dock badges" in settings defaults to on; with it off the Dock is not
-  read at all. If the Dock cannot be read (not running or restarting, Accessibility not
-  granted, or no answer within 0.2 seconds) the switcher opens without badges and logs
-  the failure.
+  wider for more, and cut off with an ellipsis past about four digits. Two running
+  instances of an app have a Dock item each with the same bundle URL, so both show the
+  badge of whichever item is read last. Apps not in the Dock, and windows, have none.
+  The badges are read once each time the apps are listed (Cmd+Tab, Cmd+F, the preview),
+  not followed while the switcher is open. The badge dims with a hidden app's icon but
+  stays red when the icon turns gray, and stays while only the whitelist is listed.
+  "Show Dock badges" in settings defaults to on; with it off neither the switcher nor
+  the preview reads the Dock. Only the Dock's app items are asked. If the Dock cannot be
+  read (not running or restarting, Accessibility not granted, a question left unanswered
+  for 0.1 seconds, or the whole read taking longer than 0.2 seconds) the switcher opens
+  without badges and logs the failure.
 - While only the whitelist is listed, a green "Whitelist" capsule sits above the top
   row. When the filter is on but no whitelisted app is running, every app is listed
   and the panel looks as with the filter off.
@@ -217,40 +219,38 @@ Filter on, only the whitelist, the Whitelist capsule above the icons:
 - `SwitcherPreview` is the live preview beside the settings pane: it follows the
   settings stores, the settings window's focus and the checkbox, and steps aside while
   the switcher is up. `WindowThumbnailCache` keeps the thumbnails both share.
-- The system is reached through `SwitcherWorkspace` (running apps, the activation
-  order, windows, Batch Quit, the Dock's badges, and quit/hide notifications), `SwitcherScreen` (the
-  visible size and thumbnail capture) and `SwitcherPanel`, with `SwitcherApp` and
+- The system is reached through `SwitcherWorkspace` (running apps, the activation order,
+  windows, Batch Quit, the Dock's badges, and quit/hide notifications), `SwitcherScreen`
+  (the visible size and thumbnail capture) and `SwitcherPanel`, with `SwitcherApp` and
   `SwitcherWindow` as the switcher's own notion of an app and a window. The real ones
   are `SystemSwitcherWorkspace` (NSWorkspace, `RecentAppsTracker`, `RunningApps.swift`,
   `SpaceWindows.swift` asking the window server for the open windows on other Spaces,
-  `AppWindows.swift` listing an app's windows as `AppWindow`s through the
-  accessibility API, and `DockBadges.swift` reading the `AXStatusLabel` and `AXURL` of
-  each item in the Dock's `AXList`), `SystemSwitcherScreen` (ScreenCaptureKit), `GlassSwitcherPanel`
-  and `RunningApp`.
+  `AppWindows.swift` listing an app's windows as `AppWindow`s through the accessibility
+  API, and `DockBadges.swift` reading the `AXStatusLabel` and `AXURL` of each
+  `AXApplicationDockItem` in the Dock's `AXList`), `SystemSwitcherScreen`
+  (ScreenCaptureKit), `GlassSwitcherPanel` and `RunningApp`.
 - `GlassSwitcherPanel` is the window: it orders itself in and out, places itself
   (`getPreviewFrame` beside settings) and grows for the hint band. What it draws is a
   `SwitcherPanelContent`, which builds and updates the views from a `SwitcherState`
   without needing a window: a `SwitcherContentView` laid out from the top down by
   `SwitcherLayout`, `IconCellView` (with a `DockBadgeView` for a badged app) or
   `WindowCellView` (both `SwitcherCellView`s with a `SwitcherCardView`),
-  `WhitelistBadgeView`, the `ResizeHandleView` strips and
-  `HintBandView`, which shows the `ShortcutHint`s and, for a moment after a shortcut,
-  its `SwitcherFeedback`. Sizes and colours are in `SwitcherMetrics`; the ones that
-  differ between icon and window cells in `SwitcherCellMetrics`.
-  `BackgroundCursor.swift` lets the panel show the resize cursor while the app is
-  inactive.
+  `WhitelistBadgeView`, the `ResizeHandleView` strips and `HintBandView`, which shows
+  the `ShortcutHint`s and, for a moment after a shortcut, its `SwitcherFeedback`. Sizes
+  and colours are in `SwitcherMetrics`; the ones that differ between icon and window
+  cells in `SwitcherCellMetrics`. `BackgroundCursor.swift` lets the panel show the
+  resize cursor while the app is inactive.
 - `SwitcherSettings` groups the stores, all in UserDefaults except the preview's:
   `WhitelistStore` (filter switch and whitelist), `BatchQuitStore` (list and mode),
   `SwitcherAppearanceStore` (hidden-app dimming), `DockBadgeStore` (the Dock badges
-  switch), one `GlassStore` each for the app and
-  window panels and their cards, a `SwitcherCardStore` per list's cards switch,
-  `PanelWidthStore` (dragged width) and `SwitcherPreviewStore` (the transient preview
-  checkbox and mode). `AppSwitcherSettingsView` draws the settings pane from them, with
-  `GlassSettingsRow`, an `AppListPicker` per app list, the running apps from
-  `RunningRegularApps` and the shared `KeycapsView`. `BatchQuitTile` is the popover tile,
-  its feedback held in a `BatchQuitTileState`; `BackgroundJobs.swift` removes the quit
-  apps' own launchd jobs after a Batch Quit, finding them with `lsappinfo` and removing
-  them with `launchctl`.
+  switch), one `GlassStore` each for the app and window panels and their cards, a
+  `SwitcherCardStore` per list's cards switch, `PanelWidthStore` (dragged width) and
+  `SwitcherPreviewStore` (the transient preview checkbox and mode).
+  `AppSwitcherSettingsView` draws the settings pane from them, with `GlassSettingsRow`,
+  an `AppListPicker` per app list, the running apps from `RunningRegularApps` and the
+  shared `KeycapsView`. `BatchQuitTile` is the popover tile, its feedback held in a
+  `BatchQuitTileState`; `BackgroundJobs.swift` removes the quit apps' own launchd jobs
+  after a Batch Quit, finding them with `lsappinfo` and removing them with `launchctl`.
 
 `Tests/MacUtilitiesTests/` test it in-process: `AppSwitcherFeatureTests`,
 `AppSwitcherKeyRoutingTests` (which presses are swallowed in each phase),
@@ -264,9 +264,9 @@ panel class is not `final` for this), and draw the rest into a `SwitcherPanelCon
 
 ## Dev
 
-Open the panel once without a keyboard, print its geometry, the Dock badges and how
-long one read of the Dock took, capture it to
-`/tmp/app-switcher-smoke.png` once the hints have come in and exit:
+Open the panel once without a keyboard, print its geometry, the Dock badges and how long
+one read of the Dock took, capture it to `/tmp/app-switcher-smoke.png` once the hints
+have come in and exit:
 
 ```sh
 APP_SWITCHER_SMOKE_TEST=1 APP_SWITCHER_SMOKE_INDEX=3 APP_SWITCHER_SMOKE_FILTER=1 \
@@ -274,15 +274,16 @@ APP_SWITCHER_SMOKE_TEST=1 APP_SWITCHER_SMOKE_INDEX=3 APP_SWITCHER_SMOKE_FILTER=1
 ```
 
 `APP_SWITCHER_SMOKE_INDEX` picks the selected app (default 1),
-`APP_SWITCHER_SMOKE_FILTER=1/0` writes the filter preference before showing the
-panel, `APP_SWITCHER_SMOKE_WINDOWS=1` lists the frontmost app's windows instead of
-the apps (pick an index below their count) and `APP_SWITCHER_SMOKE_DARK=1` swaps the
-gradient behind the panel for a dark one. The line starting `smoke: dockBadges=` shows
-what the Dock reported (by bundle URL), `dockReadMs` how long that read took just before
-the list was loaded, whether the switch is on, and the badges the listed apps got (by
-name). The capture is a screen-region capture of
-our own windows, so it needs no Screen Recording permission but only shows the
-desktop and this app; the window thumbnails need Screen Recording for the terminal
-running it. A gradient window is put behind the panel first, so the glass has
-something to blur. The smoke test, `AppSwitcherSmokeTest`, runs from the feature's start, so the App Switcher
-toggle must be on.
+`APP_SWITCHER_SMOKE_FILTER=1/0` writes the filter preference before showing the panel,
+`APP_SWITCHER_SMOKE_WINDOWS=1` lists the frontmost app's windows instead of the apps
+(pick an index below their count) and `APP_SWITCHER_SMOKE_DARK=1` swaps the gradient
+behind the panel for a dark one. The line starting `smoke: dockBadges=` shows what the
+Dock reported (by bundle URL), `dockReadMs` how long that read took, whether the switch
+is on, and the badges the listed apps got (by name). The smoke test reads the Dock
+itself just before the list is loaded, whatever the switch says, so with the switch on
+the Dock is read twice and `dockReadMs` times the first read. The capture is a
+screen-region capture of our own windows, so it needs no Screen Recording permission but
+only shows the desktop and this app; the window thumbnails need Screen Recording for the
+terminal running it. A gradient window is put behind the panel first, so the glass has
+something to blur. The smoke test, `AppSwitcherSmokeTest`, runs from the feature's
+start, so the App Switcher toggle must be on.

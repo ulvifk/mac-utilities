@@ -6,7 +6,7 @@ final class IconCellView: SwitcherCellView {
     let icon = NSImageView()
     let dot = NSView()
     /// Nil for an app without a badge.
-    private(set) var dockBadge: DockBadgeView?
+    private var dockBadge: DockBadgeView?
 
     convenience init(app: SwitcherApp, badgeText: String?, cardGlass: GlassStore?) {
         self.init(frame: .zero)
@@ -29,8 +29,9 @@ final class IconCellView: SwitcherCellView {
         addSubview(icon)
         addSubview(dot)
         if let badgeText {
-            dockBadge = buildDockBadge(text: badgeText)
-            addSubview(dockBadge!)
+            let badge = buildDockBadge(text: badgeText)
+            addSubview(badge)
+            dockBadge = badge
         }
 
         card.updateGlass(cardGlass)

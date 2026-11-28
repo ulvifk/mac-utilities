@@ -94,12 +94,20 @@ final class AppSwitcherTestHarness {
 
 extension SwitcherState {
     var bundleIdentifiers: [String] {
-        guard case .apps(let apps, _) = list.items else { return [] }
+        guard case .apps(let apps, _, _) = list.items else { return [] }
         return apps.map { $0.bundleIdentifier }
     }
 
     var windowIDs: [CGWindowID] {
         guard case .windows(let windows, _) = list.items else { return [] }
         return windows.map { $0.windowID }
+    }
+}
+
+extension SwitcherList {
+    /// [processIdentifier] -> Dock badge text of the listed apps; empty while windows are listed.
+    var appBadges: [pid_t: String] {
+        guard case .apps(_, _, let badges) = items else { return [:] }
+        return badges
     }
 }

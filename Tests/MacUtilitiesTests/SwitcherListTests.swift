@@ -39,7 +39,7 @@ final class SwitcherListTests {
 
     @Test
     func removingTheOnlyAppLeavesAnEmptyList() {
-        let list = SwitcherList(items: .apps([workspace.buildApp(index: 0)], whitelistOnly: true), cellsPerRow: 1)
+        let list = SwitcherList(items: .apps([workspace.buildApp(index: 0)], whitelistOnly: true, badges: [:]), cellsPerRow: 1)
 
         let remaining = list.removingApp(at: 0)
 
@@ -228,15 +228,10 @@ final class SwitcherListTests {
     }
 
     @Test
-    func listChangesKeepTheBadges() {
-        let list = SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false), cellsPerRow: 5, appBadges: [0: "3", 2: "•"])
+    func removingAnAppTakesItsBadgeAlong() {
+        let list = SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false, badges: [0: "3", 1: "5", 2: "•"]), cellsPerRow: 5)
 
-        #expect(list.selecting(3).appBadges == list.appBadges)
-        #expect(list.advancing(by: 1).appBadges == list.appBadges)
-        #expect(list.movingBetweenRows(up: true).appBadges == list.appBadges)
-        #expect(list.rewrapping(cellsPerRow: 2).appBadges == list.appBadges)
-        #expect(list.removingApp(at: 1).appBadges == list.appBadges)
-        #expect(list.selectingApp(processIdentifier: 2).appBadges == list.appBadges)
+        #expect(list.removingApp(at: 1).appBadges == [0: "3", 2: "•"])
     }
 
     // MARK: helpers
@@ -246,7 +241,7 @@ final class SwitcherListTests {
     }
 
     private func buildAppList(cellsPerRow: Int) -> SwitcherList {
-        return SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false), cellsPerRow: cellsPerRow)
+        return SwitcherList(items: .apps(workspace.runningApps, whitelistOnly: false, badges: [:]), cellsPerRow: cellsPerRow)
     }
 
     private func buildLoader(defaults: UserDefaults) -> SwitcherListLoader {
@@ -255,12 +250,12 @@ final class SwitcherListTests {
     }
 
     private func getBundleIdentifiers(_ list: SwitcherList) -> [String] {
-        guard case .apps(let apps, _) = list.items else { return [] }
+        guard case .apps(let apps, _, _) = list.items else { return [] }
         return apps.map { $0.bundleIdentifier }
     }
 
     private func getProcessIdentifiers(_ list: SwitcherList) -> [pid_t] {
-        guard case .apps(let apps, _) = list.items else { return [] }
+        guard case .apps(let apps, _, _) = list.items else { return [] }
         return apps.map { $0.processIdentifier }
     }
 }

@@ -22,9 +22,9 @@ final class SwitcherListLoader {
         let apps = getRunningAppsByRecency()
         let whitelistedApps = getWhitelistedApps(apps)
         let listedApps = whitelistedApps.isEmpty ? apps : whitelistedApps
-        let items = SwitcherItems.apps(listedApps, whitelistOnly: !whitelistedApps.isEmpty)
+        let items = SwitcherItems.apps(listedApps, whitelistOnly: !whitelistedApps.isEmpty, badges: getAppBadges(listedApps))
 
-        return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items), appBadges: getAppBadges(listedApps))
+        return SwitcherList(items: items, cellsPerRow: getCellsPerRow(for: items))
     }
 
     /// Whatever the whitelist and the filter say.

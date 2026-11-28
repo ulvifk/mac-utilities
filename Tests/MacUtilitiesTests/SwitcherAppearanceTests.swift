@@ -223,8 +223,11 @@ final class SwitcherAppearanceTests {
         #expect(unbadgedCell.subviews.allSatisfy { !($0 is DockBadgeView) }, "An app without a badge shows one")
         #expect(circle.frame.width == circle.frame.height, "One character is not a circle")
         #expect(capsule.frame.width > capsule.frame.height, "Two characters did not widen the badge")
-        for badge in [circle, capsule] {
+        for (cell, badge) in [(circleCell, circle), (capsuleCell, capsule)] {
             #expect(!badge.isHidden && badge.alphaValue == 1, "Badge is not visible")
+            #expect(cell.subviews.last === badge, "Badge is drawn below the icon")
+            #expect(badge.layer?.backgroundColor == NSColor.systemRed.cgColor, "Badge is not red")
+            #expect(try getLabel(of: badge).textColor == .white, "Badge text is not white")
             #expect(circleCell.bounds.contains(badge.frame), "Badge leaves its cell")
             #expect(badge.frame.maxX == iconCardFrameInCell.maxX && badge.frame.maxY == iconCardFrameInCell.maxY, "Badge is not at the icon's top right")
             #expect(!badge.frame.intersects(circleCell.dot.frame), "Badge covers the whitelist dot")
@@ -245,6 +248,22 @@ final class SwitcherAppearanceTests {
         #expect(badge.frame.width == dockBadgeMaxWidth, "Long text widened the badge past its maximum")
         #expect(label.fittingSize.width > label.frame.width, "Long text fits, so nothing is truncated")
         #expect(label.lineBreakMode == .byTruncatingTail, "Long text is cut off without an ellipsis")
+    }
+
+    /// With only the whitelist listed, an app taken off it turns gray, but its badge stays red: the count is still true.
+    @Test
+    func badgeStaysRedOnAGrayIcon() throws {
+        let apps = [workspace.buildApp(index: 0), workspace.buildApp(index: 1)]
+        let content = SwitcherPanelContent()
+        content.rebuild(state: buildState(apps: apps, appBadges: [0: "3"], cardGlass: nil, whitelistOnly: true, whitelisted: ["test.app.1"]),
+                        glassStore: panelGlass, showsHintsAtOnce: false)
+        let cell = try getIconCell(in: content, at: 0)
+        let badge = try getDockBadge(in: cell)
+
+        #expect(!(cell.icon.contentFilters.isEmpty), "Icon taken off the whitelist is not gray")
+        #expect(badge.contentFilters.isEmpty, "Badge turned gray with its icon")
+        #expect(badge.layer?.backgroundColor == NSColor.systemRed.cgColor, "Badge is not red")
+        #expect(!badge.isHidden && badge.alphaValue == 1, "Badge is not visible")
     }
 
     /// The badge dims with its hidden app's icon, and comes back with it.
@@ -352,7 +371,7 @@ final class SwitcherAppearanceTests {
     private func buildState(listingWindows: Bool, cardGlass: GlassStore?, selectedIndex: Int = 0, itemCount: Int = 2) -> SwitcherState {
         let items = listingWindows
             ? SwitcherItems.windows((0..<itemCount).map { workspace.buildWindow(windowID: CGWindowID($0 + 1)) }, of: workspace.buildApp(index: 0))
-            : .apps((0..<itemCount).map { workspace.buildApp(index: $0) }, whitelistOnly: false)
+            : .apps((0..<itemCount).map { workspace.buildApp(index: $0) }, whitelistOnly: false, badges: [:])
 
         return SwitcherState(
             list: SwitcherList(items: items, cellsPerRow: itemCount, selectedIndex: selectedIndex),
@@ -366,7 +385,7 @@ final class SwitcherAppearanceTests {
 
     private func buildState(apps: [SwitcherFakeApp], dimHiddenApps: Bool, whitelisted: Set<String>) -> SwitcherState {
         return SwitcherState(
-            list: SwitcherList(items: .apps(apps, whitelistOnly: false), cellsPerRow: apps.count),
+            list: SwitcherList(items: .apps(apps, whitelistOnly: false, badges: [:]), cellsPerRow: apps.count),
             thumbnails: [:],
             cardGlass: nil,
             isFilterEnabled: false,
@@ -375,14 +394,16 @@ final class SwitcherAppearanceTests {
         )
     }
 
-    private func buildState(apps: [SwitcherFakeApp], appBadges: [pid_t: String], cardGlass: GlassStore?, whitelistOnly: Bool) -> SwitcherState {
+    /// Every app whitelisted unless whitelisted says otherwise.
+    private func buildState(apps: [SwitcherFakeApp], appBadges: [pid_t: String], cardGlass: GlassStore?, whitelistOnly: Bool,
+                            whitelisted: Set<String>? = nil) -> SwitcherState {
         return SwitcherState(
-            list: SwitcherList(items: .apps(apps, whitelistOnly: whitelistOnly), cellsPerRow: apps.count, appBadges: appBadges),
+            list: SwitcherList(items: .apps(apps, whitelistOnly: whitelistOnly, badges: appBadges), cellsPerRow: apps.count),
             thumbnails: [:],
             cardGlass: cardGlass,
             isFilterEnabled: whitelistOnly,
             dimHiddenApps: true,
-            whitelisted: Set(apps.map { $0.bundleIdentifier })
+            whitelisted: whitelisted ?? Set(apps.map { $0.bundleIdentifier })
         )
     }
 
@@ -398,8 +419,12 @@ final class SwitcherAppearanceTests {
         return badges[0]
     }
 
+    private func getLabel(of badge: DockBadgeView, sourceLocation: SourceLocation = #_sourceLocation) throws -> NSTextField {
+        return try #require(badge.subviews.first as? NSTextField, "The badge has no text", sourceLocation: sourceLocation)
+    }
+
     private func getText(of badge: DockBadgeView, sourceLocation: SourceLocation = #_sourceLocation) throws -> String {
-        return try #require(badge.subviews.first as? NSTextField, "The badge has no text", sourceLocation: sourceLocation).stringValue
+        return try getLabel(of: badge, sourceLocation: sourceLocation).stringValue
     }
 
     private func buildSettingsWindow() -> NSWindow {
