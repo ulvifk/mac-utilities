@@ -35,7 +35,7 @@ final class HotkeyBindingsStoreTests {
 
         let edited = [buildBinding(target: "edited")]
         try writeInPlace(JSONEncoder().encode(edited))
-        try await waitForWatcher { store.bindings == edited }
+        try await waitForOutsideEvent { store.bindings == edited }
         #expect(store.loadError == nil)
     }
 
@@ -46,11 +46,11 @@ final class HotkeyBindingsStoreTests {
 
         let replaced = [buildBinding(target: "replaced")]
         try writeBindings(replaced, options: .atomic)
-        try await waitForWatcher { store.bindings == replaced }
+        try await waitForOutsideEvent { store.bindings == replaced }
 
         let edited = [buildBinding(target: "edited after replacement")]
         try writeInPlace(JSONEncoder().encode(edited))
-        try await waitForWatcher { store.bindings == edited }
+        try await waitForOutsideEvent { store.bindings == edited }
     }
 
     @Test @MainActor
@@ -61,11 +61,11 @@ final class HotkeyBindingsStoreTests {
 
         let created = [buildBinding(target: "created")]
         try writeBindings(created)
-        try await waitForWatcher { store.bindings == created }
+        try await waitForOutsideEvent { store.bindings == created }
 
         let edited = [buildBinding(target: "edited after creation")]
         try writeInPlace(JSONEncoder().encode(edited))
-        try await waitForWatcher { store.bindings == edited }
+        try await waitForOutsideEvent { store.bindings == edited }
     }
 
     @Test @MainActor
@@ -75,12 +75,12 @@ final class HotkeyBindingsStoreTests {
         let store = HotkeyBindingsStore()
 
         try writeInPlace(Data("[".utf8))
-        try await waitForWatcher { store.loadError != nil }
+        try await waitForOutsideEvent { store.loadError != nil }
         #expect(store.bindings == original)
 
         let edited = [buildBinding(target: "recovered")]
         try writeInPlace(JSONEncoder().encode(edited))
-        try await waitForWatcher { store.bindings == edited }
+        try await waitForOutsideEvent { store.bindings == edited }
         #expect(store.loadError == nil)
     }
 
@@ -92,7 +92,7 @@ final class HotkeyBindingsStoreTests {
 
         let edited = [buildBinding(target: "recovered")]
         try writeInPlace(JSONEncoder().encode(edited))
-        try await waitForWatcher { store.bindings == edited }
+        try await waitForOutsideEvent { store.bindings == edited }
         #expect(store.loadError == nil)
     }
 
@@ -104,7 +104,7 @@ final class HotkeyBindingsStoreTests {
 
         let external = buildBinding(target: "external")
         try writeInPlace(JSONEncoder().encode([original, external]))
-        try await waitForWatcher { store.bindings == [original, external] }
+        try await waitForOutsideEvent { store.bindings == [original, external] }
 
         let added = buildBinding(target: "added in settings")
         store.add(added)
@@ -118,16 +118,16 @@ final class HotkeyBindingsStoreTests {
         let store = HotkeyBindingsStore()
 
         try FileManager.default.removeItem(at: hotkeysURL)
-        try await waitForWatcher { store.bindings.isEmpty }
+        try await waitForOutsideEvent { store.bindings.isEmpty }
         #expect(store.loadError == nil)
 
         let recreated = [buildBinding(target: "recreated")]
         try writeBindings(recreated)
-        try await waitForWatcher { store.bindings == recreated }
+        try await waitForOutsideEvent { store.bindings == recreated }
 
         let edited = [buildBinding(target: "edited after recreation")]
         try writeInPlace(JSONEncoder().encode(edited))
-        try await waitForWatcher { store.bindings == edited }
+        try await waitForOutsideEvent { store.bindings == edited }
     }
 
     @Test @MainActor
@@ -141,7 +141,7 @@ final class HotkeyBindingsStoreTests {
 
         store = nil
         #expect(releasedStore == nil)
-        try await waitForWatcher { try hasNoWatcherDescriptors() }
+        try await waitForOutsideEvent { try hasNoWatcherDescriptors() }
     }
 
     private var hotkeysURL: URL {
@@ -184,18 +184,5 @@ final class HotkeyBindingsStoreTests {
         if try !getOpenDescriptors(for: hotkeysURL.deletingLastPathComponent()).isEmpty { return false }
         if try !getOpenDescriptors(for: hotkeysURL).isEmpty { return false }
         return true
-    }
-
-    /// Waits until the condition holds after a change on disk, which reaches the store from the kernel through a dispatch source.
-    @MainActor
-    private func waitForWatcher(_ condition: () throws -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
-        let deadline = ContinuousClock.now.advanced(by: outsideEventTimeLimit)
-        while try !condition() {
-            if ContinuousClock.now >= deadline {
-                Issue.record("Timed out waiting for the hotkey file change", sourceLocation: sourceLocation)
-                return
-            }
-            try await Task.sleep(for: .milliseconds(10))
-        }
     }
 }

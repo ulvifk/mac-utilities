@@ -86,7 +86,7 @@ struct AppSwitcherOpenPanelTests {
 
         #expect(!harness.panel.isVisible, "Switcher stayed open on the quit app's windows")
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.expectNoActivation()
         await harness.finish()
     }
@@ -99,7 +99,7 @@ struct AppSwitcherOpenPanelTests {
 
         #expect(harness.panel.isVisible, "Another app's quit closed the window list")
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.expectActivation(listingWindows: true, selection: 1)
         await harness.finish()
     }
@@ -111,12 +111,12 @@ struct AppSwitcherOpenPanelTests {
         let harness = await openAppSwitcher()
 
         harness.press(wKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.settings.whitelistStore.isListed("test.app.1"), "Cmd+W did not whitelist the selected app")
         #expect(harness.log.updatedStates.last!.whitelisted == ["test.app.1"], "Cmd+W did not mark the app")
 
         harness.press(wKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(!harness.settings.whitelistStore.isListed("test.app.1"), "Second Cmd+W did not take the app off the whitelist")
         #expect(harness.log.updatedStates.last!.whitelisted.isEmpty, "Second Cmd+W did not unmark the app")
         #expect(getFeedbackTexts(harness) == [SwitcherFeedback.addedToWhitelist.text, SwitcherFeedback.removedFromWhitelist.text], "Wrong whitelist feedback")
@@ -129,7 +129,7 @@ struct AppSwitcherOpenPanelTests {
         let harness = await openAppSwitcher()
 
         harness.press(hKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.workspace.hiddenBundleIdentifiers == ["test.app.1"], "Cmd+H did not hide the selected app")
         #expect(getFeedbackTexts(harness) == [SwitcherFeedback.hidden.text], "Cmd+H feedback was lost")
 
@@ -138,7 +138,7 @@ struct AppSwitcherOpenPanelTests {
         #expect(harness.log.updatedStates.count == 1, "Hidden app was not redrawn")
 
         harness.press(hKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.workspace.hiddenBundleIdentifiers == ["test.app.1"], "Second Cmd+H hid the app again")
         #expect(harness.log.feedback.count == 1, "Second Cmd+H showed feedback")
         #expect(harness.panel.isVisible, "Cmd+H closed the switcher")
@@ -150,7 +150,7 @@ struct AppSwitcherOpenPanelTests {
         let harness = await openAppSwitcher()
 
         harness.press(qKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.quitBundleIdentifiers == ["test.app.1"], "Cmd+Q did not quit the selected app")
         #expect(getFeedbackTexts(harness) == [SwitcherFeedback.quittingApp(name: "Test App").text], "Cmd+Q feedback was lost")
@@ -162,7 +162,7 @@ struct AppSwitcherOpenPanelTests {
     func appShortcutsDoNothingWhileListingWindows() async {
         let harness = AppSwitcherTestHarness()
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.press(wKeyCode)
         harness.press(fKeyCode)
@@ -170,7 +170,7 @@ struct AppSwitcherOpenPanelTests {
         harness.press(qKeyCode)
         harness.press(qKeyCode, modifiers: [.maskCommand, .maskShift])
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.settings.whitelistStore.getWhitelist().isEmpty, "Cmd+W changed the whitelist")
         #expect(!harness.settings.whitelistStore.isFilterEnabled, "Cmd+F changed the filter")
@@ -192,7 +192,7 @@ struct AppSwitcherOpenPanelTests {
         let harness = AppSwitcherTestHarness(itemCount: 5)
         harness.settings.panelWidthStore.setWidth(Self.threeAppCellWidth)
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.shownStates.last!.list.cellsPerRow == 3, "Panel width did not give three apps to a row")
 
         harness.press(rightArrowKeyCode)
@@ -214,7 +214,7 @@ struct AppSwitcherOpenPanelTests {
     func arrowsAndSwitchingMoveTheWindowSelection() async {
         let harness = AppSwitcherTestHarness()
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.press(graveKeyCode)
         harness.press(graveKeyCode, modifiers: [.maskCommand, .maskShift])
@@ -223,7 +223,7 @@ struct AppSwitcherOpenPanelTests {
 
         #expect(harness.log.updatedStates.map { $0.list.selectedIndex } == [2, 1, 2, 0], "Wrong selection steps")
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.expectActivation(listingWindows: true, selection: 0)
         await harness.finish()
     }
@@ -234,10 +234,10 @@ struct AppSwitcherOpenPanelTests {
     func clickActivatesTheCell(listingWindows: Bool) async {
         let harness = AppSwitcherTestHarness()
         harness.press(listingWindows ? graveKeyCode : tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.panel.onCellClicked(2)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(!harness.panel.isVisible, "Click left the switcher open")
         harness.expectActivation(listingWindows: listingWindows, selection: 2)
@@ -251,7 +251,7 @@ struct AppSwitcherOpenPanelTests {
         harness.press(escapeKeyCode, modifiers: [])
 
         harness.panel.onCellClicked(2)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.expectNoActivation()
         await harness.finish()
@@ -294,7 +294,7 @@ struct AppSwitcherOpenPanelTests {
         let harness = AppSwitcherTestHarness(itemCount: itemCount)
 
         harness.press(tabKeyCode, modifiers: backward ? [.maskCommand, .maskShift] : .maskCommand)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         return harness
     }
@@ -304,7 +304,7 @@ struct AppSwitcherOpenPanelTests {
         let harness = AppSwitcherTestHarness()
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         return harness
     }

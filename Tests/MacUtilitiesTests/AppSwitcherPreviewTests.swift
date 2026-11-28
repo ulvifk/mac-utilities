@@ -14,7 +14,7 @@ struct AppSwitcherPreviewTests {
         harness.settings.appGlassStore.objectWillChange.send()
         harness.feature.stop(because: .switchedOff)
         harness.feature.start()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 1, "Stopped look change showed a preview")
         #expect(!harness.previewPanel.isVisible, "Stop left the preview visible")
@@ -30,7 +30,7 @@ struct AppSwitcherPreviewTests {
         harness.settings.appGlassStore.objectWillChange.send()
         harness.press(tabKeyCode)
         harness.press(escapeKeyCode, modifiers: [])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 2, "Canceled opening did not restore only the checked preview")
         #expect(harness.log.glassUpdatedStates.isEmpty, "Old look change changed the restored preview")
@@ -46,7 +46,7 @@ struct AppSwitcherPreviewTests {
         harness.press(tabKeyCode)
         harness.settings.windowGlassStore.objectWillChange.send()
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.count == 2, "Quick switching did not restore only the checked preview")
         #expect(harness.log.shownStates.last!.list.isListingWindows, "Quick switching did not restore the selected preview mode")
@@ -61,7 +61,7 @@ struct AppSwitcherPreviewTests {
         let oldCapture = harness.screen.thumbnailRequests[0]
 
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         oldCapture.onCaptured(0, NSImage(size: NSSize(width: 1, height: 1)))
 
         #expect(!harness.previewPanel.isVisible, "Opening kept the preview visible")
@@ -91,7 +91,7 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview(listingWindows: true)
 
         harness.settings.windowGlassStore.objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.screen.thumbnailRequests[0].onCaptured(0, NSImage(size: NSSize(width: 2, height: 2)))
 
         #expect(harness.log.updatedStates.count == 1, "Continuous preview lost its capture")
@@ -110,7 +110,7 @@ struct AppSwitcherPreviewTests {
 
         for _ in 0..<20 {
             store.objectWillChange.send()
-            await harness.drainMainQueue()
+            await letMainQueueRun()
         }
 
         #expect(harness.workspace.runningAppQueryCount == 1, "Slider repeated running app queries")
@@ -131,9 +131,9 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview(listingWindows: listingWindows)
 
         cards.setShowsCards(true)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         cardGlass.objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.runningAppQueryCount == 1, "Card changes repeated app queries")
         #expect(harness.workspace.windowQueryProcessIdentifiers.count == (listingWindows ? 1 : 0), "Card changes repeated window queries")
@@ -143,7 +143,7 @@ struct AppSwitcherPreviewTests {
         #expect(harness.screen.thumbnailRequests.count == (listingWindows ? 1 : 0), "Card changes repeated thumbnail capture")
 
         cards.setShowsCards(false)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.glassUpdatedStates.last!.cardGlass == nil, "Cards-off did not clear the mode's card glass")
         await harness.finish()
     }
@@ -192,7 +192,7 @@ struct AppSwitcherPreviewTests {
 
         harness.workspace.windows = [harness.workspace.buildWindow(windowID: 9)]
         harness.settings.windowGlassStore.objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.shownStates.last!.windowIDs == [9], "Next preview did not recover after an empty list")
         #expect(harness.workspace.windowQueryProcessIdentifiers.count == 2, "Next preview did not reload after an empty list")
         await harness.finish()
@@ -205,7 +205,7 @@ struct AppSwitcherPreviewTests {
 
         harness.workspace.runningApps = [harness.workspace.buildApp(index: 9)]
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(!harness.previewPanel.isVisible, "Normal switcher kept its preview visible")
         #expect(harness.workspace.runningAppQueryCount == 2, "Normal switcher reused preview candidates")
@@ -223,15 +223,15 @@ struct AppSwitcherPreviewTests {
         #expect(harness.workspace.runningAppQueryCount == 1, "Idle preview reloaded apps")
 
         harness.settings.previewStore.isShown = false
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(!harness.previewPanel.isVisible, "Unchecked preview stayed visible")
         harness.settings.appGlassStore.objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(!harness.previewPanel.isVisible, "Appearance changes reopened an unchecked preview")
 
         harness.workspace.runningApps = [harness.workspace.buildApp(index: 9)]
         harness.settings.previewStore.isShown = true
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.workspace.runningAppQueryCount == 2, "New preview did not reload after being unchecked")
         #expect(harness.log.shownStates.last!.bundleIdentifiers == ["test.app.9"], "New preview kept candidates from before being unchecked")
@@ -245,7 +245,7 @@ struct AppSwitcherPreviewTests {
         harness.feature.settingsWindowChanged(harness.settingsWindow)
         harness.settings.appGlassStore.objectWillChange.send()
         harness.settings.windowGlassStore.objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.isEmpty, "Unchecked settings opened a preview")
         #expect(harness.workspace.runningAppQueryCount == 0, "Unchecked settings queried preview apps")
@@ -261,7 +261,7 @@ struct AppSwitcherPreviewTests {
         harness.settings.windowGlassStore.objectWillChange.send()
         harness.feature.settingsWindowChanged(nil)
         harness.feature.settingsWindowChanged(harness.settingsWindow)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         oldCapture.onCaptured(0, NSImage(size: NSSize(width: 1, height: 1)))
 
         #expect(!harness.settings.previewStore.isShown, "Settings reopening kept preview checked")
@@ -278,7 +278,7 @@ struct AppSwitcherPreviewTests {
         harness.feature.settingsWindowChanged(harness.settingsWindow)
         harness.settings.previewStore.isShown = true
         harness.feature.settingsWindowChanged(nil)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.log.shownStates.isEmpty, "Queued checkbox showed a preview after close")
         #expect(!harness.settings.previewStore.isShown, "Close left the queued checkbox checked")
@@ -291,7 +291,7 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview(listingWindows: listingWindows)
 
         (listingWindows ? harness.settings.appGlassStore : harness.settings.windowGlassStore).objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.settings.previewStore.isListingWindows == listingWindows, "Other settings changed the picker")
         #expect(harness.log.glassUpdatedStates.last!.list.isListingWindows == listingWindows, "Other settings changed the preview mode")
@@ -306,12 +306,12 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview(listingWindows: listingWindows)
 
         harness.press(listingWindows ? tabKeyCode : graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(!harness.previewPanel.isVisible, "Switching kept the preview visible")
         #expect(harness.log.shownStates.last!.list.isListingWindows != listingWindows, "Preview replaced the switcher's list")
 
         harness.press(escapeKeyCode, modifiers: [])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(harness.previewPanel.isVisible, "Cancel did not restore the checked preview")
         #expect(harness.log.shownStates.count == 3, "Cancel rebuilt more than one preview")
@@ -326,9 +326,9 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview(listingWindows: listingWindows)
 
         harness.press(listingWindows ? tabKeyCode : graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.expectActivation(listingWindows: !listingWindows, selection: 1)
         #expect(harness.previewPanel.isVisible, "Activation did not restore the checked preview")
@@ -344,7 +344,7 @@ struct AppSwitcherPreviewTests {
 
         harness.press(graveKeyCode)
         if !releaseWhileOpening {
-            await harness.drainMainQueue()
+            await letMainQueueRun()
         }
 
         let runningAppQueriesBeforeActivation = harness.workspace.runningAppQueryCount
@@ -359,7 +359,7 @@ struct AppSwitcherPreviewTests {
         }
 
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.expectActivation(listingWindows: true, selection: 1)
         #expect(harness.previewPanel.isVisible, "Window activation did not restore the checked preview")
@@ -377,16 +377,16 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.press(escapeKeyCode, modifiers: [])
         harness.press(graveKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         #expect(!harness.previewPanel.isVisible, "Old cancel restored preview over a new switcher")
         #expect(harness.log.shownStates.count == 3, "Old cancel opened extra panels")
         #expect(harness.log.shownStates.last!.list.isListingWindows, "Old cancel replaced the new list")
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.expectActivation(listingWindows: true, selection: 1)
         await harness.finish()
     }
@@ -397,10 +397,10 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview(listingWindows: true)
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         harness.feature.settingsWindowChanged(nil)
         harness.releaseCommand()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
 
         harness.expectActivation(listingWindows: false, selection: 1)
         #expect(!harness.previewPanel.isVisible, "Closing settings restored preview after activation")
@@ -414,13 +414,13 @@ struct AppSwitcherPreviewTests {
         await harness.showPreview()
 
         harness.press(tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         await harness.setPreviewMode(listingWindows: true)
         #expect(!harness.previewPanel.isVisible, "Picker reopened preview during switching")
         #expect(!harness.log.shownStates.last!.list.isListingWindows, "Picker changed the active switcher's list")
 
         harness.press(escapeKeyCode, modifiers: [])
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.shownStates.last!.list.isListingWindows, "Cancel did not use the selected preview mode")
         harness.expectNoActivation()
         await harness.finish()
@@ -448,7 +448,7 @@ struct AppSwitcherPreviewTests {
         let preview = harness.log.shownStates.last!
 
         harness.press(listingWindows ? graveKeyCode : tabKeyCode)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         let switcher = harness.log.shownStates.last!
 
         #expect(preview.bundleIdentifiers == switcher.bundleIdentifiers, "Preview app list differs from Cmd+Tab")
@@ -469,7 +469,7 @@ struct AppSwitcherPreviewTests {
         #expect(harness.settings.previewStore.isShown, "Focus loss cleared the preview preference")
 
         harness.settings.appGlassStore.objectWillChange.send()
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(!harness.previewPanel.isVisible, "Appearance change reopened an unfocused preview")
 
         harness.settingsWindow.hasFocus = true
@@ -499,12 +499,12 @@ struct AppSwitcherPreviewTests {
 
         whitelist.setListed("test.app.2", true)
         whitelist.setFilterEnabled(true)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.shownStates.last!.bundleIdentifiers == ["test.app.2"], "Preview ignored the filter or whitelist")
         #expect(harness.log.shownStates.last!.list.items.isWhitelistOnly, "Preview omitted the whitelist badge")
 
         whitelist.setFilterEnabled(false)
-        await harness.drainMainQueue()
+        await letMainQueueRun()
         #expect(harness.log.shownStates.last!.list.count == 3, "Preview did not restore all apps")
         await harness.finish()
     }

@@ -216,7 +216,7 @@ struct KeepAwakeFeatureTests {
             await feature.prepareForTermination()
             didFinishTermination = true
         }
-        await Task.yield()
+        await letMainQueueRun()
         #expect(!didFinishTermination, "Termination abandoned an in-flight activation")
 
         feature.turnOn(for: .oneHour)
@@ -257,7 +257,7 @@ struct KeepAwakeFeatureTests {
             await feature.prepareForTermination()
             didFinishTermination = true
         }
-        await Task.yield()
+        await letMainQueueRun()
         #expect(!didFinishTermination, "Termination discarded an in-flight restore")
 
         try await harness.completeCommand(disabled: false)
@@ -288,5 +288,26 @@ struct KeepAwakeFeatureTests {
         }
         try await waitUntil { didFinishCleanup || !power.pendingCommands.isEmpty }
         #expect(power.commandHistory.isEmpty, "Quit ran a power command")
+    }
+
+    /// Quit handed a failed restoration to the watchdog; unplugging or changing a preference afterwards must not try again.
+    @Test(arguments: [false, true])
+    func conditionChangesAfterQuitRunNoCommand(changesPreference: Bool) async throws {
+        let harness = KeepAwakeHarness()
+        let power = harness.power
+        let feature = harness.buildFeature()
+        try await harness.activate(feature)
+
+        let termination = Task { await feature.prepareForTermination() }
+        try await harness.completeCommand(disabled: false, succeeds: false)
+        try await waitForResult(of: termination)
+
+        if changesPreference {
+            harness.preferences.setOnlyWhileConnectedToPower(true)
+        } else {
+            power.setExternalPowerConnected(false)
+        }
+        await letMainQueueRun()
+        #expect(power.commandHistory == [true, false], "A condition change after Quit ran a power command")
     }
 }

@@ -36,13 +36,13 @@ struct SystemAudioInputTests {
         }
         try await waitUntil { hardware.requestedDeviceID == 20 }
 
-        hardware.notify(kAudioHardwarePropertyDevices)
-        for _ in 0..<10 { await Task.yield() }
+        try hardware.notify(kAudioHardwarePropertyDevices)
+        await letMainQueueRun()
         #expect(!completed, "Device-list notification completed a pending selection")
 
         hardware.defaultInputDeviceID = 20
-        hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
-        #expect(await selection.value == noErr)
+        try hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
+        #expect(try await waitForResult(of: selection) == noErr)
         #expect(hardware.listeners.isEmpty)
     }
 
@@ -53,9 +53,9 @@ struct SystemAudioInputTests {
         try await waitUntil { hardware.requestedDeviceID == 20 }
 
         hardware.defaultInputDeviceID = defaultInputDeviceID
-        hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
+        try hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
 
-        #expect(await selection.value == kAudioHardwareIllegalOperationError)
+        #expect(try await waitForResult(of: selection) == kAudioHardwareIllegalOperationError)
         #expect(hardware.defaultInputDeviceID == defaultInputDeviceID)
         #expect(hardware.listeners.isEmpty)
     }
@@ -66,9 +66,9 @@ struct SystemAudioInputTests {
         try await waitUntil { hardware.requestedDeviceID == 20 }
 
         hardware.deviceIDs = [10, 30]
-        hardware.notify(kAudioHardwarePropertyDevices)
+        try hardware.notify(kAudioHardwarePropertyDevices)
 
-        #expect(await selection.value == kAudioHardwareBadDeviceError)
+        #expect(try await waitForResult(of: selection) == kAudioHardwareBadDeviceError)
         #expect(hardware.listeners.isEmpty)
     }
 
@@ -83,8 +83,8 @@ struct SystemAudioInputTests {
         #expect(hardware.listeners.count == 1)
 
         hardware.defaultInputDeviceID = 20
-        hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
-        #expect(await selection.value == noErr)
+        try hardware.notify(kAudioHardwarePropertyDefaultInputDevice)
+        #expect(try await waitForResult(of: selection) == noErr)
         #expect(notifications == 0)
         #expect(hardware.listeners.isEmpty)
     }

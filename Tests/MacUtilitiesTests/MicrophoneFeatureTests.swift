@@ -311,14 +311,14 @@ struct MicrophoneFeatureTests {
         #expect(!didTerminate)
 
         audioInput.completeSelection()
-        await termination.value
+        try await waitForResult(of: termination)
         #expect(didTerminate)
         #expect(audioInput.defaultInputDeviceID == builtIn.id)
         #expect(audioInput.onChange == nil)
 
         feature.start()
         feature.selectInput(iPhone.uid)
-        await Task.yield()
+        await letMainQueueRun()
         #expect(!feature.canSelect)
         #expect(audioInput.onChange == nil)
         #expect(audioInput.selectedDeviceIDs == [iPhone.id, builtIn.id])

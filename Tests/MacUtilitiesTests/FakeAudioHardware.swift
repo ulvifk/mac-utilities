@@ -1,4 +1,5 @@
 import CoreAudio
+import Testing
 @testable import MacUtilities
 
 /// Devices 10, 20 and 30, all live inputs, with 10 the default. A device's UID and name are "input-<id>". A requested default only takes
@@ -50,8 +51,9 @@ final class FakeAudioHardware: AudioHardware {
     }
 
     /// Reports one changed property to the listener, as CoreAudio does.
-    func notify(_ selector: AudioObjectPropertySelector) {
+    func notify(_ selector: AudioObjectPropertySelector, sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let listener = try #require(listeners.first, "Nothing listened for the hardware change", sourceLocation: sourceLocation)
         var address = AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        listeners[0](1, &address)
+        listener(1, &address)
     }
 }

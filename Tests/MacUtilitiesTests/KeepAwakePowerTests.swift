@@ -60,7 +60,7 @@ struct KeepAwakePowerTests {
             feature.toggle(from: .popoverToggle)
         }
         #expect(feature.isWaitingForPower, "Battery activation did not retain the user's enablement")
-        await Task.yield()
+        await letMainQueueRun()
         #expect(feature.session == nil, "Keep Awake activated on battery")
         #expect(power.commandHistory.isEmpty, "Battery activation disabled lid sleep")
         #expect(power.watchdogLaunchCount == 0, "Battery activation launched a watchdog")

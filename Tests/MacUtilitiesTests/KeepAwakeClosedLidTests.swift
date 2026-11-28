@@ -115,7 +115,7 @@ struct KeepAwakeClosedLidTests {
         #expect(feature.session == nil, "Quit did not restore sleep")
         #expect(power.sleepCount == 0, "Quit slept the Mac before its cleanup began")
 
-        await Task { await feature.prepareForTermination() }.value
+        try await waitForResult(of: Task { await feature.prepareForTermination() })
         #expect(power.sleepCount == 0, "Quit slept the Mac")
     }
 
@@ -133,7 +133,7 @@ struct KeepAwakeClosedLidTests {
 
         let termination = Task { await feature.prepareForTermination() }
         try await harness.completeCommand(disabled: false)
-        await termination.value
+        try await waitForResult(of: termination)
         #expect(feature.session == nil, "Quit did not finish the switched-off feature's restoration")
         #expect(power.sleepCount == 0, "Quit slept the Mac")
     }

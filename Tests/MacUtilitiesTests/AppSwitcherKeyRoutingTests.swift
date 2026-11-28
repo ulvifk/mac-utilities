@@ -52,10 +52,10 @@ struct AppSwitcherKeyRoutingTests {
             harness.press(tabKeyCode)
         case .listingApps:
             harness.press(tabKeyCode)
-            await harness.drainMainQueue()
+            await letMainQueueRun()
         case .listingWindows:
             harness.press(graveKeyCode)
-            await harness.drainMainQueue()
+            await letMainQueueRun()
         }
     }
 }

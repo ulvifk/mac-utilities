@@ -37,7 +37,7 @@ final class AppSwitcherTestHarness {
     /// Stops the feature, lets its queued work run out and drops the defaults domain.
     func finish() async {
         feature.stop(because: .switchedOff)
-        await drainMainQueue()
+        await letMainQueueRun()
         defaults.remove()
     }
 
@@ -61,27 +61,18 @@ final class AppSwitcherTestHarness {
         #expect(!feature.handle(type: .flagsChanged, event: event), "Command release must pass through", sourceLocation: sourceLocation)
     }
 
-    /// Runs what the main queue holds now, then what that work queued in turn.
-    func drainMainQueue() async {
-        for _ in 0..<2 {
-            await withCheckedContinuation { continuation in
-                DispatchQueue.main.async { continuation.resume() }
-            }
-        }
-    }
-
     /// The settings pane open and focused with Show preview checked.
     func showPreview(listingWindows: Bool = false) async {
         feature.settingsWindowChanged(settingsWindow)
         settings.previewStore.isListingWindows = listingWindows
-        await drainMainQueue()
+        await letMainQueueRun()
         settings.previewStore.isShown = true
-        await drainMainQueue()
+        await letMainQueueRun()
     }
 
     func setPreviewMode(listingWindows: Bool) async {
         settings.previewStore.isListingWindows = listingWindows
-        await drainMainQueue()
+        await letMainQueueRun()
     }
 
     func expectNoActivation(sourceLocation: SourceLocation = #_sourceLocation) {

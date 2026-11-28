@@ -30,7 +30,7 @@ final class SwitcherSystemWorkspaceTests {
         startObserving()
 
         post(NSWorkspace.didTerminateApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
 
         #expect(terminatedProcessIdentifiers == [app.processIdentifier], "Quit app was not reported by its process identifier")
         #expect(hiddenOrShownCount == 0, "Quit was reported as hidden or shown")
@@ -54,7 +54,7 @@ final class SwitcherSystemWorkspaceTests {
         post(NSWorkspace.didActivateApplicationNotification, about: app)
         post(NSWorkspace.didActivateApplicationNotification, about: otherApp)
         post(NSWorkspace.didActivateApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
 
         #expect(getTrackedTestProcessIdentifiers() == [app.processIdentifier, otherApp.processIdentifier], "Activations were not tracked in order")
         workspace.stopObserving()
@@ -65,11 +65,11 @@ final class SwitcherSystemWorkspaceTests {
         startObserving()
 
         post(NSWorkspace.didActivateApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
         #expect(getTrackedTestProcessIdentifiers() == [app.processIdentifier], "Activated process was not tracked")
 
         post(NSWorkspace.didTerminateApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
         #expect(getTrackedTestProcessIdentifiers().isEmpty, "Quit process kept its place")
         workspace.stopObserving()
     }
@@ -79,7 +79,7 @@ final class SwitcherSystemWorkspaceTests {
     func forgetsProcessesTrackedBeforeARestart() async {
         startObserving()
         post(NSWorkspace.didActivateApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
         workspace.stopObserving()
 
         post(NSWorkspace.didTerminateApplicationNotification, about: app)
@@ -94,11 +94,11 @@ final class SwitcherSystemWorkspaceTests {
         startObserving()
 
         post(NSWorkspace.didHideApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
         #expect(hiddenOrShownCount == 1, "Hidden app was not reported")
 
         post(NSWorkspace.didUnhideApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
         #expect(hiddenOrShownCount == 2, "Shown app was not reported")
         #expect(terminatedProcessIdentifiers.isEmpty, "Hiding or showing was reported as a quit")
         workspace.stopObserving()
@@ -112,7 +112,7 @@ final class SwitcherSystemWorkspaceTests {
         post(NSWorkspace.didTerminateApplicationNotification, about: app)
         post(NSWorkspace.didHideApplicationNotification, about: app)
         post(NSWorkspace.didUnhideApplicationNotification, about: app)
-        await drainMainQueue()
+        await letMainQueueRun()
 
         #expect(terminatedProcessIdentifiers.isEmpty, "Stopped workspace reported a quit")
         #expect(hiddenOrShownCount == 0, "Stopped workspace reported hiding or showing")
@@ -134,12 +134,6 @@ final class SwitcherSystemWorkspaceTests {
     /// As the workspace names the app in each of these notifications.
     private func post(_ name: Notification.Name, about app: NSRunningApplication) {
         NSWorkspace.shared.notificationCenter.post(name: name, object: NSWorkspace.shared, userInfo: [NSWorkspace.applicationUserInfoKey: app])
-    }
-
-    private func drainMainQueue() async {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.main.async { continuation.resume() }
-        }
     }
 }
 

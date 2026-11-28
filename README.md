@@ -250,9 +250,10 @@ Nothing compiles sources by hand. Quitting ends the process, so the termination 
 run the real `NSApplication` in Swift Testing exit tests, child processes of the test
 runner.
 
-Tests wait for work on the main queue with `waitUntil` and `letMainQueueRun` from
-`Tests/MacUtilitiesTests/MainQueueWaiting.swift`. They count main queue turns, not time,
-so a busy machine or a test holding the main thread cannot make a wait fail; the turn
-limit only turns a hang into a failure. Only events from outside the main queue, such as
-a file system notification or a child process, are awaited against the clock, with
-`outsideEventTimeLimit`, which exists for the same reason.
+Tests wait with the helpers in `Tests/MacUtilitiesTests/MainQueueWaiting.swift`. Work on
+the main queue is awaited with `waitUntil`, `waitForResult` and, before checking that
+something did not happen, `letMainQueueRun`. They count main queue turns, not time, so a
+busy machine or a test holding the main thread cannot make a wait fail; the turn limit
+only turns a hang into a failure. Only events from outside the main queue, such as a file
+system notification or a child process, are awaited against the clock, with
+`waitForOutsideEvent`, whose 60-second limit exists for the same reason.
